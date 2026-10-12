@@ -1,0 +1,12 @@
+{
+  "name": "@tickethub/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Next.js web app stub'",
+    "build": "echo 'Next.js web app stub build'"
+  },
+  "dependencies": {
+    "@tickethub/shared": "workspace:*"
+  }
+}
