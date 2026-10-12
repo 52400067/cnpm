@@ -1,41 +1,39 @@
-# Kiến Trúc Hệ Thống (System Architecture)
-**Dự án:** Nền tảng bán vé sự kiện trực tuyến (TicketHub)  
-**Tiêu chuẩn:** Microservices-Ready Modular Monorepo · High-Throughput Concurrency · Zero Double-Booking  
+# Kiến trúc hệ thống
 
----
+Tài liệu này mô tả kiến trúc tổng thể, mô hình phân chia module trong monorepo và các luồng xử lý đồng thời của hệ thống TicketHub.
 
-## 1. Kiến Trúc Tổng Thể (System Architecture Diagram)
+## Kiến trúc tổng thể
 
-Hệ thống được tổ chức theo mô hình **pnpm Monorepo** hiện đại, kết hợp sức mạnh render SEO của Next.js App Router phía Frontend và hiệu năng xử lý cao của NestJS trên nền tảng Fastify phía Backend.
+Hệ thống được thiết kế theo mô hình monorepo, chia tách ứng dụng web và API backend, sử dụng PostgreSQL làm nơi lưu trữ trạng thái giao dịch và Redis làm lớp đệm trung gian.
 
 ```mermaid
 graph TD
-    subgraph Clients["Tầng Client & Người Dùng"]
-        BuyerBrowser["Trình duyệt Người mua\n(Next.js App Router - Web)"]
+    subgraph Clients["Tầng Client"]
+        BuyerBrowser["Trình duyệt Người mua\n(Next.js App Router)"]
         OrganizerDashboard["Bảng điều khiển BTC & Admin\n(Next.js App Router)"]
-        GateStaffPWA["Ứng dụng Soát vé\n(Next.js PWA + Camera Scanner)"]
+        GateStaffPWA["Ứng dụng Soát vé\n(Next.js PWA)"]
     end
 
-    subgraph EdgeLayer["Tầng Biên (Edge & CDN)"]
-        Cloudflare["Cloudflare CDN / WAF / Turnstile CAPTCHA\n(Chống DDoS, Bot & Chặn IP xấu)"]
+    subgraph EdgeLayer["Tầng Biên"]
+        Cloudflare["Cloudflare CDN / WAF / Turnstile CAPTCHA\n(Chặn bot và cân bằng tải)"]
     end
 
-    subgraph AppLayer["Tầng Ứng Dụng (Application Layer)"]
-        WebApp["Web App Frontend Service\n(Next.js 15 / React 19 / TanStack Query)"]
-        API["Backend API Core Service\n(NestJS + Fastify / Drizzle ORM)"]
-        Worker["Background Job Worker\n(BullMQ / Cùng Codebase API)"]
+    subgraph AppLayer["Tầng Ứng dụng"]
+        WebApp["Web App Frontend\n(Next.js / React 19)"]
+        API["Backend API Service\n(NestJS + Fastify)"]
+        Worker["Background Job Worker\n(BullMQ)"]
     end
 
-    subgraph DataLayer["Tầng Dữ Liệu & Hạ Tầng (Infrastructure)"]
-        Postgres[(PostgreSQL 16/17\nNguồn Sự Thật Duy Nhất\nKhóa hàng Row-level Lock)]
-        Redis[(Redis Cluster / Standalone\nCache 60s, Hàng chờ Sorted Set,\nPub/Sub & BullMQ)]
-        Storage[(Cloudflare R2 / AWS S3\nẢnh sự kiện, GPKD, file xuất)]
+    subgraph DataLayer["Tầng Dữ liệu"]
+        Postgres[(PostgreSQL 16/17\nLưu trữ giao dịch, khóa hàng)]
+        Redis[(Redis\nCache, Hàng chờ, Pub/Sub, BullMQ)]
+        Storage[(Cloudflare R2 / AWS S3\nLưu trữ ảnh và tệp)]
     end
 
-    subgraph ExternalServices["Dịch Vụ Bên Ngoài (Third-Party Integrations)"]
-        VNPay["Cổng Thanh Toán VNPay\n(URL Thanh toán, IPN Callback, QueryDR, Hoàn tiền)"]
-        EmailService["Nhà Cung Cấp Email\n(Resend / Amazon SES)"]
-        SMSService["Cổng SMS OTP Trong Nước\n(eSMS / SpeedSMS)"]
+    subgraph ExternalServices["Dịch vụ bên thứ ba"]
+        VNPay["Cổng thanh toán VNPay"]
+        EmailService["Dịch vụ Email (Resend / SES)"]
+        SMSService["Dịch vụ SMS"]
     end
 
     BuyerBrowser --> Cloudflare
@@ -45,129 +43,86 @@ graph TD
     Cloudflare --> WebApp
     Cloudflare --> API
 
-    WebApp -.->|"Server-Side Rendering (SSR)"| API
-    BuyerBrowser -->|"REST API & SSE Stream"| API
+    WebApp -.->|"SSR"| API
+    BuyerBrowser -->|"REST API & SSE"| API
     OrganizerDashboard -->|"REST API"| API
-    GateStaffPWA -->|"Quét QR / Check-in API"| API
+    GateStaffPWA -->|"Soát vé API"| API
 
-    API -->|"Transaction, Khóa hàng, Audit Log"| Postgres
-    API -->|"Sorted Set Queue, Cache, Pub/Sub"| Redis
-    API -->|"Upload Presigned URL"| Storage
-    API -->|"Tạo URL thanh toán, Refund"| VNPay
+    API --> Postgres
+    API --> Redis
+    API --> Storage
+    API --> VNPay
 
-    Worker -->|"Đọc hàng đợi BullMQ & Outbox"| Redis
-    Worker -->|"Cập nhật đơn EXPIRED, hoàn ghế"| Postgres
-    Worker -->|"Gửi email vé, thông báo"| EmailService
-    Worker -->|"Gửi OTP đăng nhập Admin"| SMSService
+    Worker --> Redis
+    Worker --> Postgres
+    Worker --> EmailService
+    Worker --> SMSService
 
-    VNPay -->|"Webhook IPN Chữ Ký HMAC"| API
+    VNPay -->|"Webhook IPN"| API
 ```
 
----
+## Cấu trúc thư mục
 
-## 2. Cấu Trúc Monorepo (Repository Layout)
+Kho mã nguồn sử dụng pnpm workspaces để quản lý các gói:
 
-```
-ticket-hub/
-├── apps/
-│   ├── web/                          # Next.js App Router (Client, BTC, Admin, PWA)
-│   │   ├── app/                      # App router layout & route groups
-│   │   │   ├── (public)/             # Trang chủ, tìm kiếm sự kiện, chi tiết sự kiện
-│   │   │   ├── (buyer)/              # Chọn ghế, checkout, Vé của tôi
-│   │   │   ├── (organizer)/          # Dashboard BTC, tạo sự kiện, báo cáo
-│   │   │   ├── (admin)/              # Dashboard Admin, duyệt sự kiện, đối soát
-│   │   │   └── (gate)/               # Ứng dụng PWA quét vé tại cổng
-│   │   ├── components/               # UI components (shadcn/ui, SeatMap SVG)
-│   │   └── hooks/                    # Custom hooks (SSE, camera scanner, countdown)
-│   │
-│   └── api/                          # NestJS trên nền tảng Fastify
-│       ├── src/
-│       │   ├── modules/
-│       │   │   ├── auth/             # JWT, argon2id, RBAC, Rate-limit
-│       │   │   ├── events/           # Quản lý sự kiện, danh mục, upload ảnh
-│       │   │   ├── seats/            # Sinh sơ đồ ghế, quản lý ghế
-│       │   │   ├── booking/          # Khóa hàng SELECT FOR UPDATE, giữ chỗ 5p
-│       │   │   ├── waiting-room/     # Hàng chờ ảo Redis Sorted Set, admission token
-│       │   │   ├── payment/          # Adapter VNPay, IPN handler, querydr
-│       │   │   ├── ticket/           # Ký số QR Ed25519, phát hành vé
-│       │   │   ├── checkin/          # Soát vé nguyên tử, tra cứu thủ công
-│       │   │   ├── refund/           # Chính sách hoàn vé, gọi refund VNPay
-│       │   │   ├── reporting/        # Materialized views, xuất Excel/CSV
-│       │   │   ├── admin/            # Phê duyệt, Kill Switch, đối soát chi trả
-│       │   │   └── notification/     # Worker BullMQ, outbox email/SMS
-│       │   └── main.ts               # Fastify bootstrap & global guards
-│
-├── packages/
-│   └── shared/                       # Thư viện dùng chung cả Client và Server
-│       ├── src/
-│       │   ├── schemas/              # Zod schemas (Auth, Booking, Event, Payment)
-│       │   ├── types/                # TypeScript types & DTOs
-│       │   └── constants/            # Error codes, Enums, Timeouts
-│
-├── docker-compose.yml                # Chạy PostgreSQL 16 và Redis cho local dev
-├── pnpm-workspace.yaml               # Cấu hình workspace
-└── tsconfig.base.json                # TypeScript strict config dùng chung
-```
+- `apps/web`: Ứng dụng giao diện người dùng xây dựng bằng Next.js App Router, bao gồm trang công khai, trang mua vé, bảng điều khiển ban tổ chức, bảng điều khiển quản trị viên và ứng dụng PWA soát vé.
+- `apps/api`: Dịch vụ backend xây dựng bằng NestJS trên nền tảng Fastify. Các module nghiệp vụ được tách biệt (auth, events, seats, booking, waiting-room, payment, ticket, checkin, refund, reporting, admin, notification).
+- `packages/shared`: Thư viện dùng chung chứa định nghĩa kiểu dữ liệu TypeScript, schema xác thực Zod và hằng số hệ thống.
 
----
+## Các luồng xử lý chính
 
-## 3. Các Luồng Nghiệp Vụ Trọng Yếu (Critical Sequence Diagrams)
+### Giữ chỗ và điều tiết hàng chờ
 
-### 3.1 Luồng Giữ Chỗ Ghế & Hàng Chờ Ảo (UC03 & UC04)
+Khi sự kiện mở bán lượng vé lớn, hàng chờ ảo được kích hoạt để giới hạn số lượng phiên chọn ghế đồng thời không vượt quá ngưỡng `MAX_ACTIVE`.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Buyer as Người mua
-    participant Web as Web Client (Next.js)
+    participant Web as Web Client
     participant Redis as Redis
-    participant API as API Server (Fastify)
+    participant API as API Server
     participant DB as PostgreSQL
     participant Worker as BullMQ Worker
 
-    alt Sự kiện bật Hàng chờ ảo (UC03)
-        Buyer->>Web: Bấm "Mua Vé"
+    alt Sự kiện bật Hàng chờ ảo
+        Buyer->>Web: Nhấn Mua vé
         Web->>API: POST /waiting-room/:eventId/join
         API->>Redis: ZADD event_queue (score = timestamp)
-        API-->>Web: Trả trạng thái QUEUED & Số thứ tự (VD: 142)
-        loop Mỗi 15s gửi Heartbeat
+        API-->>Web: Trả vị trí trong hàng và thời gian chờ dự kiến
+        loop Heartbeat 15 giây/lần
             Web->>API: POST /waiting-room/:eventId/heartbeat
-            API->>Redis: Cập nhật TTL heartbeat
+            API->>Redis: Cập nhật thời điểm kết nối
         end
-        Note over API,Redis: Worker chạy mỗi 5s tính slot trống < MAX_ACTIVE
-        API->>Web: Phát thông báo SSE "Đến lượt bạn" kèm Admission Token (hạn 10p)
+        Note over API,Redis: Job quét cấp admission token cho đầu hàng khi có slot trống
+        API->>Web: SSE báo đến lượt kèm Admission Token (hiệu lực 10 phút)
     end
 
-    Buyer->>Web: Chọn ghế trên sơ đồ SVG & bấm "Giữ chỗ"
-    Web->>API: POST /booking/hold (kèm admission token & Idempotency-Key)
+    Buyer->>Web: Chọn ghế và gửi yêu cầu giữ chỗ
+    Web->>API: POST /booking/hold (kèm Idempotency-Key và admission token)
     API->>DB: BEGIN TRANSACTION
     API->>DB: SELECT id FROM seats WHERE id = ANY($1) ORDER BY id ASC FOR UPDATE
-    Note over API,DB: Khóa hàng theo thứ tự ID để triệt tiêu Deadlock
-    API->>DB: UPDATE seats SET status = 'HELD', hold_expires_at = now() + 5p WHERE id = ANY($1) AND (status='AVAILABLE' OR (status='HELD' AND hold_expires_at < now())) RETURNING id
+    API->>DB: UPDATE seats SET status = 'HELD', hold_expires_at = now() + 5 phút WHERE id = ANY($1) AND (status='AVAILABLE' OR (status='HELD' AND hold_expires_at < now())) RETURNING id
     
-    alt Số ghế trả về < Số ghế yêu cầu
+    alt Số dòng cập nhật nhỏ hơn số ghế yêu cầu
         API->>DB: ROLLBACK
-        API-->>Web: Lỗi SEAT_ALREADY_HELD (HTTP 409)
-        Web-->>Buyer: Hiển thị ghế vừa bị người khác chọn
-    else Giữ ghế thành công
-        API->>DB: INSERT INTO orders (status = 'PENDING', expires_at = now() + 5p)
+        API-->>Web: Báo lỗi SEAT_ALREADY_HELD
+    else Cập nhật đủ số ghế
+        API->>DB: INSERT INTO orders (status = 'PENDING', expires_at = now() + 5 phút)
         API->>DB: COMMIT
-        API->>Redis: PUBLISH seat_events (seatIds chuyển HELD)
-        Redis-->>Web: SSE cập nhật sơ đồ ghế của các người dùng khác
-        API-->>Web: Trả orderId & Đồng hồ đếm ngược 5 phút
+        API->>Redis: PUBLISH trạng thái ghế chuyển HELD
+        Redis-->>Web: SSE cập nhật sơ đồ ghế tới các client khác
+        API-->>Web: Trả mã đơn hàng và bắt đầu đếm ngược 5 phút
     end
 
-    opt Nếu quá 5 phút chưa thanh toán
+    opt Quá hạn 5 phút chưa thanh toán
         Worker->>DB: Quét đơn PENDING hết hạn
-        Worker->>DB: UPDATE orders SET status = 'EXPIRED'
-        Worker->>DB: UPDATE seats SET status = 'AVAILABLE', hold_order_id = NULL
-        Worker->>Redis: PUBLISH seat_events (seatIds chuyển AVAILABLE)
+        Worker->>DB: Chuyển đơn sang EXPIRED, hoàn ghế về AVAILABLE
+        Worker->>Redis: PUBLISH trạng thái ghế chuyển AVAILABLE
     end
 ```
 
----
-
-### 3.2 Luồng Thanh Toán VNPay & IPN Xử Lý Idempotent (UC05)
+### Thanh toán qua VNPay và xử lý webhook
 
 ```mermaid
 sequenceDiagram
@@ -176,104 +131,80 @@ sequenceDiagram
     participant Web as Web Client
     participant API as API Server
     participant DB as PostgreSQL
-    participant VNPay as Cổng VNPay Sandbox/Prod
+    participant VNPay as Cổng VNPay
     participant Worker as BullMQ Worker
 
-    Buyer->>Web: Nhập mã giảm giá & chọn phương thức VNPay
-    Web->>API: POST /checkout/create-payment (orderId, Idempotency-Key)
-    API->>DB: Kiểm tra đơn PENDING & tính lại tổng tiền phía Server
-    API->>API: Sinh URL thanh toán có mã băm bảo mật HMAC SHA512
-    API-->>Web: Trả về paymentUrl
-    Web->>VNPay: Chuyển hướng người mua sang trang thanh toán VNPay
-    Buyer->>VNPay: Quét mã QR ngân hàng / Nhập thẻ ATM thành công
+    Buyer->>Web: Chọn thanh toán qua VNPay
+    Web->>API: POST /checkout/create-payment
+    API->>DB: Kiểm tra đơn PENDING và tính tổng tiền phía server
+    API->>API: Tạo URL thanh toán kèm chữ ký HMAC SHA512
+    API-->>Web: Trả về URL thanh toán
+    Web->>VNPay: Chuyển hướng người dùng sang VNPay
+    Buyer->>VNPay: Hoàn tất thao tác thanh toán
 
-    VNPay->>API: Webhook Gọi IPN (GET /webhooks/vnpay/ipn)
-    Note over API: 1. Kiểm tra chữ ký HMAC SHA512 với vnp_HashSecret
-    Note over API: 2. Kiểm tra Idempotency (giao dịch đã xử lý chưa)
+    VNPay->>API: Gửi IPN webhook (GET /webhooks/vnpay/ipn)
+    Note over API: Xác thực chữ ký HMAC và kiểm tra bản ghi giao dịch
     
-    alt Chữ ký hợp lệ & Chưa xử lý
+    alt Chữ ký hợp lệ và giao dịch chưa được xử lý
         API->>DB: BEGIN TRANSACTION
-        API->>DB: UPDATE orders SET status = 'PAID', paid_at = now() WHERE id = $orderId
-        API->>DB: UPDATE seats SET status = 'SOLD' WHERE hold_order_id = $orderId
-        API->>DB: INSERT INTO tickets (status = 'SOLD', ticket_code = ...)
-        API->>DB: INSERT INTO transactions (status = 'SUCCESS', raw_callback = ...)
-        API->>DB: INSERT INTO outbox (event_type = 'TICKET_ISSUED', payload = ...)
+        API->>DB: Cập nhật đơn PAID, ghế SOLD, tạo bản ghi tickets
+        API->>DB: Ghi bản ghi outbox TICKET_ISSUED
         API->>DB: COMMIT
-        API-->>VNPay: Trả JSON {"RspCode":"00","Message":"Confirm Success"}
+        API-->>VNPay: Trả {"RspCode":"00","Message":"Confirm Success"}
         
         Worker->>DB: Đọc bản ghi outbox
-        Worker->>Worker: Gửi Email xác nhận đơn kèm mã vé qua Resend/SES
-    else Callback trùng lặp
-        API-->>VNPay: Trả ngay {"RspCode":"00","Message":"Confirm Success"}
+        Worker->>Worker: Gửi email vé qua Resend/SES
+    else Giao dịch đã xử lý trước đó
+        API-->>VNPay: Trả {"RspCode":"00","Message":"Confirm Success"}
     else Chữ ký không hợp lệ
         API-->>VNPay: Trả {"RspCode":"97","Message":"Invalid Signature"}
     end
 
-    VNPay->>Web: Chuyển hướng trình duyệt về return URL (/checkout/result)
-    Web->>API: Lấy trạng thái đơn hàng
-    API-->>Web: Đơn PAID -> Chuyển sang trang "Vé của tôi"
+    VNPay->>Web: Chuyển hướng người dùng về màn hình kết quả
 ```
 
----
+### Ký số mã QR động và kiểm soát soát vé
 
-### 3.3 Luồng Ký Số QR Động & Soát Vé Nguyên Tử Tại Cổng (UC05 & UC08)
+Mã QR hiển thị trên ứng dụng là một token JWS có thời hạn ngắn (30 giây) để giảm nguy cơ chia sẻ ảnh chụp màn hình.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Buyer as Người mua (Khán giả)
-    participant AppBuyer as Web "Vé của tôi"
+    actor Buyer as Người mua
+    participant AppBuyer as Màn hình Vé của tôi
     participant API as API Server
     actor Staff as Nhân viên soát vé
-    participant GateApp as Ứng dụng Soát vé PWA (Camera)
+    participant GateApp as Ứng dụng Soát vé
     participant DB as PostgreSQL
 
-    Buyer->>AppBuyer: Mở vé trong mục "Vé của tôi"
-    Note over AppBuyer: Khung giờ: 2 tiếng trước giờ mở cổng đến hết sự kiện
+    Buyer->>AppBuyer: Mở chi tiết vé trong khung giờ check-in
     AppBuyer->>API: GET /tickets/:id/dynamic-qr
-    API->>API: Sinh JWS Token ký bằng Ed25519 (iat, exp = iat + 30s, jti)
-    API-->>AppBuyer: Trả qrToken & đếm ngược 30 giây
-    AppBuyer->>AppBuyer: Dựng mã QR hiển thị trên màn hình điện thoại
-    Note over AppBuyer: Tự động xin token mới mỗi 25-30 giây ngầm
+    API->>API: Tạo token JWS ký bằng khóa riêng Ed25519 (exp = iat + 30s, jti)
+    API-->>AppBuyer: Trả qrToken
+    AppBuyer->>AppBuyer: Hiển thị mã QR và tự xin token mới sau mỗi 25-30 giây
 
-    Staff->>GateApp: Đưa camera quét mã QR của khán giả
+    Staff->>GateApp: Quét mã QR bằng camera
     GateApp->>API: POST /checkin/scan (qrToken, gateId)
-    
-    API->>API: 1. Xác thực chữ ký Ed25519 với Public Key
-    API->>API: 2. Kiểm tra token chưa hết hạn & jti chưa từng xuất hiện
-    
-    API->>DB: UPDATE tickets SET status = 'CHECKED_IN', checked_in_at = now(), gate_id = $gateId, checked_in_by = $staffId WHERE id = $ticketId AND status = 'SOLD' RETURNING id, ticket_code, seat_id;
+    API->>API: Xác thực chữ ký bằng khóa công khai Ed25519, kiểm tra hạn và jti
+    API->>DB: UPDATE tickets SET status = 'CHECKED_IN', checked_in_at = now(), gate_id = $gateId WHERE id = $ticketId AND status = 'SOLD' RETURNING id
 
-    alt Cập nhật thành công 1 dòng (Thành công)
-        API-->>GateApp: Trả VALID (Màn hình XANH, rung, âm thanh báo hợp lệ)
-        GateApp-->>Staff: Cho khán giả vào cổng
-    else Trả về 0 dòng (Đã check-in trước đó hoặc vé bị hủy)
-        API-->>GateApp: Trả INVALID / ALREADY_USED (Màn hình ĐỎ, cảnh báo)
-        GateApp-->>Staff: Giữ lại kiểm tra thủ công
+    alt Trả về 1 dòng
+        API-->>GateApp: Xác nhận hợp lệ (màn hình xanh)
+    else Trả về 0 dòng
+        API-->>GateApp: Báo vé không hợp lệ hoặc đã sử dụng (màn hình đỏ)
     end
 ```
 
----
+## Các biện pháp an toàn và giới hạn
 
-## 4. Kiến Trúc Bảo Mật & Phòng Thủ (Security Architecture)
+### Giới hạn gian lận vé
+- Cơ chế QR động giới hạn hiệu lực trong 30 giây giúp giảm thiểu việc chia sẻ ảnh chụp màn hình, nhưng không ngăn được việc người dùng đưa trực tiếp thiết bị của họ cho người khác vào cổng.
+- Nhân viên soát vé vẫn duy trì quy trình kiểm tra đối chiếu giấy tờ tùy thân khi phát hiện dấu hiệu nghi vấn.
 
-1. **Bảo Vệ Vé Giả Mạo & Chụp Màn Hình:**
-   - Mã QR động sử dụng cơ chế token JWT ký bằng cặp khóa bất đối xứng **Ed25519 (EdDSA)**.
-   - Khóa riêng (Private Key) chỉ lưu trữ trong Secret Manager trên server. Thiết bị soát vé chỉ sử dụng Khóa công khai (Public Key) để xác thực.
-   - Token chỉ có hiệu lực tối đa 30 giây kèm mã dùng một lần (`jti`). Ảnh chụp màn hình gửi qua tin nhắn sẽ hết hạn trong vài giây.
+### Dừng khẩn cấp (Kill Switch)
+- Khi phát hiện sự kiện vi phạm hoặc có khiếu nại nghiêm trọng, quản trị viên có thể chuyển trạng thái sự kiện sang `SUSPENDED`.
+- Hệ thống sẽ chặn các yêu cầu đặt chỗ, thanh toán mới, hủy các đơn đang giữ chỗ và thông báo cho người dùng đang chờ trong hàng.
 
-2. **Cơ Chế Khẩn Cấp (Kill Switch - UC10):**
-   - Khi Admin phát hiện sự kiện lừa đảo hoặc có sự cố an ninh nghiêm trọng, kích hoạt lệnh Kill Switch:
-     - Trạng thái sự kiện chuyển thành `SUSPENDED`.
-     - Lập tức chặn mọi API đặt chỗ, thanh toán và hủy các đơn đang giữ chỗ.
-     - Toàn bộ hàng chờ ảo bị giải tán với thông báo chính thức.
-     - Tự động chuyển các đơn đã thanh toán sang danh sách hoàn tiền hàng loạt.
-
-3. **Chống Tấn Công Từ Chối Dịch Vụ & Bot:**
-   - Cloudflare WAF và Turnstile CAPTCHA chặn bot tự động trước khi request chạm vào backend.
-   - Rate limit theo IP và theo User ID trên các endpoint nhạy cảm (`/auth/login`, `/booking/hold`, `/checkout/create-payment`).
-
-4. **Bảo Mật Dữ Liệu Cá Nhân (Nghị định 13/2023/NĐ-CP):**
-   - Mọi mật khẩu băm bằng Argon2id với salt duy nhất.
-   - Thông tin cá nhân nhạy cảm được mã hóa khi truyền (HTTPS/TLS 1.3) và khi lưu trữ (Encryption at Rest).
-   - Quyền truy cập dữ liệu được phân chia chặt chẽ bằng Role-Based Access Control (RBAC).
+### Kiểm soát lưu lượng và bảo vệ ứng dụng
+- Cloudflare áp dụng tường lửa ứng dụng (WAF) và Turnstile CAPTCHA để hạn chế lưu lượng truy cập từ bot tự động.
+- API áp dụng rate limiting theo địa chỉ IP và tài khoản người dùng trên các endpoint nhạy cảm như đăng nhập, giữ chỗ và tạo thanh toán.
