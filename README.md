@@ -1,22 +1,22 @@
-# TicketHub (Vé Việt) 🎟️🇻🇳
+# TicketHub (Vé Việt)
 
 > **Nền tảng bán và quản lý vé sự kiện trực tuyến chuẩn Production tại Việt Nam.**  
 > Giải quyết triệt để các bài toán hóc búa: **Chống bán trùng vé (Zero Double-Booking)** khi mở bán lượng truy cập lớn, **Hàng chờ ảo điều tiết tải**, **Mã QR động Ed25519** chống chụp màn hình gian lận, và tích hợp cổng thanh toán nội địa **VNPay**.
 
 ---
 
-## 📌 Mục Lục
-1. [Giới Thiệu & Bài Toán Giải Quyết](#-giới-thiệu--bài-toán-giải-quyết)
-2. [Ba Cơ Chế Cốt Lõi](#-ba-cơ-chế-cốt-lõi)
-3. [Kiến Trúc & Ngăn Xếp Công Nghệ](#-kiến-trúc--ngăn-xếp-công-nghệ)
-4. [Tài Liệu Thiết Kế Kỹ Thuật (Docs)](#-tài-liệu-thiết-kế-kỹ-thuật-docs)
-5. [Đội Ngũ & Lộ Trình 6 Tuần](#-đội-ngũ--lộ-trình-6-tuần)
-6. [Hướng Dẫn Khởi Chạy Môi Trường Local](#-hướng-dẫn-khởi-chạy-môi-trường-local)
-7. [Khuyến Nghị Các Bước Triển Khai Tiếp Theo](#-khuyến-nghị-các-bước-triển-khai-tiếp-theo)
+## Mục Lục
+1. [Giới Thiệu & Bài Toán Giải Quyết](#giới-thiệu--bài-toán-giải-quyết)
+2. [Ba Cơ Chế Cốt Lõi](#ba-cơ-chế-cốt-lõi)
+3. [Kiến Trúc & Ngăn Xếp Công Nghệ](#kiến-trúc--ngăn-xếp-công-nghệ)
+4. [Tài Liệu Thiết Kế Kỹ Thuật (Docs)](#tài-liệu-thiết-kế-kỹ-thuật-docs)
+5. [Đội Ngũ & Lộ Trình 6 Tuần](#đội-ngũ--lộ-trình-6-tuần)
+6. [Hướng Dẫn Khởi Chạy Môi Trường Local](#hướng-dẫn-khởi-chạy-môi-trường-local)
+7. [Khuyến Nghị Các Bước Triển Khai Tiếp Theo](#khuyến-nghị-các-bước-triển-khai-tiếp-theo)
 
 ---
 
-## 🎯 Giới Thiệu & Bài Toán Giải Quyết
+## Giới Thiệu & Bài Toán Giải Quyết
 
 TicketHub được thiết kế để phục vụ các sự kiện ca nhạc, hội thảo, thể thao, triển lãm và hoạt động giải trí tại Việt Nam. Hệ thống kết nối ba nhóm người dùng:
 - **Người mua vé (Buyers):** Khám phá sự kiện, chọn ghế trực quan trên sơ đồ SVG tương tác, xếp hàng văn minh, thanh toán qua VNPay và nhận vé QR động trong ứng dụng.
@@ -26,7 +26,7 @@ TicketHub được thiết kế để phục vụ các sự kiện ca nhạc, h�
 
 ---
 
-## ⚡ Ba Cơ Chế Cốt Lõi
+## Ba Cơ Chế Cốt Lõi
 
 1. **Giữ Chỗ Tạm Thời 5 Phút (PostgreSQL Row-Level Locking):**
    - Nguồn sự thật duy nhất về tồn kho là **PostgreSQL Transaction**.
@@ -40,7 +40,7 @@ TicketHub được thiết kế để phục vụ các sự kiện ca nhạc, h�
 
 ---
 
-## 🛠️ Kiến Trúc & Ngăn Xếp Công Nghệ
+## Kiến Trúc & Ngăn Xếp Công Nghệ
 
 Dự án áp dụng mô hình **pnpm Monorepo**:
 ```
@@ -68,7 +68,7 @@ ticket-hub/
 
 ---
 
-## 📚 Tài Liệu Thiết Kế Kỹ Thuật (Docs)
+## Tài Liệu Thiết Kế Kỹ Thuật (Docs)
 
 Hệ thống tài liệu hoàn chỉnh được lưu trữ trong thư mục `docs/`:
 
@@ -80,7 +80,7 @@ Hệ thống tài liệu hoàn chỉnh được lưu trữ trong thư mục `doc
 
 ---
 
-## 👥 Đội Ngũ & Lộ Trình 6 Tuần
+## Đội Ngũ & Lộ Trình 6 Tuần
 
 ### Đội ngũ 5 thành viên:
 1. **Quản lý dự án & QA (PM):** Gia Khang – *Kế hoạch tiến độ, Test cases, kiểm thử đồng thời (UC03, UC04, UC08), kiểm thử tải k6, UAT.*
@@ -107,7 +107,7 @@ gantt
 
 ---
 
-## 🚀 Hướng Dẫn Khởi Chạy Môi Trường Local
+## Hướng Dẫn Khởi Chạy Môi Trường Local
 
 ### Yêu cầu tiên quyết:
 - **Node.js**: Phiên bản 22 LTS trở lên
@@ -143,7 +143,7 @@ pnpm dev
 
 ---
 
-## 🔮 Khuyến Nghị Các Bước Triển Khai Tiếp Theo (Next Steps)
+## Khuyến Nghị Các Bước Triển Khai Tiếp Theo (Next Steps)
 
 Theo kế hoạch tuần 1 (W01), các bước tiếp theo cần triển khai ngay:
 
