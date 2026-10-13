@@ -74,3 +74,7 @@ Các biến môi trường cần thiết được khai báo trong tệp `.env.ex
 - [docs/DEVELOPMENT_STANDARDS.md](docs/DEVELOPMENT_STANDARDS.md): Tiêu chuẩn phát triển và kỹ thuật hệ thống.
 - [docs/AI_CONTRACT.md](docs/AI_CONTRACT.md): Đặc tả dịch vụ AI hỗ trợ người dùng và hợp đồng giao tiếp API.
 - [CONTRIBUTING.md](CONTRIBUTING.md): Hướng dẫn đóng góp mã nguồn và quy trình làm việc.
+
+## Giấy phép
+
+Dự án được phát hành theo giấy phép mã nguồn mở [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
