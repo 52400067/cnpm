@@ -1,13 +1,14 @@
-
 name: TicketHub CI
 
 on:
   push:
     branches:
       - unstable
+      - stable
   pull_request:
     branches:
       - unstable
+      - stable
 
 permissions:
   contents: read
@@ -17,6 +18,38 @@ jobs:
     name: Lint, Test and Build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tickethub
+          POSTGRES_PASSWORD: tickethub_secret
+          POSTGRES_DB: tickethub_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://tickethub:tickethub_secret@localhost:5432/tickethub_dev
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: tickethub-super-secret-development-jwt-key-2026-min-32-chars
+      ED25519_PRIVATE_KEY: MC4CAQAwBQYDK2VwBCIEIFXdummyed25519privatekeydevelopmentonly2026=
 
     steps:
       - name: Checkout repository
@@ -28,7 +61,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -39,6 +72,11 @@ jobs:
 
       - name: Check lint
         run: pnpm lint
+
+      - name: Run database migrations and seed
+        run: |
+          pnpm --filter @tickethub/api db:migrate
+          pnpm --filter @tickethub/api db:seed
 
       - name: Run tests
         run: pnpm test

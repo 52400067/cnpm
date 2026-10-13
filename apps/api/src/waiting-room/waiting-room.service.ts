@@ -1,19 +1,14 @@
-import {
-  Injectable,
-  Inject,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import Redis from 'ioredis';
-import { eq } from 'drizzle-orm';
-import { db } from '../database/db';
-import { events } from '../database/schema';
-import { REDIS_CLIENT } from '../database/redis.module';
-import { env } from '../config/env.config';
+import { Injectable, Inject, NotFoundException } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import Redis from "ioredis";
+import { eq } from "drizzle-orm";
+import { db } from "../database/db";
+import { events } from "../database/schema";
+import { REDIS_CLIENT } from "../database/redis.module";
+import { env } from "../config/env.config";
 
 export interface WaitingRoomStatus {
-  status: 'ADMITTED' | 'QUEUED';
+  status: "ADMITTED" | "QUEUED";
   admissionToken?: string;
   queuePosition?: number;
   estimatedWaitSeconds?: number;
@@ -27,12 +22,15 @@ export class WaitingRoomService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async generateAdmissionToken(userId: string, eventId: string): Promise<string> {
+  async generateAdmissionToken(
+    userId: string,
+    eventId: string,
+  ): Promise<string> {
     return this.jwtService.signAsync(
       {
         sub: userId,
         eventId,
-        type: 'waiting_room_admission',
+        type: "waiting_room_admission",
       },
       {
         secret: env.JWT_SECRET,
@@ -52,7 +50,7 @@ export class WaitingRoomService {
       });
 
       return (
-        payload.type === 'waiting_room_admission' &&
+        payload.type === "waiting_room_admission" &&
         payload.sub === userId &&
         payload.eventId === eventId
       );
@@ -70,8 +68,8 @@ export class WaitingRoomService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy sự kiện',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy sự kiện",
           timestamp: new Date().toISOString(),
         },
       });
@@ -81,7 +79,7 @@ export class WaitingRoomService {
     if (!event.isWaitingRoomEnabled) {
       const admissionToken = await this.generateAdmissionToken(userId, eventId);
       return {
-        status: 'ADMITTED',
+        status: "ADMITTED",
         admissionToken,
       };
     }
@@ -94,7 +92,7 @@ export class WaitingRoomService {
     if (isAlreadyActive) {
       const admissionToken = await this.generateAdmissionToken(userId, eventId);
       return {
-        status: 'ADMITTED',
+        status: "ADMITTED",
         admissionToken,
       };
     }
@@ -109,7 +107,7 @@ export class WaitingRoomService {
       await this.redis.sadd(activeKey, userId);
       const admissionToken = await this.generateAdmissionToken(userId, eventId);
       return {
-        status: 'ADMITTED',
+        status: "ADMITTED",
         admissionToken,
       };
     }
@@ -125,7 +123,7 @@ export class WaitingRoomService {
     const estimatedWaitSeconds = Math.max(15, position * 15);
 
     return {
-      status: 'QUEUED',
+      status: "QUEUED",
       queuePosition: position,
       estimatedWaitSeconds,
       queueId: `q_${userId}_${eventId}`,
@@ -141,8 +139,8 @@ export class WaitingRoomService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy sự kiện',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy sự kiện",
           timestamp: new Date().toISOString(),
         },
       });
@@ -150,7 +148,7 @@ export class WaitingRoomService {
 
     if (!event.isWaitingRoomEnabled) {
       const admissionToken = await this.generateAdmissionToken(userId, eventId);
-      return { status: 'ADMITTED', admissionToken };
+      return { status: "ADMITTED", admissionToken };
     }
 
     const activeKey = `active_users:${eventId}`;
@@ -159,7 +157,7 @@ export class WaitingRoomService {
     const isAlreadyActive = await this.redis.sismember(activeKey, userId);
     if (isAlreadyActive) {
       const admissionToken = await this.generateAdmissionToken(userId, eventId);
-      return { status: 'ADMITTED', admissionToken };
+      return { status: "ADMITTED", admissionToken };
     }
 
     const [activeCount, rank] = await Promise.all([
@@ -181,7 +179,7 @@ export class WaitingRoomService {
 
       const admissionToken = await this.generateAdmissionToken(userId, eventId);
       return {
-        status: 'ADMITTED',
+        status: "ADMITTED",
         admissionToken,
       };
     }
@@ -190,7 +188,7 @@ export class WaitingRoomService {
     const estimatedWaitSeconds = Math.max(15, position * 15);
 
     return {
-      status: 'QUEUED',
+      status: "QUEUED",
       queuePosition: position,
       estimatedWaitSeconds,
       queueId: `q_${userId}_${eventId}`,
