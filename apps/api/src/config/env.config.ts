@@ -18,6 +18,9 @@ export const EnvSchema = z.object({
   VNPAY_HASH_SECRET: z.string().default('TEST_HASH_SECRET'),
   VNPAY_URL: z.string().url().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
   VNPAY_RETURN_URL: z.string().url().default('http://localhost:3000/checkout/vnpay-return'),
+  ED25519_PRIVATE_KEY: z
+    .string()
+    .default('MC4CAQAwBQYDK2VwBCIEIFXdummyed25519privatekeydevelopmentonly2026='),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
