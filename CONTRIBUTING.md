@@ -5,7 +5,7 @@ Tài liệu này quy định quy trình làm việc, tiêu chuẩn mã nguồn v
 ## 1. Nguyên tắc chung
 
 - Hệ thống sử dụng mô hình monorepo (`pnpm workspace`).
-- Mọi thay đổi kỹ thuật phải tuân thủ các nguyên tắc kiến trúc và tiêu chuẩn mã nguồn quy định tại [docs/AI_CONTRACT.md](docs/AI_CONTRACT.md). Mã nguồn do công cụ AI hỗ trợ hoặc tạo tự động bắt buộc phải được kiểm thử chặt chẽ trước khi đóng góp.
+- Mọi thay đổi kỹ thuật phải tuân thủ các nguyên tắc kiến trúc và tiêu chuẩn mã nguồn quy định tại [docs/DEVELOPMENT_STANDARDS.md](docs/DEVELOPMENT_STANDARDS.md). Mã nguồn do công cụ AI hỗ trợ hoặc tạo tự động bắt buộc phải được kiểm thử chặt chẽ trước khi đóng góp.
 - Không đưa vào kho lưu trữ các tệp chứa thông tin nhạy cảm (`.env`, khóa bí mật, token xác thực), tệp cấu hình môi trường cục bộ hoặc thư mục tạm thời (`tmp/`).
 - Không sử dụng biểu tượng cảm xúc (emoji và icon) trong mã nguồn, commit message, tài liệu và nội dung thảo luận Pull Request.
 
@@ -110,7 +110,7 @@ Hệ thống quản lý mã nguồn với hai nhánh chính và các nhánh làm
 - **Trách nhiệm của người đóng góp:** Người gửi Pull Request chịu trách nhiệm kỹ thuật đối với toàn bộ mã nguồn được gửi lên, bao gồm cả mã do các công cụ AI tạo hoặc hỗ trợ viết. Người đóng góp phải đọc hiểu từng dòng mã và giải thích được chi tiết logic khi được yêu cầu trong quá trình xem xét mã nguồn.
 - **Yêu cầu kiểm thử bắt buộc:** Mọi đoạn mã do AI sinh ra phải được kiểm thử trực tiếp trên môi trường chạy thực tế và có bộ kiểm thử tự động (unit test, integration test) đi kèm để xác minh hành vi trước khi gửi đóng góp. Không chấp nhận mã nguồn chưa qua kiểm thử thực tế hoặc chỉ dựa vào suy đoán của mô hình AI.
 - **Kiểm soát tính chính xác của phụ thuộc:** Không sử dụng các hàm, API hoặc gói phụ thuộc (dependency) không tồn tại do mô hình AI tự tạo. Mọi gói phụ thuộc mới phải được xác thực nguồn gốc và kiểm tra trước khi thêm vào `package.json`.
-- **Tuân thủ chuẩn mã nguồn và kiến trúc:** Mã nguồn do AI tạo phải tuân thủ đầy đủ quy chuẩn TypeScript nghiêm ngặt (không sử dụng `any`), đúng các mẫu kiến trúc quy định tại [docs/AI_CONTRACT.md](docs/AI_CONTRACT.md), không chứa mã thừa không sử dụng và không làm suy giảm hiệu năng hoặc tính bảo mật của hệ thống.
+- **Tuân thủ chuẩn mã nguồn và kiến trúc:** Mã nguồn do AI tạo phải tuân thủ đầy đủ quy chuẩn TypeScript nghiêm ngặt (không sử dụng `any`), đúng các mẫu kiến trúc quy định tại [docs/DEVELOPMENT_STANDARDS.md](docs/DEVELOPMENT_STANDARDS.md), không chứa mã thừa không sử dụng và không làm suy giảm hiệu năng hoặc tính bảo mật của hệ thống.
 
 ## 9. Quy trình gửi Pull Request (PR Process)
 

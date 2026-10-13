@@ -71,5 +71,6 @@ Các biến môi trường cần thiết được khai báo trong tệp `.env.ex
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Kiến trúc tổng thể và các luồng xử lý chính.
 - [docs/ERD.md](docs/ERD.md): Thiết kế cơ sở dữ liệu và các ràng buộc dữ liệu.
 - [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Đặc tả chi tiết các endpoint API.
-- [docs/AI_CONTRACT.md](docs/AI_CONTRACT.md): Quy chuẩn lập trình và kiểm thử khi phát triển hệ thống.
+- [docs/DEVELOPMENT_STANDARDS.md](docs/DEVELOPMENT_STANDARDS.md): Tiêu chuẩn phát triển và kỹ thuật hệ thống.
+- [docs/AI_CONTRACT.md](docs/AI_CONTRACT.md): Đặc tả dịch vụ AI hỗ trợ người dùng và hợp đồng giao tiếp API.
 - [CONTRIBUTING.md](CONTRIBUTING.md): Hướng dẫn đóng góp mã nguồn và quy trình làm việc.

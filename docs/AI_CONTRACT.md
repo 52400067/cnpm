@@ -1,89 +1,146 @@
-# Quy chuẩn phát triển và kiểm thử
+# Đặc tả dịch vụ AI (AI Service Contract)
 
-Tài liệu này quy định các nguyên tắc kiến trúc, quy chuẩn mã nguồn và tiêu chuẩn kiểm thử áp dụng cho kỹ sư và các công cụ hỗ trợ lập trình trên kho mã nguồn TicketHub.
+Tài liệu này đặc tả kiến trúc tích hợp, giao thức API, cơ chế RAG (Retrieval-Augmented Generation), định dạng dữ liệu và các ràng buộc bảo mật cho các dịch vụ AI trên nền tảng TicketHub, điển hình là trợ lý ảo hỗ trợ người dùng (AI Event Concierge).
 
-## Nguyên tắc kiến trúc và dữ liệu
+## 1. Mục tiêu và phạm vi nghiệp vụ
 
-### Nguồn sự thật về tồn kho và giao dịch
-Tồn kho vé, phiên giữ chỗ và giao dịch tiền tệ được quản lý tập trung trên PostgreSQL qua database transaction.
+### Mục tiêu
 
-Redis được sử dụng cho việc xếp hàng chờ ảo, lưu tạm dữ liệu truy vấn (cache), xuất bản thông điệp thời gian thực (Pub/Sub) và hàng đợi nền BullMQ. Không đưa ra quyết định xác nhận đặt chỗ hay thanh toán dựa trên dữ liệu lưu tạm trong bộ nhớ Redis.
+Cung cấp kênh hỗ trợ tương tác tự động giúp người mua vé tra cứu thông tin sự kiện nhanh chóng, tìm kiếm sự kiện phù hợp theo sở thích, hiểu rõ chính sách vé và nhận hướng dẫn thao tác trên nền tảng.
 
-### Kiểm soát tranh chấp ghế ngồi
-Thao tác giữ chỗ cho ghế có số bắt buộc sử dụng cơ chế khóa mức hàng:
-```sql
-SELECT id FROM seats WHERE id = ANY($1) ORDER BY id ASC FOR UPDATE;
+### Phạm vi nghiệp vụ hỗ trợ
+
+- **Tra cứu thông tin sự kiện:** Thời gian tổ chức, địa điểm, danh sách nghệ sĩ/diễn giả, sơ đồ chỗ ngồi tổng quát, thời gian mở cổng và quy định độ tuổi.
+- **Tư vấn giá và hạng vé:** Thông tin các hạng vé (VIP, Standard, GA), giá niêm yết, quyền lợi đi kèm và trạng thái tồn kho vé còn hay hết.
+- **Giải đáp chính sách:** Quy định hoàn trả/đổi vé theo từng sự kiện, thời hạn check-in, quy định về vật dụng được phép mang vào địa điểm.
+- **Hướng dẫn thao tác:** Hướng dẫn thanh toán qua cổng VNPay, hướng dẫn sử dụng mã QR động trên ứng dụng để soát vé tại cổng.
+
+### Phạm vi không hỗ trợ (Out-of-Scope)
+
+- AI không trực tiếp thực hiện giao dịch giữ chỗ, mua vé, xuất vé hoặc hủy vé.
+- AI không xử lý hoặc thu thập dữ liệu thanh toán, thông tin thẻ ngân hàng hoặc thông tin định danh nhạy cảm.
+- AI không can thiệp vào dữ liệu cấu hình sự kiện, quản trị của ban tổ chức hoặc phân quyền hệ thống.
+
+## 2. Kiến trúc tích hợp dịch vụ AI
+
+Hệ thống kết hợp giữa giao diện Web Frontend (`apps/web`), dịch vụ Backend API (`apps/api`) và nhà cung cấp mô hình ngôn ngữ lớn (LLM Provider):
+
+1. **Client Layer (`apps/web`):** Cung cấp giao diện hộp thoại chat, quản lý `sessionId` cục bộ và tiếp nhận luồng dữ liệu streaming thời gian thực qua Server-Sent Events (SSE).
+2. **API Layer (`apps/api`):** Tiếp nhận yêu cầu, áp dụng kiểm soát tần suất (Rate Limiting), điều phối lịch sử hội thoại trên Redis, thực thi cơ chế Function Calling để truy xuất dữ liệu từ cơ sở dữ liệu PostgreSQL.
+3. **Data Retrieval (RAG & Tools):** Sử dụng các hàm tra cứu chỉ đọc (read-only) để lấy dữ liệu thực tế từ các bảng `events`, `ticket_types` và `organizer_profiles`.
+4. **LLM Provider:** Nhận prompt kèm ngữ cảnh thực tế đã được chuẩn hóa để tổng hợp câu trả lời và truyền về dưới dạng streaming token.
+
+## 3. Đặc tả API Contract
+
+### Endpoint: Giao tiếp với trợ lý ảo
+
+- **Đường dẫn:** `POST /api/v1/ai/chat`
+- **Content-Type:** `application/json`
+- **Accept:** `text/event-stream` (mặc định cho phản hồi trực tiếp từng token) hoặc `application/json` (cho phản hồi khối đơn)
+- **Xác thực:** Tùy chọn (hỗ trợ cả khách vãng lai và người dùng đã đăng nhập). Khi có người dùng đăng nhập, client đính kèm header `Authorization: Bearer <JWT_ACCESS_TOKEN>`.
+- **Headers bắt buộc:**
+  - `X-Session-Id`: Chuỗi UUID v4 định danh phiên hội thoại liên tục của người dùng.
+
+#### Request Body Schema
+
+```typescript
+export interface AiChatRequest {
+  sessionId: string; // Chuỗi UUID v4 của phiên hội thoại
+  eventId?: string; // UUID của sự kiện nếu người dùng đang đứng tại trang chi tiết sự kiện
+  message: string; // Nội dung câu hỏi từ người dùng (tối thiểu 1 ký tự, tối đa 1000 ký tự)
+  history?: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>; // Lịch sử hội thoại gần nhất (tối đa 10 lượt gần nhất để duy trì ngữ cảnh)
+}
 ```
-Việc sắp xếp danh sách định danh ghế tăng dần (`ORDER BY id ASC`) là bắt buộc để ngăn ngừa deadlock giữa các transaction chạy song song.
 
-Ràng buộc `UNIQUE (event_id, seat_id)` trên bảng `tickets` với điều kiện vé chưa bị hủy là lớp kiểm tra bắt buộc ở tầng cơ sở dữ liệu.
+#### Định dạng phản hồi luồng (Server-Sent Events)
 
-### Kiểm soát soát vé tại cổng
-Lệnh check-in vé tại cổng phải thực thi qua một câu lệnh cập nhật nguyên tử:
-```sql
-UPDATE tickets SET status = 'CHECKED_IN', checked_in_at = now()
-WHERE id = $1 AND status = 'SOLD' RETURNING id;
-```
-Chỉ chấp nhận vào cổng khi câu lệnh trả về đúng một dòng dữ liệu.
+Mỗi thông điệp được truyền về dưới dạng sự kiện SSE chuẩn:
 
-### Tính bất biến của bảng nhật ký
-Bảng `audit_log` chỉ tiếp nhận thao tác ghi mới (`INSERT`). Không viết mã hoặc cung cấp quyền thực thi các câu lệnh `UPDATE` hoặc `DELETE` trên bảng này.
+- **Sự kiện `token`:** Chứa từng phần văn bản được sinh ra từ mô hình.
 
-### Mẫu Transactional Outbox
-Các thao tác gửi thông báo bên ngoài (email Resend/SES, SMS) không được gọi trực tiếp bên trong database transaction đang xử lý đơn hàng. Bản ghi sự kiện được ghi vào bảng `outbox` cùng transaction với đơn hàng; worker nền sẽ đọc bảng này và gửi đi với cơ chế thử lại có khoảng lùi thời gian (retry backoff).
+  ```
+  event: token
+  data: {"text": "Vé hạng Standard "}
+  ```
 
-## Tiêu chuẩn mã nguồn
+- **Sự kiện `source`:** Danh sách nguồn dữ liệu tham chiếu được sử dụng để trả lời (nếu có).
 
-### Cấu hình TypeScript
-Kho mã nguồn kích hoạt chế độ nghiêm ngặt trong `tsconfig.json`:
-- `strict: true`
-- `noUncheckedIndexedAccess: true`
-- `exactOptionalPropertyTypes: true`
+  ```
+  event: source
+  data: {"eventId": "b2c6e643-4e3a-4db3-80b6-1ef21b1b46a2", "title": "Đêm Nhạc Indie 2026", "url": "/events/b2c6e643-4e3a-4db3-80b6-1ef21b1b46a2"}
+  ```
 
-Không sử dụng kiểu `any`. Định nghĩa kiểu rõ ràng cho mọi tham số và giá trị trả về. Trường hợp dữ liệu chưa xác định từ bên ngoài, sử dụng `unknown` kết hợp hàm kiểm tra kiểu hoặc schema Zod.
+- **Sự kiện `done`:** Đánh dấu lượt hội thoại kết thúc.
 
-### Tổ chức mã dùng chung
-Toàn bộ schema xác thực Zod và interface TypeScript dùng chung giữa client và server phải được đặt trong package `packages/shared`.
+  ```
+  event: done
+  data: {"sessionId": "8f8ef59a-1153-43ef-ba2e-8cb51f65f02c", "finishReason": "stop"}
+  ```
 
-## Các mẫu thiết kế bắt buộc
+- **Sự kiện `error`:** Trả về khi xuất hiện lỗi trong quá trình xử lý luồng.
+  ```
+  event: error
+  data: {"code": "AI_RATE_LIMIT_EXCEEDED", "message": "Bạn đã gửi quá nhiều yêu cầu trong thời gian ngắn. Vui lòng thử lại sau giây lát."}
+  ```
 
-### Khóa Idempotency
-Các endpoint tạo đơn, thanh toán và yêu cầu hoàn tiền yêu cầu header `Idempotency-Key`. Hệ thống kiểm tra và lưu kết quả vào bảng `idempotency_keys` với thời hạn tối thiểu 24 giờ để ngăn chặn việc gửi trùng yêu cầu.
+### Danh mục mã lỗi chuẩn
 
-### Khóa lạc quan (Optimistic Locking)
-Các bảng `events`, `organizer_profiles` và `seats` chứa cột `version INT NOT NULL DEFAULT 1`. Khi cập nhật thông tin cấu hình sự kiện hoặc hồ sơ:
-```sql
-UPDATE events SET title = $1, version = version + 1 
-WHERE id = $2 AND version = $currentVersion RETURNING version;
-```
-Nếu không có dòng nào được cập nhật, trả về mã lỗi `CONFLICT_VERSION` (HTTP 409).
+| Mã lỗi (Code)            | HTTP Status | Diễn giải                                                              |
+| :----------------------- | :---------- | :--------------------------------------------------------------------- |
+| `AI_RATE_LIMIT_EXCEEDED` | 429         | Vượt quá số lượng yêu cầu cho phép trong khoảng thời gian quy định     |
+| `AI_INVALID_PROMPT`      | 400         | Nội dung câu hỏi rỗng, quá độ dài cho phép hoặc vi phạm bộ lọc an toàn |
+| `AI_CONTEXT_NOT_FOUND`   | 404         | Tham số `eventId` được cung cấp không tồn tại trong cơ sở dữ liệu      |
+| `AI_SERVICE_UNAVAILABLE` | 503         | Dịch vụ LLM của nhà cung cấp tạm thời gián đoạn hoặc mất kết nối       |
 
-### Ký số mã QR động
-Mã QR hiển thị trên ứng dụng là chuỗi JWS được ký bằng thuật toán Ed25519 (EdDSA) qua thư viện `jose`:
-- `iat`: Thời điểm phát hành.
-- `exp`: `iat + 30 seconds`.
-- `jti`: Chuỗi định danh dùng một lần.
+## 4. Công cụ tra cứu dữ liệu (Function Calling / Tools)
 
-Khóa riêng (Private Key) được lưu trong trình quản lý bí mật (Secret Manager); ứng dụng soát vé chỉ lưu khóa công khai (Public Key) để xác thực tính toàn vẹn và nguồn gốc của token.
+Để đảm bảo câu trả lời luôn khớp với dữ liệu thực tế trong hệ thống thay vì dựa trên phỏng đoán, dịch vụ AI được tích hợp các công cụ tra cứu sau:
 
-## Yêu cầu kiểm thử
+1. `get_event_details(eventId: string)`:
+   - **Mục đích:** Lấy thông tin tổng quan, thời gian, địa điểm tổ chức, trạng thái sự kiện và thông tin ban tổ chức.
+   - **Nguồn dữ liệu:** Bảng `events` kết hợp bảng `organizer_profiles`.
 
-### Kiểm thử giữ chỗ và thanh toán
-Logic giữ chỗ và soát vé bắt buộc có test tích hợp chạy trên PostgreSQL thật qua thư viện Testcontainers. Không dùng mock cơ sở dữ liệu cho các logic này.
+2. `get_ticket_types(eventId: string)`:
+   - **Mục đích:** Lấy danh sách hạng vé, giá bán, số lượng vé còn lại và giới hạn mua tối đa.
+   - **Nguồn dữ liệu:** Bảng `ticket_types` và bảng `seats`.
 
-Mỗi thay đổi liên quan đến tồn kho phải đi kèm kịch bản kiểm thử đồng thời (tối thiểu 50 yêu cầu tranh chấp cùng một ghế) để xác nhận chỉ có một yêu cầu thành công.
+3. `get_event_policies(eventId: string)`:
+   - **Mục đích:** Lấy thông tin điều khoản hoàn tiền, quy định độ tuổi và hướng dẫn check-in của sự kiện.
+   - **Nguồn dữ liệu:** Cột `description` và cấu hình chính sách của bảng `events`.
 
-### Kiểm thử tích hợp cổng thanh toán
-Kiểm thử xử lý webhook IPN VNPay phải bao gồm các trường hợp:
-- Chữ ký HMAC không khớp.
-- Gửi trùng lặp nhiều webhook cho cùng một giao dịch.
-- Webhook trả về sau khi đơn hàng đã hết hạn giữ chỗ (xử lý cấp vé nếu ghế còn trống hoặc kích hoạt hoàn tiền tự động).
-- Phản hồi timeout từ cổng thanh toán (kiểm tra luồng gọi API truy vấn trạng thái giao dịch).
+4. `search_events(query: string, city?: string, category?: string)`:
+   - **Mục đích:** Tìm kiếm các sự kiện đang mở bán vé phù hợp với từ khóa người dùng muốn tìm.
+   - **Nguồn dữ liệu:** Truy vấn tìm kiếm trên bảng `events` với điều kiện `status = 'PUBLISHED'`.
 
-## Tuân thủ quy định và định dạng
+## 5. Ràng buộc an toàn và bảo mật (Guardrails & Constraints)
 
-### Ngôn ngữ và tiền tệ
-Giao diện mặc định sử dụng tiếng Việt qua thư viện `next-intl`. Số tiền hiển thị theo định dạng VNĐ (ví dụ: `500.000 đ`). Múi giờ mặc định cho hiển thị lịch sự kiện là `Asia/Ho_Chi_Minh` (UTC+7).
+### Ranh giới chỉ đọc (Read-only Boundary)
 
-### Dữ liệu cá nhân
-Hệ thống tuân thủ Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân. Biểu mẫu đăng ký yêu cầu bước người dùng đồng ý điều khoản xử lý dữ liệu. Bản ghi nhật ký hệ thống không in mật khẩu thô, thông tin thẻ thanh toán hoặc dữ liệu định danh nhạy cảm.
+Mọi công cụ và kết nối cơ sở dữ liệu cấp cho dịch vụ AI bắt buộc ở chế độ chỉ đọc (Read-only). Dịch vụ AI không có quyền cập nhật bảng `orders`, `tickets`, `seats` hoặc kích hoạt bất kỳ lệnh chuyển tiền/hoàn tiền nào.
+
+### Phòng chống tấn công Prompt Injection
+
+Hệ thống sử dụng kỹ thuật phân tách nghiêm ngặt giữa System Prompt và User Input:
+
+- Nội dung câu hỏi của người dùng được coi là chuỗi dữ liệu chưa được tin cậy, không được thực thi như một chỉ thị thay thế cho System Prompt.
+- Mô hình phải từ chối các yêu cầu vi phạm bảo mật, yêu cầu trích xuất cấu hình hệ thống hoặc yêu cầu đóng giả vai trò quản trị viên.
+
+### Tuân thủ bảo vệ dữ liệu cá nhân
+
+- Tuân thủ Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân.
+- Không đưa thông tin cá nhân của người dùng (số CCCD, mật khẩu, mã OTP, số tài khoản thanh toán) vào ngữ cảnh gửi tới LLM.
+- Nhật ký hội thoại (chat logs) phải được ẩn danh hóa và lưu trữ có thời hạn tự hủy (TTL) trên Redis.
+
+### Kiểm soát tần suất truy vấn (Rate Limiting)
+
+Hệ thống áp dụng giới hạn tần suất bằng Redis Token Bucket:
+
+- **Khách chưa đăng nhập:** Tối đa 10 yêu cầu trong vòng 5 phút trên một địa chỉ IP.
+- **Người dùng đã đăng nhập:** Tối đa 30 yêu cầu trong vòng 5 phút trên mỗi tài khoản người dùng (`userId`).
+
+### Cơ chế dự phòng khi lỗi (Graceful Degradation)
+
+Khi dịch vụ LLM không phản hồi hoặc phản hồi timeout quá 10 giây, giao diện người dùng tự động chuyển đổi sang thông báo hướng dẫn người dùng tra cứu thông tin trực tiếp trên trang chi tiết sự kiện hoặc liên hệ ban tổ chức.
