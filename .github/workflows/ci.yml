@@ -1,0 +1,47 @@
+
+name: TicketHub CI
+
+on:
+  push:
+    branches:
+      - unstable
+  pull_request:
+    branches:
+      - unstable
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, Test and Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @tickethub/shared build
+
+      - name: Check lint
+        run: pnpm lint
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build monorepo
+        run: pnpm build
