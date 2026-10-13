@@ -11,28 +11,33 @@ TicketHub là nền tảng bán và quản lý vé sự kiện trực tuyến t�
 ## Khởi chạy môi trường phát triển
 
 1. Khởi động PostgreSQL và Redis:
+
 ```bash
 docker compose up -d
 ```
 
 2. Cài đặt các gói phụ thuộc:
+
 ```bash
 pnpm install
 ```
 
 3. Thiết lập biến môi trường:
+
 ```bash
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
 4. Chạy migration và nạp dữ liệu khởi tạo:
+
 ```bash
 pnpm --filter @tickethub/api db:migrate
 pnpm --filter @tickethub/api db:seed
 ```
 
 5. Khởi động ứng dụng ở chế độ phát triển:
+
 ```bash
 pnpm dev
 ```
@@ -67,3 +72,4 @@ Các biến môi trường cần thiết được khai báo trong tệp `.env.ex
 - [docs/ERD.md](docs/ERD.md): Thiết kế cơ sở dữ liệu và các ràng buộc dữ liệu.
 - [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Đặc tả chi tiết các endpoint API.
 - [docs/AI_CONTRACT.md](docs/AI_CONTRACT.md): Quy chuẩn lập trình và kiểm thử khi phát triển hệ thống.
+- [CONTRIBUTING.md](CONTRIBUTING.md): Hướng dẫn đóng góp mã nguồn và quy trình làm việc.
