@@ -1,9 +1,9 @@
-import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
-import { sqlClient } from '../database/db';
-import Redis from 'ioredis';
-import { env } from '../config/env.config';
+import { Controller, Get, HttpException, HttpStatus } from "@nestjs/common";
+import { sqlClient } from "../database/db";
+import Redis from "ioredis";
+import { env } from "../config/env.config";
 
-@Controller('health')
+@Controller("health")
 export class HealthController {
   private redisClient: Redis;
 
@@ -17,38 +17,38 @@ export class HealthController {
   @Get()
   async getHealth() {
     const checks: { database: string; redis: string } = {
-      database: 'unknown',
-      redis: 'unknown',
+      database: "unknown",
+      redis: "unknown",
     };
 
     let isHealthy = true;
 
     try {
       await sqlClient`SELECT 1`;
-      checks.database = 'healthy';
-    } catch (error) {
-      checks.database = 'unhealthy';
+      checks.database = "healthy";
+    } catch {
+      checks.database = "unhealthy";
       isHealthy = false;
     }
 
     try {
-      if (this.redisClient.status !== 'ready') {
+      if (this.redisClient.status !== "ready") {
         await this.redisClient.connect();
       }
       const pingRes = await this.redisClient.ping();
-      if (pingRes === 'PONG') {
-        checks.redis = 'healthy';
+      if (pingRes === "PONG") {
+        checks.redis = "healthy";
       } else {
-        checks.redis = 'unhealthy';
+        checks.redis = "unhealthy";
         isHealthy = false;
       }
-    } catch (error) {
-      checks.redis = 'unhealthy';
+    } catch{
+      checks.redis = "unhealthy";
       isHealthy = false;
     }
 
     const payload = {
-      status: isHealthy ? 'ok' : 'error',
+      status: isHealthy ? "ok" : "error",
       timestamp: new Date().toISOString(),
       services: checks,
     };

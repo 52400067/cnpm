@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EventStatus, RefundPolicyType } from '../constants/enums';
+import { RefundPolicyType } from '../constants/enums';
 
 export const TicketTypeInputSchema = z.object({
   name: z.string().min(1).max(100),

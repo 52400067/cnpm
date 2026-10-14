@@ -1,11 +1,14 @@
-import { z } from 'zod';
-import { UserRole, UserStatus, OrganizerStatus } from '../constants/enums';
+import { z } from "zod";
+import { UserRole, OrganizerStatus } from "../constants/enums";
 
 export const RegisterRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(100),
   fullName: z.string().min(2).max(150),
-  phone: z.string().regex(/^(0|\+84)[3|5|7|8|9][0-9]{8}$/).optional(),
+  phone: z
+    .string()
+    .regex(/^(0|\+84)[3|5|7|8|9][0-9]{8}$/)
+    .optional(),
   role: z.enum([UserRole.BUYER, UserRole.ORGANIZER]).default(UserRole.BUYER),
 });
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
@@ -27,10 +30,14 @@ export const SubmitOrganizerProfileSchema = z.object({
   businessLicenseUrl: z.string().url(),
   representativeName: z.string().min(2).max(150),
 });
-export type SubmitOrganizerProfile = z.infer<typeof SubmitOrganizerProfileSchema>;
+export type SubmitOrganizerProfile = z.infer<
+  typeof SubmitOrganizerProfileSchema
+>;
 
 export const ReviewOrganizerProfileSchema = z.object({
   status: z.enum([OrganizerStatus.VERIFIED, OrganizerStatus.REJECTED]),
   rejectionReason: z.string().optional(),
 });
-export type ReviewOrganizerProfile = z.infer<typeof ReviewOrganizerProfileSchema>;
+export type ReviewOrganizerProfile = z.infer<
+  typeof ReviewOrganizerProfileSchema
+>;
