@@ -83,3 +83,6 @@ jobs:
 
       - name: Build monorepo
         run: pnpm build
+
+      - name: Build Docker image
+        run: docker build -t tickethub-api:ci .
