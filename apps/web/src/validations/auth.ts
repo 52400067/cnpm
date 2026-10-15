@@ -1,36 +1,71 @@
+// apps/web/src/validations/auth.ts
 import { z } from "zod";
+import { UserRole } from "@tickethub/shared";
 
 export const loginSchema = z.object({
-  email: z.string().min(1, "Vui lòng nhập email").email("Email không hợp lệ"),
-  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+  email: z
+    .string()
+    .min(1, "Vui lòng nhập địa chỉ email")
+    .email("Địa chỉ email không đúng định dạng"),
+  password: z.string().min(1, "Vui lòng nhập mật khẩu"),
 });
 
-export const registerSchema = z.object({
-  fullName: z.string().min(2, "Họ và tên tối thiểu 2 ký tự"),
-  email: z.string().min(1, "Vui lòng nhập email").email("Email không hợp lệ"),
-  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
-  confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu"),
-  role: z.enum(["BUYER", "ORGANIZER"]),
-  organizationName: z.string().optional(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Mật khẩu xác nhận không khớp",
-  path: ["confirmPassword"],
-}).refine((data) => {
-  if (data.role === "ORGANIZER" && (!data.organizationName || data.organizationName.trim() === "")) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Ban tổ chức phải nhập tên doanh nghiệp/tổ chức",
-  path: ["organizationName"],
-});
+export const registerSchema = z
+  .object({
+    fullName: z
+      .string()
+      .min(2, "Họ và tên phải có tối thiểu 2 ký tự")
+      .max(150, "Họ và tên tối đa 150 ký tự"),
+    email: z
+      .string()
+      .min(1, "Vui lòng nhập địa chỉ email")
+      .email("Địa chỉ email không đúng định dạng"),
+    phone: z
+      .string()
+      .regex(
+        /^(0|\+84)[3|5|7|8|9][0-9]{8}$/,
+        "Số điện thoại không hợp lệ (VD: 0912345678)",
+      )
+      .or(z.literal(""))
+      .optional(),
+    password: z
+      .string()
+      .min(8, "Mật khẩu phải có tối thiểu 8 ký tự")
+      .max(100, "Mật khẩu tối đa 100 ký tự"),
+    confirmPassword: z.string().min(1, "Vui lòng nhập lại mật khẩu xác nhận"),
+    role: z.enum([UserRole.BUYER, UserRole.ORGANIZER]),
+    organizationName: z.string().optional(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Mật khẩu xác nhận không khớp",
+    path: ["confirmPassword"],
+  })
+  .refine(
+    (data) => {
+      if (
+        data.role === UserRole.ORGANIZER &&
+        (!data.organizationName || data.organizationName.trim().length < 2)
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        "Ban tổ chức vui lòng nhập tên doanh nghiệp/đơn vị (tối thiểu 2 ký tự)",
+      path: ["organizationName"],
+    },
+  );
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().min(1, "Vui lòng nhập email").email("Email không hợp lệ"),
+  email: z
+    .string()
+    .min(1, "Vui lòng nhập địa chỉ email")
+    .email("Địa chỉ email không đúng định dạng"),
 });
 
 export const verifyEmailSchema = z.object({
-  otp: z.string().length(6, "Mã OTP gồm 6 chữ số"),
+  token: z.string().min(1, "Vui lòng nhập mã xác thực hoặc token kích hoạt"),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

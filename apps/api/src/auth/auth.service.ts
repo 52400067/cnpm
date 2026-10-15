@@ -4,20 +4,20 @@ import {
   UnauthorizedException,
   ForbiddenException,
   NotFoundException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as argon2 from 'argon2';
-import crypto from 'crypto';
-import { eq } from 'drizzle-orm';
-import { db } from '../database/db';
-import { users, outbox } from '../database/schema';
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import * as argon2 from "argon2";
+import crypto from "crypto";
+import { eq } from "drizzle-orm";
+import { db } from "../database/db";
+import { users, outbox } from "../database/schema";
 import {
   UserStatus,
   OutboxStatus,
   RegisterRequest,
   LoginRequest,
-} from '@tickethub/shared';
-import { env } from '../config/env.config';
+} from "@tickethub/shared";
+import { env } from "../config/env.config";
 
 @Injectable()
 export class AuthService {
@@ -44,8 +44,8 @@ export class AuthService {
       throw new ConflictException({
         success: false,
         error: {
-          code: 'EMAIL_ALREADY_EXISTS',
-          message: 'Địa chỉ email đã được đăng ký trong hệ thống',
+          code: "EMAIL_ALREADY_EXISTS",
+          message: "Địa chỉ email đã được đăng ký trong hệ thống",
           timestamp: new Date().toISOString(),
         },
       });
@@ -68,16 +68,16 @@ export class AuthService {
         .returning();
 
       if (!newUser) {
-        throw new Error('Không thể tạo bản ghi người dùng');
+        throw new Error("Không thể tạo bản ghi người dùng");
       }
 
       const emailToken = await this.jwtService.signAsync(
-        { sub: newUser.id, type: 'email_verification' },
+        { sub: newUser.id, type: "email_verification" },
         { secret: env.JWT_SECRET, expiresIn: 86400 },
       );
 
       await tx.insert(outbox).values({
-        eventType: 'USER_REGISTERED',
+        eventType: "USER_REGISTERED",
         payload: {
           userId: newUser.id,
           email: newUser.email,
@@ -92,7 +92,8 @@ export class AuthService {
         email: newUser.email,
         status: newUser.status,
         verificationToken: emailToken,
-        message: 'Liên kết kích hoạt đã được gửi tới email của bạn (hiệu lực 24 giờ).',
+        message:
+          "Liên kết kích hoạt đã được gửi tới email của bạn (hiệu lực 24 giờ).",
       };
     });
 
@@ -109,19 +110,19 @@ export class AuthService {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'INVALID_VERIFICATION_TOKEN',
-          message: 'Mã xác thực email không hợp lệ hoặc đã hết hạn',
+          code: "INVALID_VERIFICATION_TOKEN",
+          message: "Mã xác thực email không hợp lệ hoặc đã hết hạn",
           timestamp: new Date().toISOString(),
         },
       });
     }
 
-    if (payload.type !== 'email_verification') {
+    if (payload.type !== "email_verification") {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'INVALID_TOKEN_TYPE',
-          message: 'Mã token không đúng mục đích xác thực email',
+          code: "INVALID_TOKEN_TYPE",
+          message: "Mã token không đúng mục đích xác thực email",
           timestamp: new Date().toISOString(),
         },
       });
@@ -135,8 +136,8 @@ export class AuthService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'USER_NOT_FOUND',
-          message: 'Người dùng không tồn tại',
+          code: "USER_NOT_FOUND",
+          message: "Người dùng không tồn tại",
           timestamp: new Date().toISOString(),
         },
       });
@@ -167,8 +168,8 @@ export class AuthService {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Email hoặc mật khẩu không chính xác',
+          code: "INVALID_CREDENTIALS",
+          message: "Email hoặc mật khẩu không chính xác",
           timestamp: new Date().toISOString(),
         },
       });
@@ -182,7 +183,7 @@ export class AuthService {
       throw new ForbiddenException({
         success: false,
         error: {
-          code: 'ACCOUNT_LOCKED',
+          code: "ACCOUNT_LOCKED",
           message: `Tài khoản tạm thời bị khóa do nhập sai mật khẩu quá 5 lần. Thử lại sau ${remainingMinutes} phút.`,
           timestamp: new Date().toISOString(),
         },
@@ -209,8 +210,9 @@ export class AuthService {
         throw new ForbiddenException({
           success: false,
           error: {
-            code: 'ACCOUNT_LOCKED',
-            message: 'Tài khoản đã bị tạm khóa 15 phút do nhập sai mật khẩu 5 lần liên tiếp.',
+            code: "ACCOUNT_LOCKED",
+            message:
+              "Tài khoản đã bị tạm khóa 15 phút do nhập sai mật khẩu 5 lần liên tiếp.",
             timestamp: new Date().toISOString(),
           },
         });
@@ -219,7 +221,7 @@ export class AuthService {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'INVALID_CREDENTIALS',
+          code: "INVALID_CREDENTIALS",
           message: `Email hoặc mật khẩu không chính xác. Số lần còn lại: ${5 - attempts}`,
           timestamp: new Date().toISOString(),
         },
@@ -230,8 +232,9 @@ export class AuthService {
       throw new ForbiddenException({
         success: false,
         error: {
-          code: 'EMAIL_NOT_VERIFIED',
-          message: 'Tài khoản chưa được kích hoạt email. Vui lòng kiểm tra hộp thư.',
+          code: "EMAIL_NOT_VERIFIED",
+          message:
+            "Tài khoản chưa được kích hoạt email. Vui lòng kiểm tra hộp thư.",
           timestamp: new Date().toISOString(),
         },
       });
@@ -241,8 +244,8 @@ export class AuthService {
       throw new ForbiddenException({
         success: false,
         error: {
-          code: 'ACCOUNT_SUSPENDED',
-          message: 'Tài khoản đã bị quản trị viên khóa.',
+          code: "ACCOUNT_SUSPENDED",
+          message: "Tài khoản đã bị quản trị viên khóa.",
           timestamp: new Date().toISOString(),
         },
       });
@@ -266,7 +269,7 @@ export class AuthService {
     );
 
     const refreshToken = await this.jwtService.signAsync(
-      { sub: user.id, tokenType: 'refresh', jti: crypto.randomUUID() },
+      { sub: user.id, tokenType: "refresh", jti: crypto.randomUUID() },
       { secret: env.JWT_SECRET, expiresIn: 604800 },
     );
 
@@ -294,19 +297,19 @@ export class AuthService {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'INVALID_REFRESH_TOKEN',
-          message: 'Refresh token không hợp lệ hoặc đã hết hạn',
+          code: "INVALID_REFRESH_TOKEN",
+          message: "Refresh token không hợp lệ hoặc đã hết hạn",
           timestamp: new Date().toISOString(),
         },
       });
     }
 
-    if (payload.tokenType !== 'refresh') {
+    if (payload.tokenType !== "refresh") {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'INVALID_TOKEN_TYPE',
-          message: 'Token cung cấp không phải refresh token',
+          code: "INVALID_TOKEN_TYPE",
+          message: "Token cung cấp không phải refresh token",
           timestamp: new Date().toISOString(),
         },
       });
@@ -320,8 +323,8 @@ export class AuthService {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'USER_INACTIVE',
-          message: 'Tài khoản không tồn tại hoặc không ở trạng thái hoạt động',
+          code: "USER_INACTIVE",
+          message: "Tài khoản không tồn tại hoặc không ở trạng thái hoạt động",
           timestamp: new Date().toISOString(),
         },
       });
@@ -333,7 +336,7 @@ export class AuthService {
     );
 
     const newRefreshToken = await this.jwtService.signAsync(
-      { sub: user.id, tokenType: 'refresh', jti: crypto.randomUUID() },
+      { sub: user.id, tokenType: "refresh", jti: crypto.randomUUID() },
       { secret: env.JWT_SECRET, expiresIn: 604800 },
     );
 
@@ -353,8 +356,8 @@ export class AuthService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'USER_NOT_FOUND',
-          message: 'Không tìm thấy thông tin người dùng',
+          code: "USER_NOT_FOUND",
+          message: "Không tìm thấy thông tin người dùng",
           timestamp: new Date().toISOString(),
         },
       });

@@ -103,7 +103,7 @@ sequenceDiagram
     API->>DB: BEGIN TRANSACTION
     API->>DB: SELECT id FROM seats WHERE id = ANY($1) ORDER BY id ASC FOR UPDATE
     API->>DB: UPDATE seats SET status = 'HELD', hold_expires_at = now() + 5 phút WHERE id = ANY($1) AND (status='AVAILABLE' OR (status='HELD' AND hold_expires_at < now())) RETURNING id
-    
+
     alt Số dòng cập nhật nhỏ hơn số ghế yêu cầu
         API->>DB: ROLLBACK
         API-->>Web: Báo lỗi SEAT_ALREADY_HELD
@@ -144,14 +144,14 @@ sequenceDiagram
 
     VNPay->>API: Gửi IPN webhook (GET /webhooks/vnpay/ipn)
     Note over API: Xác thực chữ ký HMAC và kiểm tra bản ghi giao dịch
-    
+
     alt Chữ ký hợp lệ và giao dịch chưa được xử lý
         API->>DB: BEGIN TRANSACTION
         API->>DB: Cập nhật đơn PAID, ghế SOLD, tạo bản ghi tickets
         API->>DB: Ghi bản ghi outbox TICKET_ISSUED
         API->>DB: COMMIT
         API-->>VNPay: Trả {"RspCode":"00","Message":"Confirm Success"}
-        
+
         Worker->>DB: Đọc bản ghi outbox
         Worker->>Worker: Gửi email vé qua Resend/SES
     else Giao dịch đã xử lý trước đó
@@ -198,13 +198,16 @@ sequenceDiagram
 ## Các biện pháp an toàn và giới hạn
 
 ### Giới hạn gian lận vé
+
 - Cơ chế QR động giới hạn hiệu lực trong 30 giây giúp giảm thiểu việc chia sẻ ảnh chụp màn hình, nhưng không ngăn được việc người dùng đưa trực tiếp thiết bị của họ cho người khác vào cổng.
 - Nhân viên soát vé vẫn duy trì quy trình kiểm tra đối chiếu giấy tờ tùy thân khi phát hiện dấu hiệu nghi vấn.
 
 ### Dừng khẩn cấp (Kill Switch)
+
 - Khi phát hiện sự kiện vi phạm hoặc có khiếu nại nghiêm trọng, quản trị viên có thể chuyển trạng thái sự kiện sang `SUSPENDED`.
 - Hệ thống sẽ chặn các yêu cầu đặt chỗ, thanh toán mới, hủy các đơn đang giữ chỗ và thông báo cho người dùng đang chờ trong hàng.
 
 ### Kiểm soát lưu lượng và bảo vệ ứng dụng
+
 - Cloudflare áp dụng tường lửa ứng dụng (WAF) và Turnstile CAPTCHA để hạn chế lưu lượng truy cập từ bot tự động.
 - API áp dụng rate limiting theo địa chỉ IP và tài khoản người dùng trên các endpoint nhạy cảm như đăng nhập, giữ chỗ và tạo thanh toán.

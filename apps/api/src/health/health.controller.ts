@@ -42,7 +42,7 @@ export class HealthController {
         checks.redis = "unhealthy";
         isHealthy = false;
       }
-    } catch{
+    } catch {
       checks.redis = "unhealthy";
       isHealthy = false;
     }

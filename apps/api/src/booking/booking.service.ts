@@ -4,10 +4,10 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
-} from '@nestjs/common';
-import { sql, eq, and, or, lt, inArray, asc } from 'drizzle-orm';
-import crypto from 'crypto';
-import { db } from '../database/db';
+} from "@nestjs/common";
+import { sql, eq, and, or, lt, inArray, asc } from "drizzle-orm";
+import crypto from "crypto";
+import { db } from "../database/db";
 import {
   orders,
   orderItems,
@@ -15,15 +15,15 @@ import {
   ticketTypes,
   events,
   outbox,
-} from '../database/schema';
+} from "../database/schema";
 import {
   HoldSeatsRequest,
   OrderStatus,
   OutboxStatus,
   EventStatus,
   SeatStatus,
-} from '@tickethub/shared';
-import { WaitingRoomService } from '../waiting-room/waiting-room.service';
+} from "@tickethub/shared";
+import { WaitingRoomService } from "../waiting-room/waiting-room.service";
 
 @Injectable()
 export class BookingService {
@@ -42,8 +42,8 @@ export class BookingService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy sự kiện',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy sự kiện",
           timestamp: new Date().toISOString(),
         },
       });
@@ -53,8 +53,8 @@ export class BookingService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'EVENT_NOT_PUBLISHED',
-          message: 'Sự kiện chưa mở bán vé hoặc đã kết thúc',
+          code: "EVENT_NOT_PUBLISHED",
+          message: "Sự kiện chưa mở bán vé hoặc đã kết thúc",
           timestamp: new Date().toISOString(),
         },
       });
@@ -66,28 +66,27 @@ export class BookingService {
         throw new ForbiddenException({
           success: false,
           error: {
-            code: 'MISSING_ADMISSION_TOKEN',
+            code: "MISSING_ADMISSION_TOKEN",
             message:
-              'Sự kiện đang bật hàng chờ ảo, yêu cầu header X-Admission-Token',
+              "Sự kiện đang bật hàng chờ ảo, yêu cầu header X-Admission-Token",
             timestamp: new Date().toISOString(),
           },
         });
       }
 
-      const isValidToken =
-        await this.waitingRoomService.verifyAdmissionToken(
-          admissionToken,
-          dto.eventId,
-          userId,
-        );
+      const isValidToken = await this.waitingRoomService.verifyAdmissionToken(
+        admissionToken,
+        dto.eventId,
+        userId,
+      );
 
       if (!isValidToken) {
         throw new ForbiddenException({
           success: false,
           error: {
-            code: 'INVALID_ADMISSION_TOKEN',
+            code: "INVALID_ADMISSION_TOKEN",
             message:
-              'Mã lượt hàng chờ ảo không hợp lệ hoặc đã hết hạn (X-Admission-Token)',
+              "Mã lượt hàng chờ ảo không hợp lệ hoặc đã hết hạn (X-Admission-Token)",
             timestamp: new Date().toISOString(),
           },
         });
@@ -103,8 +102,8 @@ export class BookingService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'MAX_TICKETS_EXCEEDED',
-          message: 'Số lượng vé tối đa trên mỗi đơn hàng là 6 vé',
+          code: "MAX_TICKETS_EXCEEDED",
+          message: "Số lượng vé tối đa trên mỗi đơn hàng là 6 vé",
           timestamp: new Date().toISOString(),
         },
       });
@@ -119,8 +118,8 @@ export class BookingService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'DUPLICATE_SEATS',
-          message: 'Danh sách ghế yêu cầu chứa vị trí trùng lặp',
+          code: "DUPLICATE_SEATS",
+          message: "Danh sách ghế yêu cầu chứa vị trí trùng lặp",
           timestamp: new Date().toISOString(),
         },
       });
@@ -147,14 +146,14 @@ export class BookingService {
             ),
           )
           .orderBy(asc(seats.id))
-          .for('update');
+          .for("update");
 
         if (lockedSeats.length < sortedSeatIds.length) {
           throw new NotFoundException({
             success: false,
             error: {
-              code: 'SEAT_NOT_FOUND',
-              message: 'Một số ghế yêu cầu không tồn tại trong sự kiện',
+              code: "SEAT_NOT_FOUND",
+              message: "Một số ghế yêu cầu không tồn tại trong sự kiện",
               timestamp: new Date().toISOString(),
             },
           });
@@ -191,9 +190,9 @@ export class BookingService {
           throw new ConflictException({
             success: false,
             error: {
-              code: 'SEAT_ALREADY_HELD',
+              code: "SEAT_ALREADY_HELD",
               message:
-                'Một hoặc nhiều ghế đã được người khác giữ chỗ hoặc đã bán',
+                "Một hoặc nhiều ghế đã được người khác giữ chỗ hoặc đã bán",
               timestamp: new Date().toISOString(),
             },
           });
@@ -220,14 +219,14 @@ export class BookingService {
               eq(ticketTypes.eventId, dto.eventId),
             ),
           )
-          .for('update');
+          .for("update");
 
         if (!lockedTT || lockedTT.isSeated) {
           throw new BadRequestException({
             success: false,
             error: {
-              code: 'INVALID_TICKET_TYPE',
-              message: 'Hạng vé khu đứng không hợp lệ',
+              code: "INVALID_TICKET_TYPE",
+              message: "Hạng vé khu đứng không hợp lệ",
               timestamp: new Date().toISOString(),
             },
           });
@@ -237,8 +236,8 @@ export class BookingService {
           throw new ConflictException({
             success: false,
             error: {
-              code: 'INSUFFICIENT_TICKET_CAPACITY',
-              message: 'Số lượng vé khu đứng không còn đủ để giữ chỗ',
+              code: "INSUFFICIENT_TICKET_CAPACITY",
+              message: "Số lượng vé khu đứng không còn đủ để giữ chỗ",
               timestamp: new Date().toISOString(),
             },
           });
@@ -278,7 +277,7 @@ export class BookingService {
           throw new NotFoundException({
             success: false,
             error: {
-              code: 'TICKET_TYPE_NOT_FOUND',
+              code: "TICKET_TYPE_NOT_FOUND",
               message: `Hạng vé ${item.ticketTypeId} không tồn tại`,
               timestamp: new Date().toISOString(),
             },
@@ -302,8 +301,8 @@ export class BookingService {
       // 4. Tạo bản ghi đơn hàng PENDING có hạn 5 phút
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
-      const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
-      const orderCode = `ORD-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${randomSuffix}`;
+      const randomSuffix = crypto.randomBytes(3).toString("hex").toUpperCase();
+      const orderCode = `ORD-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}-${randomSuffix}`;
 
       const [newOrder] = await tx
         .insert(orders)
@@ -312,7 +311,7 @@ export class BookingService {
           userId,
           eventId: dto.eventId,
           totalAmount: totalAmount.toFixed(2),
-          discountAmount: '0.00',
+          discountAmount: "0.00",
           finalAmount: totalAmount.toFixed(2),
           status: OrderStatus.PENDING,
           expiresAt,
@@ -320,7 +319,7 @@ export class BookingService {
         .returning();
 
       if (!newOrder) {
-        throw new Error('Không thể tạo bản ghi đơn hàng');
+        throw new Error("Không thể tạo bản ghi đơn hàng");
       }
 
       // 5. Gắn orderId vào các ghế đã giữ
@@ -345,7 +344,7 @@ export class BookingService {
 
       // 7. Ghi nhận sự kiện Outbox
       await tx.insert(outbox).values({
-        eventType: 'ORDER_HOLD_CREATED',
+        eventType: "ORDER_HOLD_CREATED",
         payload: {
           orderId: newOrder.id,
           orderCode: newOrder.orderCode,
@@ -379,8 +378,8 @@ export class BookingService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'ORDER_NOT_FOUND',
-          message: 'Không tìm thấy đơn hàng cần giải phóng',
+          code: "ORDER_NOT_FOUND",
+          message: "Không tìm thấy đơn hàng cần giải phóng",
           timestamp: new Date().toISOString(),
         },
       });
@@ -390,7 +389,7 @@ export class BookingService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'ORDER_NOT_PENDING',
+          code: "ORDER_NOT_PENDING",
           message: `Chỉ đơn hàng PENDING mới có thể hủy giữ chỗ (trạng thái: ${order.status})`,
           timestamp: new Date().toISOString(),
         },
@@ -431,7 +430,7 @@ export class BookingService {
 
       // 4. Ghi outbox
       await tx.insert(outbox).values({
-        eventType: 'ORDER_HOLD_RELEASED',
+        eventType: "ORDER_HOLD_RELEASED",
         payload: {
           orderId,
           userId,
@@ -441,7 +440,7 @@ export class BookingService {
       });
 
       return {
-        message: 'Đã giải phóng ghế thành công',
+        message: "Đã giải phóng ghế thành công",
       };
     });
   }
@@ -464,8 +463,8 @@ export class BookingService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'ORDER_NOT_FOUND',
-          message: 'Không tìm thấy đơn hàng',
+          code: "ORDER_NOT_FOUND",
+          message: "Không tìm thấy đơn hàng",
           timestamp: new Date().toISOString(),
         },
       });
@@ -498,7 +497,7 @@ export class BookingService {
             lt(orders.expiresAt, now),
           ),
         )
-        .for('update');
+        .for("update");
 
       if (expiredOrders.length === 0) {
         // Vẫn dọn các ghế rác nếu có trạng thái HELD mà quá hạn

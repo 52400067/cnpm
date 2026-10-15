@@ -9,25 +9,28 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
-} from '@nestjs/common';
-import { BookingService } from './booking.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
+} from "@nestjs/common";
+import { BookingService } from "./booking.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from "../auth/decorators/current-user.decorator";
 import {
   HoldSeatsRequestSchema,
   ReleaseHoldRequestSchema,
-} from '@tickethub/shared';
+} from "@tickethub/shared";
 
-@Controller('api/v1/booking')
+@Controller("api/v1/booking")
 @UseGuards(JwtAuthGuard)
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
-  @Post('hold')
+  @Post("hold")
   @HttpCode(HttpStatus.CREATED)
   async holdSeats(
     @CurrentUser() user: AuthenticatedUser,
-    @Headers('x-admission-token') admissionToken: string | undefined,
+    @Headers("x-admission-token") admissionToken: string | undefined,
     @Body() body: unknown,
   ) {
     const parseResult = HoldSeatsRequestSchema.safeParse(body);
@@ -35,8 +38,8 @@ export class BookingController {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Dữ liệu giữ chỗ vé không hợp lệ',
+          code: "VALIDATION_ERROR",
+          message: "Dữ liệu giữ chỗ vé không hợp lệ",
           details: parseResult.error.format(),
           timestamp: new Date().toISOString(),
         },
@@ -55,7 +58,7 @@ export class BookingController {
     };
   }
 
-  @Post('release')
+  @Post("release")
   @HttpCode(HttpStatus.OK)
   async releaseHold(
     @CurrentUser() user: AuthenticatedUser,
@@ -66,8 +69,8 @@ export class BookingController {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Yêu cầu định danh mã đơn hàng hợp lệ',
+          code: "VALIDATION_ERROR",
+          message: "Yêu cầu định danh mã đơn hàng hợp lệ",
           timestamp: new Date().toISOString(),
         },
       });
@@ -84,10 +87,10 @@ export class BookingController {
     };
   }
 
-  @Get('orders/:orderId')
+  @Get("orders/:orderId")
   async getOrder(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('orderId') orderId: string,
+    @Param("orderId") orderId: string,
   ) {
     const data = await this.bookingService.getOrderById(user.userId, orderId);
 

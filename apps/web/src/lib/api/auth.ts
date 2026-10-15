@@ -1,26 +1,51 @@
+// apps/web/src/lib/api/auth.ts
 import { apiClient } from "./client";
-import type { LoginInput, RegisterInput } from "@/validations/auth";
+import type {
+  LoginRequest,
+  RegisterRequest,
+  VerifyEmailRequest,
+  UserRole,
+  UserStatus,
+} from "@tickethub/shared";
 
-export interface AuthResponse {
+export interface LoginResponseData {
   accessToken: string;
+  expiresIn: number;
   user: {
     id: string;
     email: string;
     fullName: string;
-    role: "BUYER" | "ORGANIZER" | "ADMIN" | "GATE_STAFF";
+    role: UserRole;
+    status: UserStatus;
   };
 }
 
+export interface RegisterResponseData {
+  userId: string;
+  email: string;
+  status: UserStatus;
+  message: string;
+}
+
 export const authApi = {
-  login: async (body: LoginInput): Promise<AuthResponse> => {
-    return apiClient<AuthResponse>("/auth/login", {
+  login: async (body: LoginRequest): Promise<LoginResponseData> => {
+    return apiClient<LoginResponseData>("/auth/login", {
       method: "POST",
       body: JSON.stringify(body),
     });
   },
 
-  register: async (body: RegisterInput): Promise<{ message: string }> => {
-    return apiClient<{ message: string }>("/auth/register", {
+  register: async (body: RegisterRequest): Promise<RegisterResponseData> => {
+    return apiClient<RegisterResponseData>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  verifyEmail: async (
+    body: VerifyEmailRequest,
+  ): Promise<{ status: UserStatus }> => {
+    return apiClient<{ status: UserStatus }>("/auth/verify-email", {
       method: "POST",
       body: JSON.stringify(body),
     });
@@ -30,13 +55,6 @@ export const authApi = {
     return apiClient<{ message: string }>("/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email }),
-    });
-  },
-
-  verifyEmail: async (data: { email: string; otp: string }): Promise<{ message: string }> => {
-    return apiClient<{ message: string }>("/auth/verify-email", {
-      method: "POST",
-      body: JSON.stringify(data),
     });
   },
 };

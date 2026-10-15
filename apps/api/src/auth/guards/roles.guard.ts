@@ -3,20 +3,20 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from '../decorators/roles.decorator';
-import { UserRole } from '@tickethub/shared';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { ROLES_KEY } from "../decorators/roles.decorator";
+import { UserRole } from "@tickethub/shared";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!requiredRoles || requiredRoles.length === 0) {
       return true;
@@ -29,8 +29,8 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException({
         success: false,
         error: {
-          code: 'FORBIDDEN_RESOURCE',
-          message: 'Không đủ quyền hạn truy cập tài nguyên',
+          code: "FORBIDDEN_RESOURCE",
+          message: "Không đủ quyền hạn truy cập tài nguyên",
           timestamp: new Date().toISOString(),
         },
       });
@@ -41,8 +41,8 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException({
         success: false,
         error: {
-          code: 'FORBIDDEN_RESOURCE',
-          message: `Tài nguyên yêu cầu quyền: ${requiredRoles.join(', ')}`,
+          code: "FORBIDDEN_RESOURCE",
+          message: `Tài nguyên yêu cầu quyền: ${requiredRoles.join(", ")}`,
           timestamp: new Date().toISOString(),
         },
       });

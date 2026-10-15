@@ -1,17 +1,17 @@
-import { relations } from 'drizzle-orm';
-import { users } from './users';
-import { organizerProfiles } from './organizer-profiles';
-import { events } from './events';
-import { ticketTypes } from './ticket-types';
-import { seats } from './seats';
-import { orders } from './orders';
-import { orderItems } from './order-items';
-import { tickets } from './tickets';
-import { transactions } from './transactions';
-import { refunds } from './refunds';
-import { gates } from './gates';
-import { eventStaff } from './event-staff';
-import { payouts } from './payouts';
+import { relations } from "drizzle-orm";
+import { users } from "./users";
+import { organizerProfiles } from "./organizer-profiles";
+import { events } from "./events";
+import { ticketTypes } from "./ticket-types";
+import { seats } from "./seats";
+import { orders } from "./orders";
+import { orderItems } from "./order-items";
+import { tickets } from "./tickets";
+import { transactions } from "./transactions";
+import { refunds } from "./refunds";
+import { gates } from "./gates";
+import { eventStaff } from "./event-staff";
+import { payouts } from "./payouts";
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   organizerProfile: one(organizerProfiles, {
@@ -23,18 +23,21 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   eventStaffAssignments: many(eventStaff),
 }));
 
-export const organizerProfilesRelations = relations(organizerProfiles, ({ one, many }) => ({
-  user: one(users, {
-    fields: [organizerProfiles.userId],
-    references: [users.id],
+export const organizerProfilesRelations = relations(
+  organizerProfiles,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [organizerProfiles.userId],
+      references: [users.id],
+    }),
+    verifiedByUser: one(users, {
+      fields: [organizerProfiles.verifiedBy],
+      references: [users.id],
+    }),
+    events: many(events),
+    payouts: many(payouts),
   }),
-  verifiedByUser: one(users, {
-    fields: [organizerProfiles.verifiedBy],
-    references: [users.id],
-  }),
-  events: many(events),
-  payouts: many(payouts),
-}));
+);
 
 export const eventsRelations = relations(events, ({ one, many }) => ({
   organizer: one(organizerProfiles, {

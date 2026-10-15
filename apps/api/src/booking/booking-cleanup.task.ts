@@ -3,8 +3,8 @@ import {
   OnModuleInit,
   OnModuleDestroy,
   Logger,
-} from '@nestjs/common';
-import { BookingService } from './booking.service';
+} from "@nestjs/common";
+import { BookingService } from "./booking.service";
 
 @Injectable()
 export class BookingCleanupTask implements OnModuleInit, OnModuleDestroy {
@@ -25,7 +25,7 @@ export class BookingCleanupTask implements OnModuleInit, OnModuleDestroy {
           );
         }
       } catch (error) {
-        this.logger.error('Lỗi khi thực hiện dọn dẹp đơn hàng hết hạn', error);
+        this.logger.error("Lỗi khi thực hiện dọn dẹp đơn hàng hết hạn", error);
       }
     }, 15000);
   }

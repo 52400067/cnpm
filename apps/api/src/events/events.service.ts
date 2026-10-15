@@ -4,9 +4,9 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
-} from '@nestjs/common';
-import { eq, and, ne, sql } from 'drizzle-orm';
-import { db } from '../database/db';
+} from "@nestjs/common";
+import { eq, and, ne, sql } from "drizzle-orm";
+import { db } from "../database/db";
 import {
   events,
   ticketTypes,
@@ -14,7 +14,7 @@ import {
   organizerProfiles,
   outbox,
   tickets,
-} from '../database/schema';
+} from "../database/schema";
 import {
   CreateEventRequest,
   EventStatus,
@@ -22,7 +22,7 @@ import {
   OutboxStatus,
   SeatStatus,
   TicketStatus,
-} from '@tickethub/shared';
+} from "@tickethub/shared";
 
 export interface GenerateSeatsDto {
   zones: Array<{
@@ -60,8 +60,8 @@ export class EventsService {
       throw new ForbiddenException({
         success: false,
         error: {
-          code: 'ORGANIZER_PROFILE_REQUIRED',
-          message: 'Tài khoản chưa có hồ sơ ban tổ chức',
+          code: "ORGANIZER_PROFILE_REQUIRED",
+          message: "Tài khoản chưa có hồ sơ ban tổ chức",
           timestamp: new Date().toISOString(),
         },
       });
@@ -71,8 +71,8 @@ export class EventsService {
       throw new ForbiddenException({
         success: false,
         error: {
-          code: 'ORGANIZER_NOT_VERIFIED',
-          message: 'Hồ sơ ban tổ chức chưa được quản trị viên phê duyệt',
+          code: "ORGANIZER_NOT_VERIFIED",
+          message: "Hồ sơ ban tổ chức chưa được quản trị viên phê duyệt",
           timestamp: new Date().toISOString(),
         },
       });
@@ -92,7 +92,7 @@ export class EventsService {
       throw new ConflictException({
         success: false,
         error: {
-          code: 'SLUG_ALREADY_EXISTS',
+          code: "SLUG_ALREADY_EXISTS",
           message: `Đường dẫn định danh (slug) '${dto.slug}' đã tồn tại trong hệ thống`,
           timestamp: new Date().toISOString(),
         },
@@ -125,7 +125,7 @@ export class EventsService {
         .returning();
 
       if (!newEvent) {
-        throw new Error('Không thể khởi tạo bản ghi sự kiện');
+        throw new Error("Không thể khởi tạo bản ghi sự kiện");
       }
 
       const ticketTypeValues = dto.ticketTypes.map((tt) => ({
@@ -147,7 +147,7 @@ export class EventsService {
         .returning();
 
       await tx.insert(outbox).values({
-        eventType: 'EVENT_CREATED',
+        eventType: "EVENT_CREATED",
         payload: {
           eventId: newEvent.id,
           organizerId: profile.id,
@@ -192,8 +192,8 @@ export class EventsService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy sự kiện của ban tổ chức',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy sự kiện của ban tổ chức",
           timestamp: new Date().toISOString(),
         },
       });
@@ -222,8 +222,8 @@ export class EventsService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy sự kiện cần cập nhật',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy sự kiện cần cập nhật",
           timestamp: new Date().toISOString(),
         },
       });
@@ -233,7 +233,7 @@ export class EventsService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'EVENT_CANNOT_BE_EDITED',
+          code: "EVENT_CANNOT_BE_EDITED",
           message: `Chỉ sự kiện ở trạng thái DRAFT mới được phép chỉnh sửa (trạng thái hiện tại: ${event.status})`,
           timestamp: new Date().toISOString(),
         },
@@ -245,9 +245,9 @@ export class EventsService {
       throw new ConflictException({
         success: false,
         error: {
-          code: 'CONCURRENT_MODIFICATION',
+          code: "CONCURRENT_MODIFICATION",
           message:
-            'Dữ liệu sự kiện đã bị thay đổi bởi phiên làm việc khác. Vui lòng làm mới trang.',
+            "Dữ liệu sự kiện đã bị thay đổi bởi phiên làm việc khác. Vui lòng làm mới trang.",
           timestamp: new Date().toISOString(),
         },
       });
@@ -284,8 +284,8 @@ export class EventsService {
       throw new ConflictException({
         success: false,
         error: {
-          code: 'CONCURRENT_MODIFICATION',
-          message: 'Cập nhật thất bại do tranh chấp dữ liệu phiên bản',
+          code: "CONCURRENT_MODIFICATION",
+          message: "Cập nhật thất bại do tranh chấp dữ liệu phiên bản",
           timestamp: new Date().toISOString(),
         },
       });
@@ -306,8 +306,8 @@ export class EventsService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy sự kiện',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy sự kiện",
           timestamp: new Date().toISOString(),
         },
       });
@@ -317,8 +317,8 @@ export class EventsService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'EVENT_CANNOT_BE_EDITED',
-          message: 'Chỉ có thể sinh sơ đồ ghế khi sự kiện ở trạng thái DRAFT',
+          code: "EVENT_CANNOT_BE_EDITED",
+          message: "Chỉ có thể sinh sơ đồ ghế khi sự kiện ở trạng thái DRAFT",
           timestamp: new Date().toISOString(),
         },
       });
@@ -336,8 +336,8 @@ export class EventsService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'CANNOT_MODIFY_SOLD_SEATS',
-          message: 'Không thể sinh lại sơ đồ ghế khi đã phát sinh vé bán ra',
+          code: "CANNOT_MODIFY_SOLD_SEATS",
+          message: "Không thể sinh lại sơ đồ ghế khi đã phát sinh vé bán ra",
           timestamp: new Date().toISOString(),
         },
       });
@@ -352,7 +352,7 @@ export class EventsService {
         throw new BadRequestException({
           success: false,
           error: {
-            code: 'INVALID_TICKET_TYPE',
+            code: "INVALID_TICKET_TYPE",
             message: `Hạng vé ${zone.ticketTypeId} không thuộc sự kiện này`,
             timestamp: new Date().toISOString(),
           },
@@ -362,7 +362,7 @@ export class EventsService {
         throw new BadRequestException({
           success: false,
           error: {
-            code: 'TICKET_TYPE_NOT_SEATED',
+            code: "TICKET_TYPE_NOT_SEATED",
             message: `Hạng vé '${tt.name}' là khu đứng, không áp dụng sinh ghế ngồi`,
             timestamp: new Date().toISOString(),
           },
@@ -440,8 +440,8 @@ export class EventsService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy sự kiện',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy sự kiện",
           timestamp: new Date().toISOString(),
         },
       });
@@ -451,7 +451,7 @@ export class EventsService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'INVALID_EVENT_STATUS',
+          code: "INVALID_EVENT_STATUS",
           message: `Chỉ sự kiện DRAFT mới có thể gửi phê duyệt (trạng thái hiện tại: ${event.status})`,
           timestamp: new Date().toISOString(),
         },
@@ -462,8 +462,8 @@ export class EventsService {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'NO_TICKET_TYPES',
-          message: 'Sự kiện phải có ít nhất 1 hạng vé trước khi gửi phê duyệt',
+          code: "NO_TICKET_TYPES",
+          message: "Sự kiện phải có ít nhất 1 hạng vé trước khi gửi phê duyệt",
           timestamp: new Date().toISOString(),
         },
       });
@@ -475,13 +475,15 @@ export class EventsService {
         const [seatCount] = await db
           .select({ count: sql<number>`count(*)::int` })
           .from(seats)
-          .where(and(eq(seats.eventId, eventId), eq(seats.ticketTypeId, tt.id)));
+          .where(
+            and(eq(seats.eventId, eventId), eq(seats.ticketTypeId, tt.id)),
+          );
 
         if (!seatCount || seatCount.count === 0) {
           throw new BadRequestException({
             success: false,
             error: {
-              code: 'SEATS_NOT_GENERATED',
+              code: "SEATS_NOT_GENERATED",
               message: `Hạng vé có số ghế '${tt.name}' chưa được sinh sơ đồ ghế`,
               timestamp: new Date().toISOString(),
             },
@@ -502,7 +504,7 @@ export class EventsService {
         .returning();
 
       await tx.insert(outbox).values({
-        eventType: 'EVENT_SUBMITTED_FOR_APPROVAL',
+        eventType: "EVENT_SUBMITTED_FOR_APPROVAL",
         payload: {
           eventId: event.id,
           organizerId: profile.id,
@@ -542,7 +544,10 @@ export class EventsService {
 
   async getPublicEventBySlug(slug: string) {
     const event = await db.query.events.findFirst({
-      where: and(eq(events.slug, slug), eq(events.status, EventStatus.PUBLISHED)),
+      where: and(
+        eq(events.slug, slug),
+        eq(events.status, EventStatus.PUBLISHED),
+      ),
       with: {
         ticketTypes: true,
       },
@@ -552,8 +557,8 @@ export class EventsService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy thông tin sự kiện',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy thông tin sự kiện",
           timestamp: new Date().toISOString(),
         },
       });
@@ -574,8 +579,8 @@ export class EventsService {
       throw new NotFoundException({
         success: false,
         error: {
-          code: 'EVENT_NOT_FOUND',
-          message: 'Không tìm thấy sự kiện',
+          code: "EVENT_NOT_FOUND",
+          message: "Không tìm thấy sự kiện",
           timestamp: new Date().toISOString(),
         },
       });
@@ -593,7 +598,10 @@ export class EventsService {
         zoneName: string;
         ticketTypeId: string;
         isSeated: boolean;
-        rows: Map<string, Array<{ id: string; seatNumber: string; status: string }>>;
+        rows: Map<
+          string,
+          Array<{ id: string; seatNumber: string; status: string }>
+        >;
       }
     >();
 

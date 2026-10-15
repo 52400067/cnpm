@@ -3,9 +3,9 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { env } from '../../config/env.config';
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { env } from "../../config/env.config";
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -13,26 +13,26 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers['authorization'];
+    const authHeader = request.headers["authorization"];
 
-    if (!authHeader || typeof authHeader !== 'string') {
+    if (!authHeader || typeof authHeader !== "string") {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'UNAUTHORIZED',
-          message: 'Yêu cầu token xác thực Bearer',
+          code: "UNAUTHORIZED",
+          message: "Yêu cầu token xác thực Bearer",
           timestamp: new Date().toISOString(),
         },
       });
     }
 
-    const [bearer, token] = authHeader.split(' ');
-    if (bearer !== 'Bearer' || !token) {
+    const [bearer, token] = authHeader.split(" ");
+    if (bearer !== "Bearer" || !token) {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'INVALID_TOKEN_FORMAT',
-          message: 'Định dạng token không hợp lệ',
+          code: "INVALID_TOKEN_FORMAT",
+          message: "Định dạng token không hợp lệ",
           timestamp: new Date().toISOString(),
         },
       });
@@ -52,8 +52,8 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException({
         success: false,
         error: {
-          code: 'TOKEN_EXPIRED_OR_INVALID',
-          message: 'Token đã hết hạn hoặc không hợp lệ',
+          code: "TOKEN_EXPIRED_OR_INVALID",
+          message: "Token đã hết hạn hoặc không hợp lệ",
           timestamp: new Date().toISOString(),
         },
       });

@@ -9,22 +9,25 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
-} from '@nestjs/common';
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { CurrentUser, AuthenticatedUser } from './decorators/current-user.decorator';
+} from "@nestjs/common";
+import { FastifyRequest, FastifyReply } from "fastify";
+import { AuthService } from "./auth.service";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from "./decorators/current-user.decorator";
 import {
   RegisterRequestSchema,
   LoginRequestSchema,
   VerifyEmailRequestSchema,
-} from '@tickethub/shared';
+} from "@tickethub/shared";
 
-@Controller('api/v1/auth')
+@Controller("api/v1/auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('register')
+  @Post("register")
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() body: unknown) {
     const parseResult = RegisterRequestSchema.safeParse(body);
@@ -32,8 +35,8 @@ export class AuthController {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Dữ liệu đăng ký không hợp lệ',
+          code: "VALIDATION_ERROR",
+          message: "Dữ liệu đăng ký không hợp lệ",
           details: parseResult.error.format(),
           timestamp: new Date().toISOString(),
         },
@@ -52,7 +55,7 @@ export class AuthController {
     };
   }
 
-  @Post('verify-email')
+  @Post("verify-email")
   @HttpCode(HttpStatus.OK)
   async verifyEmail(@Body() body: unknown) {
     const parseResult = VerifyEmailRequestSchema.safeParse(body);
@@ -60,8 +63,8 @@ export class AuthController {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Mã token xác thực là bắt buộc',
+          code: "VALIDATION_ERROR",
+          message: "Mã token xác thực là bắt buộc",
           timestamp: new Date().toISOString(),
         },
       });
@@ -74,7 +77,7 @@ export class AuthController {
     };
   }
 
-  @Post('login')
+  @Post("login")
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() body: unknown,
@@ -85,8 +88,8 @@ export class AuthController {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Email hoặc mật khẩu không đúng định dạng',
+          code: "VALIDATION_ERROR",
+          message: "Email hoặc mật khẩu không đúng định dạng",
           timestamp: new Date().toISOString(),
         },
       });
@@ -95,11 +98,11 @@ export class AuthController {
     const result = await this.authService.login(parseResult.data);
 
     // Gán cookie HttpOnly cho Refresh Token
-    res.setCookie('refreshToken', result.refreshToken, {
-      path: '/',
+    res.setCookie("refreshToken", result.refreshToken, {
+      path: "/",
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
     });
 
@@ -113,7 +116,7 @@ export class AuthController {
     };
   }
 
-  @Post('refresh')
+  @Post("refresh")
   @HttpCode(HttpStatus.OK)
   async refresh(
     @Req() req: FastifyRequest,
@@ -127,8 +130,8 @@ export class AuthController {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'MISSING_REFRESH_TOKEN',
-          message: 'Không tìm thấy refresh token trong cookie hoặc body',
+          code: "MISSING_REFRESH_TOKEN",
+          message: "Không tìm thấy refresh token trong cookie hoặc body",
           timestamp: new Date().toISOString(),
         },
       });
@@ -136,11 +139,11 @@ export class AuthController {
 
     const result = await this.authService.refreshToken(token);
 
-    res.setCookie('refreshToken', result.refreshToken, {
-      path: '/',
+    res.setCookie("refreshToken", result.refreshToken, {
+      path: "/",
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -153,19 +156,19 @@ export class AuthController {
     };
   }
 
-  @Post('logout')
+  @Post("logout")
   @HttpCode(HttpStatus.OK)
   async logout(@Res({ passthrough: true }) res: FastifyReply) {
-    res.clearCookie('refreshToken', { path: '/' });
+    res.clearCookie("refreshToken", { path: "/" });
     return {
       success: true,
       data: {
-        message: 'Đăng xuất thành công',
+        message: "Đăng xuất thành công",
       },
     };
   }
 
-  @Get('me')
+  @Get("me")
   @UseGuards(JwtAuthGuard)
   async getMe(@CurrentUser() user: AuthenticatedUser) {
     const data = await this.authService.getCurrentUser(user.userId);

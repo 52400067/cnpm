@@ -10,19 +10,26 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
-} from '@nestjs/common';
-import { EventsService, GenerateSeatsDto, UpdateEventDto } from './events.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
+} from "@nestjs/common";
+import {
+  EventsService,
+  GenerateSeatsDto,
+  UpdateEventDto,
+} from "./events.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from "../auth/decorators/current-user.decorator";
 import {
   UserRole,
   CreateEventRequestSchema,
   EventFilterQuerySchema,
-} from '@tickethub/shared';
+} from "@tickethub/shared";
 
-@Controller('api/v1/organizer/events')
+@Controller("api/v1/organizer/events")
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
 export class OrganizerEventsController {
@@ -39,15 +46,18 @@ export class OrganizerEventsController {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Dữ liệu tạo sự kiện không hợp lệ',
+          code: "VALIDATION_ERROR",
+          message: "Dữ liệu tạo sự kiện không hợp lệ",
           details: parseResult.error.format(),
           timestamp: new Date().toISOString(),
         },
       });
     }
 
-    const data = await this.eventsService.createEvent(user.userId, parseResult.data);
+    const data = await this.eventsService.createEvent(
+      user.userId,
+      parseResult.data,
+    );
     return {
       success: true,
       data,
@@ -66,30 +76,33 @@ export class OrganizerEventsController {
     };
   }
 
-  @Get(':id')
+  @Get(":id")
   async getOrganizerEventById(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param("id") id: string,
   ) {
-    const data = await this.eventsService.getOrganizerEventById(user.userId, id);
+    const data = await this.eventsService.getOrganizerEventById(
+      user.userId,
+      id,
+    );
     return {
       success: true,
       data,
     };
   }
 
-  @Put(':id')
+  @Put(":id")
   async updateEvent(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() body: UpdateEventDto,
   ) {
-    if (typeof body?.version !== 'number') {
+    if (typeof body?.version !== "number") {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'VERSION_REQUIRED',
-          message: 'Trường version là bắt buộc để kiểm soát tranh chấp dữ liệu',
+          code: "VERSION_REQUIRED",
+          message: "Trường version là bắt buộc để kiểm soát tranh chấp dữ liệu",
           timestamp: new Date().toISOString(),
         },
       });
@@ -102,19 +115,19 @@ export class OrganizerEventsController {
     };
   }
 
-  @Post(':id/seats/generate')
+  @Post(":id/seats/generate")
   @HttpCode(HttpStatus.OK)
   async generateSeats(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() body: GenerateSeatsDto,
   ) {
     if (!body?.zones || !Array.isArray(body.zones) || body.zones.length === 0) {
       throw new BadRequestException({
         success: false,
         error: {
-          code: 'INVALID_ZONE_CONFIG',
-          message: 'Danh sách cấu hình khu vực ghế không hợp lệ',
+          code: "INVALID_ZONE_CONFIG",
+          message: "Danh sách cấu hình khu vực ghế không hợp lệ",
           timestamp: new Date().toISOString(),
         },
       });
@@ -127,13 +140,16 @@ export class OrganizerEventsController {
     };
   }
 
-  @Post(':id/submit')
+  @Post(":id/submit")
   @HttpCode(HttpStatus.OK)
   async submitEvent(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param("id") id: string,
   ) {
-    const data = await this.eventsService.submitEventForApproval(user.userId, id);
+    const data = await this.eventsService.submitEventForApproval(
+      user.userId,
+      id,
+    );
     return {
       success: true,
       data,
@@ -141,7 +157,7 @@ export class OrganizerEventsController {
   }
 }
 
-@Controller('api/v1/events')
+@Controller("api/v1/events")
 export class PublicEventsController {
   constructor(private readonly eventsService: EventsService) {}
 
@@ -160,8 +176,8 @@ export class PublicEventsController {
     };
   }
 
-  @Get(':slug')
-  async getPublicEventBySlug(@Param('slug') slug: string) {
+  @Get(":slug")
+  async getPublicEventBySlug(@Param("slug") slug: string) {
     const data = await this.eventsService.getPublicEventBySlug(slug);
     return {
       success: true,
@@ -169,8 +185,8 @@ export class PublicEventsController {
     };
   }
 
-  @Get(':id/seatmap')
-  async getEventSeatMap(@Param('id') id: string) {
+  @Get(":id/seatmap")
+  async getEventSeatMap(@Param("id") id: string) {
     const data = await this.eventsService.getEventSeatMap(id);
     return {
       success: true,

@@ -1,42 +1,65 @@
-import { pgTable, uuid, varchar, text, boolean, integer, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
-import { EventStatus, RefundPolicyType } from '@tickethub/shared';
-import { organizerProfiles } from './organizer-profiles';
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  boolean,
+  integer,
+  timestamp,
+  jsonb,
+  index,
+} from "drizzle-orm/pg-core";
+import { EventStatus, RefundPolicyType } from "@tickethub/shared";
+import { organizerProfiles } from "./organizer-profiles";
 
 export const events = pgTable(
-  'events',
+  "events",
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    organizerId: uuid('organizer_id')
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizerId: uuid("organizer_id")
       .notNull()
       .references(() => organizerProfiles.id),
-    title: varchar('title', { length: 255 }).notNull(),
-    slug: varchar('slug', { length: 255 }).notNull().unique(),
-    description: text('description').notNull(),
-    category: varchar('category', { length: 50 }).notNull(),
-    bannerUrl: varchar('banner_url', { length: 500 }).notNull(),
-    venueName: varchar('venue_name', { length: 255 }).notNull(),
-    venueAddress: text('venue_address').notNull(),
-    city: varchar('city', { length: 100 }).notNull(),
-    startTime: timestamp('start_time', { withTimezone: true }).notNull(),
-    endTime: timestamp('end_time', { withTimezone: true }).notNull(),
-    gateOpeningTime: timestamp('gate_opening_time', { withTimezone: true }).notNull(),
-    status: varchar('status', { length: 25 })
+    title: varchar("title", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull().unique(),
+    description: text("description").notNull(),
+    category: varchar("category", { length: 50 }).notNull(),
+    bannerUrl: varchar("banner_url", { length: 500 }).notNull(),
+    venueName: varchar("venue_name", { length: 255 }).notNull(),
+    venueAddress: text("venue_address").notNull(),
+    city: varchar("city", { length: 100 }).notNull(),
+    startTime: timestamp("start_time", { withTimezone: true }).notNull(),
+    endTime: timestamp("end_time", { withTimezone: true }).notNull(),
+    gateOpeningTime: timestamp("gate_opening_time", {
+      withTimezone: true,
+    }).notNull(),
+    status: varchar("status", { length: 25 })
       .notNull()
       .default(EventStatus.DRAFT)
       .$type<EventStatus>(),
-    rejectionReason: text('rejection_reason'),
-    isWaitingRoomEnabled: boolean('is_waiting_room_enabled').notNull().default(false),
-    maxActiveUsers: integer('max_active_users').notNull().default(200),
-    refundPolicyType: varchar('refund_policy_type', { length: 25 })
+    rejectionReason: text("rejection_reason"),
+    isWaitingRoomEnabled: boolean("is_waiting_room_enabled")
+      .notNull()
+      .default(false),
+    maxActiveUsers: integer("max_active_users").notNull().default(200),
+    refundPolicyType: varchar("refund_policy_type", { length: 25 })
       .notNull()
       .default(RefundPolicyType.FLEXIBLE)
       .$type<RefundPolicyType>(),
-    refundPolicyRules: jsonb('refund_policy_rules').notNull().default([]),
-    version: integer('version').notNull().default(1),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    refundPolicyRules: jsonb("refund_policy_rules").notNull().default([]),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
-    index('idx_events_search_filters').on(table.city, table.category, table.startTime, table.status),
+    index("idx_events_search_filters").on(
+      table.city,
+      table.category,
+      table.startTime,
+      table.status,
+    ),
   ],
 );
