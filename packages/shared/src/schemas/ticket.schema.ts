@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { TicketStatus } from '../constants/enums';
+import { z } from "zod";
 
 export const CheckInRequestSchema = z.object({
   qrToken: z.string().min(1),

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import fastifyCookie from '@fastify/cookie';
 import { AppModule } from './app.module';
 import { env } from './config/env.config';
 
@@ -12,7 +13,15 @@ async function bootstrap() {
     }),
   );
 
-  app.enableCors();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await app.register(fastifyCookie as any, {
+    secret: env.JWT_SECRET,
+  });
+
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
   app.enableShutdownHooks();
 
   await app.listen(env.PORT, '0.0.0.0');

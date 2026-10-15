@@ -1,6 +1,4 @@
-import { z } from 'zod';
-import { OrderStatus, PaymentProvider } from '../constants/enums';
-
+import { z } from "zod";
 export const HoldSeatItemSchema = z.object({
   seatId: z.string().uuid().optional(),
   ticketTypeId: z.string().uuid(),
