@@ -10,16 +10,28 @@ import { UserRegisteredPayloadSchema } from "./email.types";
 
 // Chỉ cho phép gửi job với dữ liệu giả khi kiểm thử.
 const enqueueTest = process.argv.includes("--enqueue-test");
+const enqueueLive = process.argv.includes("--enqueue");
+
+if (enqueueTest && enqueueLive) {
+  throw new Error("Cannot use --enqueue and --enqueue-test together.");
+}
 
 async function main() {
-  if (process.argv.includes("--enqueue")) {
+  if (enqueueLive && process.env.ENABLE_REAL_EMAIL_DISPATCH !== "true") {
     throw new Error(
-      "Worker currently simulates email. Use --enqueue-test for smoke tests only.",
+      "Real email dispatch is disabled. " +
+        "ENABLE_REAL_EMAIL_DISPATCH must be true.",
     );
   }
 
+  const mode = enqueueTest
+    ? "TEST ENQUEUE"
+    : enqueueLive
+      ? "LIVE ENQUEUE"
+      : "DRY RUN";
+
   console.log("[Dispatcher] Starting...");
-  console.log(`[Dispatcher] Mode: ${enqueueTest ? "TEST ENQUEUE" : "DRY RUN"}`);
+  console.log(`[Dispatcher] Mode: ${mode}`);
 
   const events = await db
     .select({
@@ -47,15 +59,16 @@ async function main() {
     try {
       const payload = UserRegisteredPayloadSchema.parse(event.payload);
 
-      if (!enqueueTest) {
+      if (!enqueueTest && !enqueueLive) {
         console.log(`[Dispatcher] Valid event: ${event.id}`);
         continue;
       }
 
       // Không xử lý email đăng ký thật trong giai đoạn mock.
       if (
-        payload.email !== "outbox-smoke@example.invalid" ||
-        payload.verificationToken !== "fake-test-token"
+        enqueueTest &&
+        (payload.email !== "outbox-smoke@example.invalid" ||
+          payload.verificationToken !== "fake-test-token")
       ) {
         console.log(`[Dispatcher] Skipped non-test event: ${event.id}`);
         continue;
@@ -65,9 +78,25 @@ async function main() {
       const existingJob = await emailQueue.getJob(`outbox_${event.id}`);
 
       if (existingJob) {
-        console.log(`[Dispatcher] Job already exists: ${existingJob.id}`);
+        const jobState = await existingJob.getState();
+
+        console.warn(
+          `[Dispatcher] Existing BullMQ job detected: ` +
+            `outboxId=${event.id}, ` +
+            `jobId=${existingJob.id}, ` +
+            `state=${jobState}`,
+        );
+
+        // Không tự động enqueue lại khi chưa đối soát
+        // trạng thái Redis với PostgreSQL.
+        console.warn(
+          `[Dispatcher] Skipped to prevent duplicate enqueue. ` +
+            `Manual reconciliation may be required.`,
+        );
+
         continue;
       }
+
 
       // Atomic Claim: chỉ 1 Dispatcher nhận được sự kiện.
       const [claimed] = await db
