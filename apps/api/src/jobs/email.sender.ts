@@ -17,7 +17,23 @@ export async function sendRegistrationEmail(
   }
 
   if (env.NODE_ENV === "production" && from.includes("resend.dev")) {
-    throw new Error("Configure a verified sender domain for production");
+    const sender = from.trim().toLowerCase();
+
+    const validTestSender =
+      sender === "onboarding@resend.dev" ||
+      sender === "tickethub <onboarding@resend.dev>";
+
+    const allowTestEmail =
+      process.env.EMAIL_WORKER_MODE === "live-test" &&
+      process.env.ALLOW_RESEND_TEST_SENDER === "true" &&
+      validTestSender &&
+      !!process.env.TEST_EMAIL_TO &&
+      payload.email.trim().toLowerCase() ===
+        process.env.TEST_EMAIL_TO.trim().toLowerCase();
+
+    if (!allowTestEmail) {
+      throw new Error("Configure a verified sender domain for production");
+    }
   }
 
   const resend = new Resend(apiKey);

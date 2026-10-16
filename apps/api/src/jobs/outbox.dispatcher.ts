@@ -1,4 +1,4 @@
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
 import { OutboxStatus } from "@tickethub/shared";
 
 import { db, sqlClient } from "../database/db";
@@ -11,12 +11,35 @@ import { UserRegisteredPayloadSchema } from "./email.types";
 // Chỉ cho phép gửi job với dữ liệu giả khi kiểm thử.
 const enqueueTest = process.argv.includes("--enqueue-test");
 const enqueueLive = process.argv.includes("--enqueue");
+const enqueueEmailTest = process.argv.includes("--enqueue-email-test");
 
-if (enqueueTest && enqueueLive) {
-  throw new Error("Cannot use --enqueue and --enqueue-test together.");
+if ([enqueueTest, enqueueLive, enqueueEmailTest].filter(Boolean).length > 1) {
+  throw new Error("Only one enqueue mode is allowed.");
 }
 
 async function main() {
+  const testEmail = process.env.TEST_EMAIL_TO?.trim().toLowerCase();
+
+  if (enqueueEmailTest) {
+    if (process.env.ENABLE_TEST_EMAIL_DISPATCH !== "true") {
+      throw new Error("Test email dispatch is disabled.");
+    }
+
+    if (!testEmail) {
+      throw new Error("TEST_EMAIL_TO is required.");
+    }
+
+    if (process.env.EMAIL_WORKER_MODE !== "live-test") {
+      throw new Error("Worker must use live-test mode.");
+    }
+
+    const redisUrl = process.env.REDIS_URL;
+
+    if (!redisUrl || new URL(redisUrl).hostname !== "email-test-redis") {
+      throw new Error("Test dispatch must use isolated Redis.");
+    }
+  }
+
   if (enqueueLive && process.env.ENABLE_REAL_EMAIL_DISPATCH !== "true") {
     throw new Error(
       "Real email dispatch is disabled. " +
@@ -24,11 +47,13 @@ async function main() {
     );
   }
 
-  const mode = enqueueTest
-    ? "TEST ENQUEUE"
-    : enqueueLive
-      ? "LIVE ENQUEUE"
-      : "DRY RUN";
+  const mode = enqueueEmailTest
+    ? "EMAIL LIVE TEST"
+    : enqueueTest
+      ? "TEST ENQUEUE"
+      : enqueueLive
+        ? "LIVE ENQUEUE"
+        : "DRY RUN";
 
   console.log("[Dispatcher] Starting...");
   console.log(`[Dispatcher] Mode: ${mode}`);
@@ -46,6 +71,9 @@ async function main() {
         eq(outbox.status, OutboxStatus.PENDING),
         eq(outbox.eventType, "USER_REGISTERED"),
         lte(outbox.nextRetryAt, new Date()),
+        enqueueEmailTest
+          ? sql`lower(${outbox.payload} ->> 'email') = ${testEmail}`
+          : undefined,
       ),
     )
     .orderBy(asc(outbox.createdAt))
@@ -59,8 +87,16 @@ async function main() {
     try {
       const payload = UserRegisteredPayloadSchema.parse(event.payload);
 
-      if (!enqueueTest && !enqueueLive) {
+      if (!enqueueTest && !enqueueLive && !enqueueEmailTest) {
         console.log(`[Dispatcher] Valid event: ${event.id}`);
+        continue;
+      }
+
+      if (
+        enqueueEmailTest &&
+        payload.email.trim().toLowerCase() !== testEmail
+      ) {
+        console.log(`[Dispatcher] Skipped other email: ${event.id}`);
         continue;
       }
 
@@ -96,7 +132,6 @@ async function main() {
 
         continue;
       }
-
 
       // Atomic Claim: chỉ 1 Dispatcher nhận được sự kiện.
       const [claimed] = await db
