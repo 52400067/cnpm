@@ -7,8 +7,8 @@ export async function sendRegistrationEmail(
   payload: UserRegisteredPayload,
 ): Promise<string> {
   // env import ensures local .env has been loaded.
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const from = env.EMAIL_FROM || process.env.EMAIL_FROM;
 
   if (!apiKey || !from) {
     throw new Error(
