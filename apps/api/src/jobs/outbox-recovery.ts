@@ -7,13 +7,35 @@ import { emailQueue } from "./email.queue";
 
 const STALE_AFTER_MS = 5 * 60 * 1000;
 const markFailed = process.argv.includes("--mark-failed");
+const idArgs = process.argv.filter((arg) => arg.startsWith("--outbox-id="));
 
+if (idArgs.length > 1) {
+  throw new Error("Only one --outbox-id is allowed.");
+}
+
+const targetId = idArgs[0]?.slice("--outbox-id=".length);
+
+if (
+  targetId &&
+  !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(targetId)
+) {
+  throw new Error("Invalid Outbox UUID.");
+}
 async function main() {
   if (markFailed && process.env.ENABLE_OUTBOX_RECOVERY_WRITE !== "true") {
     throw new Error(
       "Recovery write is disabled. " +
         "ENABLE_OUTBOX_RECOVERY_WRITE must be true.",
     );
+  }
+  if (markFailed) {
+    if (!targetId) {
+      throw new Error("--mark-failed requires --outbox-id=<UUID>");
+    }
+
+    if (process.env.OUTBOX_RECOVERY_APPROVED_ID !== targetId) {
+      throw new Error("Explicit approval for this Outbox is required.");
+    }
   }
 
   console.log("[Recovery] Checking stuck Outbox events...");
@@ -35,6 +57,7 @@ async function main() {
         eq(outbox.status, OutboxStatus.PROCESSING),
         eq(outbox.eventType, "USER_REGISTERED"),
         lte(outbox.updatedAt, cutoff),
+        targetId ? eq(outbox.id, targetId) : undefined,
       ),
     )
     .orderBy(asc(outbox.updatedAt))
@@ -50,7 +73,12 @@ async function main() {
 
     try {
       const job = await emailQueue.getJob(jobId);
+      if (job && job.data?.outboxId !== event.id) {
+        console.warn(`[Recovery] Job/Outbox mismatch: ${event.id}`);
 
+        requiresReview++;
+        continue;
+      }
       const jobState = job ? await job.getState() : "missing";
 
       const attemptsMade = job?.attemptsMade ?? 0;
@@ -86,6 +114,13 @@ async function main() {
           continue;
         }
 
+        if (!job || (await job.getState()) !== "failed") {
+          console.warn(`[Recovery] Job state changed: ${jobId}`);
+
+          requiresReview++;
+          continue;
+        }
+
         const [updated] = await db
           .update(outbox)
           .set({
@@ -100,6 +135,7 @@ async function main() {
               eq(outbox.id, event.id),
               eq(outbox.status, OutboxStatus.PROCESSING),
               lte(outbox.updatedAt, cutoff),
+              eq(outbox.updatedAt, event.updatedAt),
             ),
           )
           .returning({

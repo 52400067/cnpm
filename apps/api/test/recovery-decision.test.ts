@@ -34,3 +34,14 @@ test("Missing job requires manual review", () => {
 test("Invalid max attempts cannot mark FAILED", () => {
   assert.equal(decideRecovery("failed", 3, 0), "MANUAL_REVIEW");
 });
+test("Prioritized job must wait", () => {
+  assert.equal(decideRecovery("prioritized", 0, 3), "WAIT");
+});
+
+test("Waiting children job must wait", () => {
+  assert.equal(decideRecovery("waiting-children", 0, 3), "WAIT");
+});
+
+test("Active job must wait even at max attempts", () => {
+  assert.equal(decideRecovery("active", 3, 3), "WAIT");
+});
