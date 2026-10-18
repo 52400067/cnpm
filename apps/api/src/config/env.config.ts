@@ -21,6 +21,8 @@ export const EnvSchema = z.object({
   ED25519_PRIVATE_KEY: z
     .string()
     .default('MC4CAQAwBQYDK2VwBCIEIFXdummyed25519privatekeydevelopmentonly2026='),
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('onboarding@resend.dev'),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
