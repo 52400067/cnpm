@@ -1,47 +1,28 @@
-import { z } from "zod";
-import dotenv from "dotenv";
+import { z } from 'zod';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
 export const EnvSchema = z.object({
-  NODE_ENV: z
-    .enum(["development", "production", "test"])
-    .default("development"),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(4000),
   DATABASE_URL: z
     .string()
     .url()
-    .default(
-      "postgresql://tickethub:tickethub_secret@localhost:5432/tickethub_dev",
-    ),
-  REDIS_URL: z.string().url().default("redis://localhost:6379"),
-  JWT_SECRET: z
-    .string()
-    .min(32)
-    .default("tickethub-super-secret-development-jwt-key-2026-min-32-chars"),
-  JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
-  JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
-  VNPAY_TMN_CODE: z.string().default("TEST_TMN_CODE"),
-  VNPAY_HASH_SECRET: z.string().default("TEST_HASH_SECRET"),
-  VNPAY_URL: z
-    .string()
-    .url()
-    .default("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"),
-  VNPAY_RETURN_URL: z
-    .string()
-    .url()
-    .default("http://localhost:3000/checkout/vnpay-return"),
+    .default('postgresql://tickethub:tickethub_secret@localhost:5432/tickethub_dev'),
+  REDIS_URL: z.string().url().default('redis://localhost:6379'),
+  JWT_SECRET: z.string().min(32).default('tickethub-super-secret-development-jwt-key-2026-min-32-chars'),
+  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  VNPAY_TMN_CODE: z.string().default('TEST_TMN_CODE'),
+  VNPAY_HASH_SECRET: z.string().default('TEST_HASH_SECRET'),
+  VNPAY_URL: z.string().url().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
+  VNPAY_RETURN_URL: z.string().url().default('http://localhost:3000/checkout/vnpay-return'),
   ED25519_PRIVATE_KEY: z
     .string()
-<<<<<<< HEAD
-    .default(
-      "MC4CAQAwBQYDK2VwBCIEIFXdummyed25519privatekeydevelopmentonly2026=",
-    ),
-=======
     .default('MC4CAQAwBQYDK2VwBCIEIFXdummyed25519privatekeydevelopmentonly2026='),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default('onboarding@resend.dev'),
->>>>>>> f182f091229bf7b490f2672e1c8f83852b13ae9f
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
@@ -50,9 +31,7 @@ export function loadEnvConfig(): EnvConfig {
   const result = EnvSchema.safeParse(process.env);
   if (!result.success) {
     const formatted = result.error.format();
-    throw new Error(
-      `Environment validation failed: ${JSON.stringify(formatted, null, 2)}`,
-    );
+    throw new Error(`Environment validation failed: ${JSON.stringify(formatted, null, 2)}`);
   }
   return result.data;
 }
