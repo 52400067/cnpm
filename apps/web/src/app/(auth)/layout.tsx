@@ -2,34 +2,32 @@
 import Link from "next/link";
 import { ShieldCheck, Ticket } from "lucide-react";
 
-export default function AuthLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/70">
-      <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-between">
+    // Dùng bg-muted thay vì bg-slate
+    <div className="min-h-screen flex flex-col bg-muted/30">
+      {/* Dùng bg-background và border-border */}
+      <header className="h-16 border-b border-border bg-background px-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="size-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-xs">
+          <div className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
             <Ticket className="size-4" />
           </div>
-          <span className="font-extrabold text-lg tracking-tight text-slate-900">
+          {/* Dùng text-foreground */}
+          <span className="font-extrabold text-lg tracking-tight text-foreground">
             Ticket<span className="text-primary">Hub</span>
           </span>
         </Link>
-        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+        {/* Dùng text-muted-foreground */}
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <ShieldCheck className="size-4 text-primary" />
-          <span>Kết nối bảo mật SSL</span>
+          <span>Kết nối SSL</span>
         </div>
       </header>
-
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
         <div className="w-full max-w-md">{children}</div>
       </main>
-
-      <footer className="py-4 text-center text-xs text-slate-400">
-        © 2026 TicketHub Vietnam · Hệ thống bán vé sự kiện trực tuyến
+      <footer className="py-4 text-center text-xs text-muted-foreground">
+        © 2026 TicketHub Vietnam. Nền tảng bán vé trực tuyến.
       </footer>
     </div>
   );
