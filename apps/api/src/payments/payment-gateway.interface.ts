@@ -4,6 +4,7 @@ export interface CreatePaymentRequest {
   orderInfo: string;
   returnUrl: string;
   ipAddress: string;
+  expiresAt?: Date;
 }
 
 export interface CreatePaymentResult {
