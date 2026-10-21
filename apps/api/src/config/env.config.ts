@@ -37,6 +37,8 @@ export const EnvSchema = z
       .default(
         "MC4CAQAwBQYDK2VwBCIEIFXdummyed25519privatekeydevelopmentonly2026=",
       ),
+    RESEND_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().default("onboarding@resend.dev"),
   })
   .superRefine((config, ctx) => {
     if (
