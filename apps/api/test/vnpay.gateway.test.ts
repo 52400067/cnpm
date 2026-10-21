@@ -58,6 +58,16 @@ test("VNPay creates a signed payment URL", async () => {
   assert.equal(url.searchParams.get("vnp_TxnRef"), "BE2TEST123");
   assert.equal(url.searchParams.get("vnp_Version"), "2.1.0");
   assert.match(url.searchParams.get("vnp_SecureHash") ?? "", /^[0-9a-f]{128}$/);
+
+  // Test IPv6 address
+  const resultIpv6 = await gateway.createPaymentUrl({
+    transactionRef: "BE2TESTIPV6",
+    amountVnd: 150000,
+    orderInfo: "TicketHub test payment IPv6",
+    returnUrl: RETURN_URL,
+    ipAddress: "::1",
+  });
+  assert.equal(resultIpv6.transactionRef, "BE2TESTIPV6");
 });
 
 test("VNPay rejects invalid payment amount", async () => {

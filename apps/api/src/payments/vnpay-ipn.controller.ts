@@ -69,8 +69,11 @@ export class VnpayIpnController {
       }
 
       return toVnpayResponse(decision);
-    } catch {
-      this.logger.error("VNPay IPN processing failed");
+    } catch (error) {
+      this.logger.error(
+        "VNPay IPN processing failed",
+        error instanceof Error ? error.stack : String(error),
+      );
 
       return {
         RspCode: "99",

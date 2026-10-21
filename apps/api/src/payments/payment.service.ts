@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 
 import { randomBytes } from "node:crypto";
+import { isIP } from "node:net";
 import { and, eq } from "drizzle-orm";
 
 import {
@@ -43,7 +44,7 @@ export class PaymentService {
 
       const now = new Date();
 
-      // Yêu cầu còn tối thiểu 2 phút giữ vé.
+      // Yêu cầu còn tối thiểu 45 giây giữ vé.
       if (order.expiresAt.getTime() - now.getTime() <= 45_000) {
         throw new ConflictException(
           "Order hold is expired or too close to expiry",
@@ -93,6 +94,9 @@ export class PaymentService {
 
       const gateway = new VnpayGateway();
 
+      const rawIp = clientIp?.split(",")[0]?.trim() || "127.0.0.1";
+      const ipAddress = isIP(rawIp) !== 0 ? rawIp : "127.0.0.1";
+
       // 5. Hạn thanh toán không vượt quá
       // thời gian giữ vé của Booking.
       const payment = await gateway.createPaymentUrl({
@@ -100,7 +104,7 @@ export class PaymentService {
         amountVnd,
         orderInfo: `TicketHub order ${order.orderCode}`,
         returnUrl: env.VNPAY_RETURN_URL,
-        ipAddress: clientIp,
+        ipAddress,
         expiresAt: order.expiresAt,
       });
 

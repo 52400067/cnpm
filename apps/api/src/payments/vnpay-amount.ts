@@ -2,7 +2,11 @@ const MAX_VND = 9_999_999_999n;
 
 // Chuyen tien trong PostgreSQL thanh VND nguyen.
 // Vi du: "150000.00" -> 150000
-export function parseVndAmount(amount: string): number | null {
+export function parseVndAmount(amount: unknown): number | null {
+  if (typeof amount !== "string") {
+    return null;
+  }
+
   const match = /^(\d+)(?:\.(0{1,2}))?$/.exec(amount);
 
   if (!match || match[1] === undefined) {

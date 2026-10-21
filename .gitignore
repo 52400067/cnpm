@@ -1,5 +1,6 @@
 # Temporary & local documents
 tmp/
+notes/
 .agents/
 skills-lock.json
 

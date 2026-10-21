@@ -13,6 +13,10 @@ test("Reject fractional VND", () => {
 test("Reject invalid or negative amount", () => {
   assert.equal(toVnpayAmount("-10000"), null);
   assert.equal(toVnpayAmount("abc"), null);
+  assert.equal(parseVndAmount(null), null);
+  assert.equal(parseVndAmount(undefined), null);
+  assert.equal(parseVndAmount(150000 as any), null);
+  assert.equal(parseVndAmount({} as any), null);
 });
 
 test("Reject zero payment amount", () => {
