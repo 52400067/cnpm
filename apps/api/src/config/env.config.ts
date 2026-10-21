@@ -33,9 +33,15 @@ export const EnvSchema = z.object({
     .default("http://localhost:3000/checkout/vnpay-return"),
   ED25519_PRIVATE_KEY: z
     .string()
+<<<<<<< HEAD
     .default(
       "MC4CAQAwBQYDK2VwBCIEIFXdummyed25519privatekeydevelopmentonly2026=",
     ),
+=======
+    .default('MC4CAQAwBQYDK2VwBCIEIFXdummyed25519privatekeydevelopmentonly2026='),
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('onboarding@resend.dev'),
+>>>>>>> f182f091229bf7b490f2672e1c8f83852b13ae9f
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
