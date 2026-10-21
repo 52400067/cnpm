@@ -44,23 +44,18 @@ export class VnpayIpnController {
 
   @Get("ipn")
   async receive(@Query() query: Record<string, unknown>) {
-    // Tam thoi chi cho phep thu nghiem local.
-    if (
-      process.env.NODE_ENV === "production" ||
-      process.env.ENABLE_VNPAY_IPN_PROCESSING !== "true"
-    ) {
+    // VNPay IPN chi duoc xu ly khi feature flag duoc bat.
+    // Mac dinh tat tren tat ca moi truong.
+    if (process.env.ENABLE_VNPAY_IPN_PROCESSING !== "true") {
       throw new NotFoundException();
     }
-
     const params: Record<string, string> = {};
-
     for (const [key, value] of Object.entries(query)) {
       if (!key.startsWith("vnp_")) continue;
 
       if (typeof value !== "string") {
         return { RspCode: "99", Message: "Invalid parameters" };
       }
-
       params[key] = value;
     }
 

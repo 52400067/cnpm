@@ -18,6 +18,7 @@ import { db } from "../database/db";
 import { orders, transactions } from "../database/schema";
 import { VnpayGateway } from "./vnpay.gateway";
 import { env } from "../config/env.config";
+import { parseVndAmount } from "./vnpay-amount";
 
 @Injectable()
 export class PaymentService {
@@ -43,16 +44,21 @@ export class PaymentService {
       const now = new Date();
 
       // Yêu cầu còn tối thiểu 2 phút giữ vé.
-      if (order.expiresAt.getTime() - now.getTime() < 2 * 60 * 1000) {
+      if (order.expiresAt.getTime() - now.getTime() <= 45_000) {
         throw new ConflictException(
           "Order hold is expired or too close to expiry",
         );
       }
 
-      // 2. Không tạo hai giao dịch VNPay cho cùng
-      // một đơn trong phiên bản an toàn ban đầu.
+      // Tim giao dich VNPay da ton tai.
+      // Khoa dong de tranh xu ly dong thoi.
       const [existingTransaction] = await tx
-        .select({ id: transactions.id })
+        .select({
+          id: transactions.id,
+          transactionRef: transactions.transactionRef,
+          status: transactions.status,
+          amount: transactions.amount,
+        })
         .from(transactions)
         .where(
           and(
@@ -60,36 +66,29 @@ export class PaymentService {
             eq(transactions.provider, PaymentProvider.VNPAY),
           ),
         )
-        .limit(1);
-
+        .limit(1)
+        .for("update");
       if (existingTransaction) {
-        throw new ConflictException(
-          "VNPay payment already initiated for this order",
-        );
+        if (existingTransaction.status !== TransactionStatus.PENDING) {
+          throw new ConflictException("VNPay transaction is no longer pending");
+        }
+        if (existingTransaction.amount !== order.finalAmount) {
+          throw new ConflictException("Payment amount mismatch");
+        }
       }
 
       // 3. Số tiền lấy từ PostgreSQL, không lấy
-      // từ request Frontend.
-      // TicketHub đang dùng VNĐ nguyên.
-      const match = /^([1-9]\d*)\.00$/.exec(order.finalAmount);
-
-      const integerPart = match?.[1];
-
-      if (!integerPart) {
-        throw new BadRequestException("Invalid order amount");
-      }
-
-      const amountVnd = Number(integerPart);
-
-      if (!Number.isSafeInteger(amountVnd)) {
-        throw new BadRequestException(
-          "Order amount exceeds safe integer range",
-        );
+      // Lay so tien tu PostgreSQL.
+      // Dung chung quy tac voi xu ly VNPay IPN.
+      const amountVnd = parseVndAmount(order.finalAmount);
+      if (amountVnd === null) {
+        throw new BadRequestException("Invalid order amount for VNPay");
       }
 
       // 4. Mã giao dịch ngẫu nhiên, không chứa
       // dấu gạch ngang hoặc ký tự đặc biệt.
       const transactionRef =
+        existingTransaction?.transactionRef ??
         "BE2" + randomBytes(12).toString("hex").toUpperCase();
 
       const gateway = new VnpayGateway();
@@ -106,15 +105,20 @@ export class PaymentService {
       });
 
       // 6. Lưu giao dịch trước khi trả URL
-      // về cho Frontend.
-      await tx.insert(transactions).values({
-        orderId: order.id,
-        provider: PaymentProvider.VNPAY,
-        transactionRef,
-        amount: order.finalAmount,
-        status: TransactionStatus.PENDING,
-        idempotencyKey: `vnpay:${order.id}`,
-      });
+      // Chi INSERT khi chua co giao dich.
+      // Neu da co giao dich PENDING, tai su dung
+      // transactionRef cu, khong tao record moi.
+
+      if (!existingTransaction) {
+        await tx.insert(transactions).values({
+          orderId: order.id,
+          provider: PaymentProvider.VNPAY,
+          transactionRef,
+          amount: order.finalAmount,
+          status: TransactionStatus.PENDING,
+          idempotencyKey: `vnpay:${order.id}`,
+        });
+      }
 
       return {
         orderId: order.id,

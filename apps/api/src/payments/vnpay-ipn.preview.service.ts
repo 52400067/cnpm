@@ -4,38 +4,17 @@ import { PaymentProvider } from "@tickethub/shared";
 
 import { db } from "../database/db";
 import { orders, transactions } from "../database/schema";
-
+import { toVnpayAmount } from "./vnpay-amount";
 import { decideVnpayIpn, type IpnDecision } from "./vnpay-ipn.decision";
 
 // Chuyển số tiền VNĐ trong PostgreSQL
 // thành đơn vị vnp_Amount (nhân 100).
 // Không dùng Number để tránh sai số tiền.
 
-export function toVnpayAmount(amount: string): string | null {
-  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(amount);
-
-  if (!match) return null;
-
-  const integerPart = match[1];
-
-  // Đảm bảo giá trị luôn là string trước khi đưa vào BigInt.
-  if (integerPart === undefined) return null;
-
-  const fraction = (match[2] ?? "").padEnd(2, "0");
-
-  // TicketHub chỉ chấp nhận số tiền VNĐ nguyên.
-  if (fraction !== "00") return null;
-
-  const vnd = BigInt(integerPart);
-
-  if (vnd <= 0n) return null;
-
-  return (vnd * 100n).toString();
-}
+export { toVnpayAmount } from "./vnpay-amount";
 
 @Injectable()
 export class VnpayIpnPreviewService {
-
   async inspect(params: Record<string, string>): Promise<IpnDecision> {
     // 1. Xác minh chữ ký VNPay trước khi truy vấn DB.
     const { VnpayGateway } = await import("./vnpay.gateway");

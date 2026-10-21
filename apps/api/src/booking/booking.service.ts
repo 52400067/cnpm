@@ -147,17 +147,38 @@ export class BookingService {
             ),
           )
           .orderBy(asc(seats.id))
-          .for('update');
+          .for("update");
 
         if (lockedSeats.length < sortedSeatIds.length) {
           throw new NotFoundException({
             success: false,
             error: {
-              code: 'SEAT_NOT_FOUND',
-              message: 'Một số ghế yêu cầu không tồn tại trong sự kiện',
+              code: "SEAT_NOT_FOUND",
+              message: "Một số ghế yêu cầu không tồn tại trong sự kiện",
               timestamp: new Date().toISOString(),
             },
           });
+        }
+        // Kiem tra ghe co dung hang ve da chon khong.
+        const seatTypeById = new Map(
+          lockedSeats.map((seat) => [seat.id, seat.ticketTypeId]),
+        );
+
+        for (const item of seatedItems) {
+          if (
+            (item.quantity ?? 1) !== 1 ||
+            seatTypeById.get(item.seatId!) !== item.ticketTypeId
+          ) {
+            throw new BadRequestException({
+              success: false,
+              error: {
+                code: "SEAT_TICKET_TYPE_MISMATCH",
+                message:
+                  "Ghế không thuộc hạng vé đã chọn hoặc số lượng không hợp lệ",
+                timestamp: new Date().toISOString(),
+              },
+            });
+          }
         }
 
         const now = new Date();
