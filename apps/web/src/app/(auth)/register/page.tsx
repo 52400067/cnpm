@@ -1,11 +1,11 @@
 // apps/web/src/app/(auth)/register/page.tsx
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { UserRole } from "@tickethub/shared";
 import { registerSchema, RegisterInput } from "@/validations/auth";
 import { authApi } from "@/lib/api/auth";
@@ -22,12 +22,28 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Building2, Phone, User, Mail, Lock } from "lucide-react";
+import {
+  AlertCircle,
+  Building2,
+  Phone,
+  User,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 
-export default function RegisterPage() {
-  const [role, setRole] = useState<"BUYER" | "ORGANIZER">(UserRole.BUYER);
-  const [serverError, setServerError] = useState<string | null>(null);
+function RegisterFormContent() {
+  const searchParams = useSearchParams();
   const router = useRouter();
+  const initialRoleParam =
+    searchParams.get("role") === UserRole.ORGANIZER
+      ? UserRole.ORGANIZER
+      : UserRole.BUYER;
+
+  const [role, setRole] = useState<"BUYER" | "ORGANIZER">(initialRoleParam);
+  const [showPassword, setShowPassword] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
@@ -37,7 +53,7 @@ export default function RegisterPage() {
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      role: UserRole.BUYER,
+      role: initialRoleParam,
       fullName: "",
       email: "",
       phone: "",
@@ -46,6 +62,10 @@ export default function RegisterPage() {
       organizationName: "",
     },
   });
+
+  useEffect(() => {
+    setValue("role", initialRoleParam);
+  }, [initialRoleParam, setValue]);
 
   const handleRoleChange = (val: string) => {
     const selected = val as "BUYER" | "ORGANIZER";
@@ -68,13 +88,15 @@ export default function RegisterPage() {
       if (err instanceof ApiError) {
         setServerError(err.message);
       } else {
-        router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+        setServerError(
+          "Không thể kết nối tới máy chủ. Vui lòng thử lại sau ít phút.",
+        );
       }
     }
   };
 
   return (
-    <Card className="shadow-xl border-slate-200/80 rounded-2xl bg-white">
+    <Card className="shadow-lg shadow-slate-900/5 border-slate-200/90 rounded-2xl bg-white">
       <CardHeader className="space-y-1.5 text-center pb-2">
         <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">
           Tạo tài khoản TicketHub
@@ -87,7 +109,7 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <CardContent className="space-y-3.5 pt-2">
           <Tabs
-            defaultValue={UserRole.BUYER}
+            defaultValue={initialRoleParam}
             value={role}
             onValueChange={handleRoleChange}
             className="w-full"
@@ -95,13 +117,13 @@ export default function RegisterPage() {
             <TabsList className="grid w-full grid-cols-2 h-10 p-1 bg-slate-100 rounded-xl">
               <TabsTrigger
                 value={UserRole.BUYER}
-                className="rounded-lg text-xs sm:text-sm"
+                className="rounded-lg text-xs sm:text-sm cursor-pointer"
               >
                 Người Mua Vé
               </TabsTrigger>
               <TabsTrigger
                 value={UserRole.ORGANIZER}
-                className="rounded-lg text-xs sm:text-sm"
+                className="rounded-lg text-xs sm:text-sm cursor-pointer"
               >
                 Ban Tổ Chức (BTC)
               </TabsTrigger>
@@ -109,7 +131,10 @@ export default function RegisterPage() {
           </Tabs>
 
           {serverError && (
-            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700">
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700"
+            >
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
               <span>{serverError}</span>
             </div>
@@ -118,9 +143,10 @@ export default function RegisterPage() {
           <div className="space-y-1.5">
             <Label htmlFor="fullName">Họ và tên</Label>
             <div className="relative">
-              <User className="size-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <User className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 id="fullName"
+                autoComplete="name"
                 placeholder="Nguyễn Văn An"
                 className="h-10 pl-9 rounded-xl"
                 aria-invalid={!!errors.fullName}
@@ -128,7 +154,7 @@ export default function RegisterPage() {
               />
             </div>
             {errors.fullName && (
-              <p className="text-xs text-red-600 font-medium">
+              <p role="alert" className="text-xs text-red-600 font-medium">
                 {errors.fullName.message}
               </p>
             )}
@@ -140,7 +166,7 @@ export default function RegisterPage() {
                 Tên Tổ chức / Doanh nghiệp
               </Label>
               <div className="relative">
-                <Building2 className="size-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Building2 className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
                   id="organizationName"
                   placeholder="Công ty Giải trí & Sự kiện XYZ"
@@ -150,71 +176,87 @@ export default function RegisterPage() {
                 />
               </div>
               {errors.organizationName && (
-                <p className="text-xs text-red-600 font-medium">
+                <p role="alert" className="text-xs text-red-600 font-medium">
                   {errors.organizationName.message}
                 </p>
               )}
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="size-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="ten@vidu.com"
-                  className="h-10 pl-9 rounded-xl"
-                  aria-invalid={!!errors.email}
-                  {...register("email")}
-                />
-              </div>
-              {errors.email && (
-                <p className="text-xs text-red-600 font-medium">
-                  {errors.email.message}
-                </p>
-              )}
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Địa chỉ Email</Label>
+            <div className="relative">
+              <Mail className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="an.nguyen@email.com"
+                className="h-10 pl-9 rounded-xl"
+                aria-invalid={!!errors.email}
+                {...register("email")}
+              />
             </div>
+            {errors.email && (
+              <p role="alert" className="text-xs text-red-600 font-medium">
+                {errors.email.message}
+              </p>
+            )}
+          </div>
 
-            <div className="space-y-1.5">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
               <Label htmlFor="phone">Số điện thoại</Label>
-              <div className="relative">
-                <Phone className="size-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="0912345678"
-                  className="h-10 pl-9 rounded-xl"
-                  aria-invalid={!!errors.phone}
-                  {...register("phone")}
-                />
-              </div>
-              {errors.phone && (
-                <p className="text-xs text-red-600 font-medium">
-                  {errors.phone.message}
-                </p>
-              )}
+              <span className="text-[11px] text-slate-400">Không bắt buộc</span>
             </div>
+            <div className="relative">
+              <Phone className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="0912345678"
+                className="h-10 pl-9 rounded-xl font-mono"
+                aria-invalid={!!errors.phone}
+                {...register("phone")}
+              />
+            </div>
+            {errors.phone && (
+              <p role="alert" className="text-xs text-red-600 font-medium">
+                {errors.phone.message}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="password">Mật khẩu (tối thiểu 8 ký tự)</Label>
+              <Label htmlFor="password">Mật khẩu</Label>
               <div className="relative">
-                <Lock className="size-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Lock className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
                   id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="h-10 pl-9 rounded-xl"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  placeholder="Tối thiểu 8 ký tự"
+                  className="h-10 pl-9 pr-8 rounded-xl"
                   aria-invalid={!!errors.password}
                   {...register("password")}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-3.5" />
+                  ) : (
+                    <Eye className="size-3.5" />
+                  )}
+                </button>
               </div>
               {errors.password && (
-                <p className="text-xs text-red-600 font-medium">
+                <p role="alert" className="text-xs text-red-600 font-medium">
                   {errors.password.message}
                 </p>
               )}
@@ -223,18 +265,19 @@ export default function RegisterPage() {
             <div className="space-y-1.5">
               <Label htmlFor="confirmPassword">Xác nhận mật khẩu</Label>
               <div className="relative">
-                <Lock className="size-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Lock className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
                   id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  placeholder="Nhập lại mật khẩu"
                   className="h-10 pl-9 rounded-xl"
                   aria-invalid={!!errors.confirmPassword}
                   {...register("confirmPassword")}
                 />
               </div>
               {errors.confirmPassword && (
-                <p className="text-xs text-red-600 font-medium">
+                <p role="alert" className="text-xs text-red-600 font-medium">
                   {errors.confirmPassword.message}
                 </p>
               )}
@@ -246,10 +289,10 @@ export default function RegisterPage() {
           <Button
             type="submit"
             size="lg"
-            className="w-full h-11 rounded-full font-semibold text-sm shadow-sm"
+            className="w-full h-11 rounded-full font-semibold text-sm shadow-xs cursor-pointer"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Đang khởi tạo tài khoản..." : "Đăng ký ngay"}
+            {isSubmitting ? "Đang tạo tài khoản..." : "Đăng ký ngay"}
           </Button>
 
           <div className="text-center text-sm text-slate-600">
@@ -264,5 +307,19 @@ export default function RegisterPage() {
         </CardFooter>
       </form>
     </Card>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="text-center text-sm text-slate-500 py-8">
+          Đang tải...
+        </div>
+      }
+    >
+      <RegisterFormContent />
+    </Suspense>
   );
 }

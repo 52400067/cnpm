@@ -1,5 +1,5 @@
 // apps/web/src/lib/api/auth.ts
-import { apiClient } from "./client";
+import { apiClient, setAccessToken } from "./client";
 import type {
   LoginRequest,
   RegisterRequest,
@@ -29,10 +29,14 @@ export interface RegisterResponseData {
 
 export const authApi = {
   login: async (body: LoginRequest): Promise<LoginResponseData> => {
-    return apiClient<LoginResponseData>("/auth/login", {
+    const result = await apiClient<LoginResponseData>("/auth/login", {
       method: "POST",
       body: JSON.stringify(body),
     });
+    if (result?.accessToken) {
+      setAccessToken(result.accessToken);
+    }
+    return result;
   },
 
   register: async (body: RegisterRequest): Promise<RegisterResponseData> => {

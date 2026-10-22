@@ -1,6 +1,7 @@
 // apps/web/src/app/(public)/layout.tsx
 import Link from "next/link";
-import { Bell, Heart, Ticket, User, Globe } from "lucide-react";
+import { User, ShieldCheck, Clock, RefreshCcw, Globe } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 
 export default function PublicLayout({
   children,
@@ -8,107 +9,93 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-white text-slate-900">
-      {/* Top Banner */}
-      <div className="bg-zinc-900 text-zinc-100 text-xs py-2 px-4 text-center font-medium">
-        TicketHub — Nền tảng săn vé sự kiện, concert và thể thao trực tuyến
-        nhanh chóng, an toàn.
+    <div className="flex min-h-screen flex-col bg-white text-[#141d23]">
+      {/* Top announcement bar */}
+      <div className="bg-[#0c141a] text-white text-[11.5px] py-1.5 px-4 text-center">
+        <p className="max-w-[1200px] mx-auto truncate">
+          TicketHub là nền tảng phân phối vé sự kiện trực tiếp hàng đầu tại Việt
+          Nam. Cam kết vé chính thức 100%.
+        </p>
       </div>
 
-      {/* Main Navbar */}
-      <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/95 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Left: Brand thẳng hàng hiện đại & Categories */}
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="size-9 rounded-xl bg-primary text-white flex items-center justify-center shadow-xs">
-                <Ticket className="size-5" />
-              </div>
-              <span className="font-extrabold text-xl tracking-tight text-slate-900">
-                Ticket<span className="text-primary">Hub</span>
-              </span>
-            </Link>
+      {/* Main navigation header */}
+      <header className="bg-white">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          {/* Left: Brand & Categories */}
+          <div className="flex items-center gap-6">
+            <Logo />
 
-            <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+            <nav
+              aria-label="Danh mục chính"
+              className="hidden md:flex items-center gap-6 text-[13.5px] font-medium text-[#141d23]"
+            >
               <Link
-                href="/?category=CONCERT"
-                className="hover:text-primary transition-colors"
-              >
-                Hòa nhạc
-              </Link>
-              <Link
-                href="/?category=SPORT"
+                href="/#heading-sports"
                 className="hover:text-primary transition-colors"
               >
                 Thể thao
               </Link>
               <Link
-                href="/?category=THEATER"
+                href="/#heading-concerts"
                 className="hover:text-primary transition-colors"
               >
-                Sân khấu & Hài kịch
+                Hòa nhạc
               </Link>
               <Link
-                href="/?category=FESTIVAL"
+                href="/#heading-theater"
                 className="hover:text-primary transition-colors"
               >
-                Lễ hội
+                Sân khấu &amp; Hài kịch
               </Link>
               <Link
-                href="/?city=HCM"
+                href="/#heading-popular"
                 className="hover:text-primary transition-colors"
               >
-                Thành phố lớn
+                Sự kiện nổi bật
               </Link>
             </nav>
           </div>
 
-          {/* Right: Actions & User Auth */}
-          <div className="flex items-center gap-5 text-sm font-medium text-slate-600">
+          {/* Right: Actions & User Profile */}
+          <div className="flex items-center gap-5 text-[13.5px] font-medium text-[#141d23]">
             <Link
-              href="/register?role=ORGANIZER"
+              href="/#heading-trending"
               className="hidden lg:inline-block hover:text-primary transition-colors"
             >
-              Tạo sự kiện (BTC)
+              Khám phá
             </Link>
             <Link
-              href="/login"
-              className="hidden sm:flex items-center gap-1.5 hover:text-primary transition-colors"
+              href="/register?role=ORGANIZER"
+              className="hidden sm:inline-block hover:text-primary transition-colors"
             >
-              <Heart className="size-4" />
-              <span>Yêu thích</span>
+              Bán vé
             </Link>
             <Link
-              href="/login"
-              className="hidden sm:flex items-center gap-1.5 hover:text-primary transition-colors"
+              href="/my-tickets"
+              className="hidden sm:inline-block hover:text-primary transition-colors"
             >
-              <Ticket className="size-4" />
-              <span>Vé của tôi</span>
+              Yêu thích
+            </Link>
+            <Link
+              href="/my-tickets"
+              className="hidden sm:inline-block hover:text-primary transition-colors"
+            >
+              Vé của tôi
             </Link>
             <Link
               href="/login"
-              className="text-slate-900 font-semibold hover:text-primary transition-colors"
+              className="hover:text-primary transition-colors"
             >
               Đăng nhập
             </Link>
 
-            <div className="flex items-center gap-2">
-              <Link
-                href="/login"
-                aria-label="Tài khoản"
-                className="size-9 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-slate-700 transition-colors"
-              >
-                <User className="size-4" />
-              </Link>
-              <button
-                type="button"
-                aria-label="Thông báo"
-                className="relative size-9 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-slate-700 transition-colors"
-              >
-                <Bell className="size-4" />
-                <span className="absolute top-1.5 right-2 size-2 rounded-full bg-emerald-500 ring-2 ring-white" />
-              </button>
-            </div>
+            <Link
+              href="/login"
+              aria-label="Tài khoản"
+              className="size-8 rounded-full bg-[#eff1f2] hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-[#141d23] transition-colors"
+            >
+              <User className="size-4 fill-current" />
+            </Link>
           </div>
         </div>
       </header>
@@ -116,28 +103,186 @@ export default function PublicLayout({
       {/* Main Content */}
       <main className="flex-1">{children}</main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-slate-50 py-8 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-sm text-slate-900">
-              Ticket<span className="text-primary">Hub</span>
-            </span>
-            <span>© 2026 TicketHub Vietnam.</span>
+      {/* Site footer */}
+      <footer className="border-t border-[#dfe3e5] bg-white pt-12 pb-10 mt-16">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8">
+            {/* Col 1: Buyer Guarantee (4 cols) */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="inline-flex items-center gap-2">
+                <svg
+                  width="24"
+                  height="30"
+                  viewBox="0 0 32 41"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M14.487 19.103l6.112-6.116 2.245 2.247-8.357 8.363-5.737-5.742 2.245-2.246 3.492 3.494zM15.735.131L31.45 5.374v13.23c0 4.743-1.996 9.237-5.488 12.357l-5.239 4.743-3.616-.998 6.86-6.116c2.868-2.497 4.49-6.116 4.49-9.986V7.745L15.858 3.501 3.262 7.745v11.109c0 3.744 1.622 7.489 4.49 9.985l8.107 7.24 2.37 2.121-2.37 2.122-10.227-9.111C2.14 28.09.144 23.597.144 18.854V5.498L15.734.131z"
+                    fill="#059669"
+                  />
+                </svg>
+                <span className="font-extrabold text-[17px] tracking-tight text-[#141d23]">
+                  TicketHub Protect
+                </span>
+              </div>
+
+              <ul className="space-y-3 text-[12.5px] text-[#2b343a]">
+                <li className="flex items-center gap-2.5">
+                  <span className="size-6 rounded-full bg-emerald-50 text-primary flex items-center justify-center shrink-0">
+                    <ShieldCheck className="size-3.5" />
+                  </span>
+                  <span>Vé chính thức 100% từ Ban tổ chức</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="size-6 rounded-full bg-emerald-50 text-primary flex items-center justify-center shrink-0">
+                    <Clock className="size-3.5" />
+                  </span>
+                  <span>Giữ chỗ riêng 5 phút khi thanh toán</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <span className="size-6 rounded-full bg-emerald-50 text-primary flex items-center justify-center shrink-0">
+                    <RefreshCcw className="size-3.5" />
+                  </span>
+                  <span>Hoàn tiền đầy đủ nếu sự kiện bị hủy</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Col 2: Về TicketHub (3 cols) */}
+            <div className="lg:col-span-3 space-y-2.5 text-[13px]">
+              <h4 className="font-bold text-[#141d23]">Về TicketHub</h4>
+              <ul className="space-y-2 text-[#2b343a]">
+                <li>
+                  <Link
+                    href="/#heading-concerts"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Giới thiệu
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/register?role=ORGANIZER"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Dành cho Ban tổ chức
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/register?role=ORGANIZER"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Hợp tác đối tác
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/login"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Tin tức sự kiện
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/login"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Tuyển dụng
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Col 3: Bạn cần hỗ trợ? (2 cols) */}
+            <div className="lg:col-span-2 space-y-2.5 text-[13px]">
+              <h4 className="font-bold text-[#141d23]">Bạn cần hỗ trợ?</h4>
+              <ul className="space-y-2 text-[#2b343a]">
+                <li>
+                  <Link
+                    href="/my-tickets"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Trung tâm trợ giúp
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/my-tickets"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Tra cứu vé đã đặt
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/login"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Chính sách hoàn tiền
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Col 4: Khu vực & Tiền tệ (3 cols) */}
+            <div className="lg:col-span-3 space-y-2.5 text-[13px]">
+              <h4 className="font-bold text-[#141d23]">
+                Sự kiện trên toàn quốc
+              </h4>
+              <div className="space-y-2">
+                <div className="rounded-[8px] border border-[#dfe3e5] px-3.5 py-2 text-[13px] text-[#2b343a] flex items-center gap-2.5">
+                  <svg
+                    width="18"
+                    height="12"
+                    viewBox="0 0 30 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                    className="rounded-[2px] shrink-0"
+                  >
+                    <rect width="30" height="20" fill="#DA251D" />
+                    <polygon
+                      points="15,4 16.47,8.52 21.22,8.52 17.38,11.31 18.85,15.83 15,13.04 11.15,15.83 12.62,11.31 8.78,8.52 13.53,8.52"
+                      fill="#FFFF00"
+                    />
+                  </svg>
+                  <span>Việt Nam</span>
+                </div>
+                <div className="rounded-[8px] border border-[#dfe3e5] px-3.5 py-2 text-[13px] text-[#2b343a] space-y-2">
+                  <div className="flex items-center gap-2 pb-2 border-b border-[#dfe3e5]">
+                    <Globe className="size-3.5 text-[#606970]" />
+                    <span>Tiếng Việt (VN)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-[#141d23] text-[12px]">
+                      ₫
+                    </span>
+                    <span>Đồng Việt Nam (VND)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-5">
-            <Link href="/login" className="hover:text-slate-900">
+
+          <div className="pt-6 border-t border-[#dfe3e5] text-[11.5px] text-[#606970] leading-relaxed">
+            © 2026 TicketHub Vietnam. Việc sử dụng trang web này đồng nghĩa với
+            việc bạn đồng ý với{" "}
+            <Link href="/login" className="underline hover:text-[#141d23]">
               Điều khoản sử dụng
             </Link>
-            <Link href="/login" className="hover:text-slate-900">
+            ,{" "}
+            <Link href="/login" className="underline hover:text-[#141d23]">
               Chính sách bảo mật
-            </Link>
-            <Link href="/login" className="hover:text-slate-900">
-              Hướng dẫn mua vé
-            </Link>
-            <span className="inline-flex items-center gap-1 text-slate-700 font-medium">
-              <Globe className="size-3.5" /> Tiếng Việt (VNĐ)
-            </span>
+            </Link>{" "}
+            và{" "}
+            <Link href="/login" className="underline hover:text-[#141d23]">
+              Chính sách hoàn tiền
+            </Link>{" "}
+            của chúng tôi.
           </div>
         </div>
       </footer>

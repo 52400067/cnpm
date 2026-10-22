@@ -42,36 +42,37 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginInput) => {
     setServerError(null);
     try {
-      const res = await authApi.login(data);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("accessToken", res.accessToken);
-      }
+      await authApi.login(data);
       router.push("/");
     } catch (err) {
       if (err instanceof ApiError) {
         setServerError(err.message);
       } else {
-        // Fallback khi chạy độc lập FE chưa bật server BE
-        router.push("/");
+        setServerError(
+          "Không thể kết nối tới máy chủ. Vui lòng thử lại sau ít phút.",
+        );
       }
     }
   };
 
   return (
-    <Card className="shadow-xl border-slate-200/80 rounded-2xl bg-white">
+    <Card className="shadow-lg shadow-slate-900/5 border-slate-200/90 rounded-2xl bg-white">
       <CardHeader className="space-y-1.5 text-center pb-2">
         <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">
           Đăng nhập vào TicketHub
         </CardTitle>
         <CardDescription className="text-slate-500">
-          Nhập email và mật khẩu để săn vé hoặc quản lý sự kiện
+          Nhập email và mật khẩu để đặt vé hoặc quản lý sự kiện của bạn
         </CardDescription>
       </CardHeader>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <CardContent className="space-y-4 pt-2">
           {serverError && (
-            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700">
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700"
+            >
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
               <span>{serverError}</span>
             </div>
@@ -80,18 +81,19 @@ export default function LoginPage() {
           <div className="space-y-1.5">
             <Label htmlFor="email">Địa chỉ Email</Label>
             <div className="relative">
-              <Mail className="size-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Mail className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 id="email"
                 type="email"
-                placeholder="user@tickethub.vn"
+                autoComplete="email"
+                placeholder="ban@email.com"
                 className="h-10 pl-9 rounded-xl"
                 aria-invalid={!!errors.email}
                 {...register("email")}
               />
             </div>
             {errors.email && (
-              <p className="text-xs text-red-600 font-medium">
+              <p role="alert" className="text-xs text-red-600 font-medium">
                 {errors.email.message}
               </p>
             )}
@@ -108,10 +110,11 @@ export default function LoginPage() {
               </Link>
             </div>
             <div className="relative">
-              <Lock className="size-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Lock className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 placeholder="••••••••"
                 className="h-10 pl-9 pr-9 rounded-xl"
                 aria-invalid={!!errors.password}
@@ -120,8 +123,8 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                aria-label="Hiện hoặc ẩn mật khẩu"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
               >
                 {showPassword ? (
                   <EyeOff className="size-4" />
@@ -131,7 +134,7 @@ export default function LoginPage() {
               </button>
             </div>
             {errors.password && (
-              <p className="text-xs text-red-600 font-medium">
+              <p role="alert" className="text-xs text-red-600 font-medium">
                 {errors.password.message}
               </p>
             )}
@@ -142,10 +145,10 @@ export default function LoginPage() {
           <Button
             type="submit"
             size="lg"
-            className="w-full h-11 rounded-full font-semibold text-sm shadow-sm"
+            className="w-full h-11 rounded-full font-semibold text-sm shadow-xs cursor-pointer"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Đang xác thực..." : "Đăng nhập"}
+            {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
           </Button>
 
           <div className="text-center text-sm text-slate-600">

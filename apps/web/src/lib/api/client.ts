@@ -2,6 +2,16 @@
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
+let inMemoryAccessToken: string | null = null;
+
+export function setAccessToken(token: string | null): void {
+  inMemoryAccessToken = token;
+}
+
+export function getAccessToken(): string | null {
+  return inMemoryAccessToken;
+}
+
 export interface ApiStandardResponse<T> {
   success: boolean;
   data: T;
@@ -34,16 +44,29 @@ export async function apiClient<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...options?.headers,
+    ...(options?.headers as Record<string, string> | undefined),
   };
 
-  const response = await fetch(url, {
-    ...options,
-    credentials: "include",
-    headers,
-  });
+  if (inMemoryAccessToken && !headers.Authorization) {
+    headers.Authorization = `Bearer ${inMemoryAccessToken}`;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      credentials: "include",
+      headers,
+    });
+  } catch {
+    throw new ApiError(
+      0,
+      "NETWORK_ERROR",
+      "Máy chủ API hiện chưa phản hồi. Vui lòng kiểm tra kết nối backend hoặc sử dụng chế độ xem trước giao diện.",
+    );
+  }
 
   const payload = (await response
     .json()
@@ -53,7 +76,7 @@ export async function apiClient<T>(
     throw new ApiError(
       response.status,
       payload?.error?.code || "UNKNOWN_ERROR",
-      payload?.error?.message || "Không thể kết nối tới máy chủ TicketHub",
+      payload?.error?.message || "Không thể xử lý yêu cầu từ máy chủ TicketHub",
       payload?.error?.details,
     );
   }

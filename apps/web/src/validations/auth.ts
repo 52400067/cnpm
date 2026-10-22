@@ -23,7 +23,7 @@ export const registerSchema = z
     phone: z
       .string()
       .regex(
-        /^(0|\+84)[3|5|7|8|9][0-9]{8}$/,
+        /^(0|\+84)[35789][0-9]{8}$/,
         "Số điện thoại không hợp lệ (VD: 0912345678)",
       )
       .or(z.literal(""))
