@@ -158,6 +158,27 @@ export class BookingService {
             },
           });
         }
+        // Kiem tra ghe co dung hang ve da chon khong.
+        const seatTypeById = new Map(
+          lockedSeats.map((seat) => [seat.id, seat.ticketTypeId]),
+        );
+
+        for (const item of seatedItems) {
+          if (
+            (item.quantity ?? 1) !== 1 ||
+            seatTypeById.get(item.seatId!) !== item.ticketTypeId
+          ) {
+            throw new BadRequestException({
+              success: false,
+              error: {
+                code: "SEAT_TICKET_TYPE_MISMATCH",
+                message:
+                  "Ghế không thuộc hạng vé đã chọn hoặc số lượng không hợp lệ",
+                timestamp: new Date().toISOString(),
+              },
+            });
+          }
+        }
 
         const now = new Date();
         const holdExpiresAt = new Date(now.getTime() + 5 * 60 * 1000);
@@ -398,10 +419,31 @@ export class BookingService {
 
     return db.transaction(async (tx) => {
       // 1. Cập nhật đơn hàng thành CANCELLED
-      await tx
+      const updatedOrders = await tx
         .update(orders)
-        .set({ status: OrderStatus.CANCELLED, updatedAt: new Date() })
-        .where(eq(orders.id, orderId));
+        .set({
+          status: OrderStatus.CANCELLED,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(orders.id, orderId),
+            eq(orders.userId, userId),
+            eq(orders.status, OrderStatus.PENDING),
+          ),
+        )
+        .returning({ id: orders.id });
+
+      if (updatedOrders.length !== 1) {
+        throw new ConflictException({
+          success: false,
+          error: {
+            code: "ORDER_STATUS_CHANGED",
+            message: "Trạng thái đơn hàng đã thay đổi, không thể hủy giữ chỗ",
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
 
       // 2. Trả ghế về AVAILABLE
       await tx

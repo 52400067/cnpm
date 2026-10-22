@@ -92,12 +92,16 @@ export class VnpayGateway implements PaymentGateway {
     if (isIP(request.ipAddress) === 0) {
       throw new Error("Invalid client IP address");
     }
-
     const now = new Date();
-    const expireAt = new Date(
-      now.getTime() + PAYMENT_EXPIRE_MINUTES * 60 * 1000,
-    );
-
+    const expireAt =
+      request.expiresAt ??
+      new Date(now.getTime() + PAYMENT_EXPIRE_MINUTES * 60 * 1000);
+    if (
+      !Number.isFinite(expireAt.getTime()) ||
+      expireAt.getTime() <= now.getTime() + 30_000
+    ) {
+      throw new Error("Payment expiration time is invalid");
+    }
     const params: Record<string, string> = {
       vnp_Version: VNPAY_VERSION,
       vnp_Command: "pay",
