@@ -45,7 +45,7 @@ function MyTicketsContent() {
     return `${rowLabel ? rowLabel.replace(/[^0-9A-Za-z]/g, "").slice(0, 3) : "S"}-${String(baseNum).padStart(2, "0")}`;
   }).join(", ");
 
-  // Verification payload for Ed25519 gate check
+  // Secure ticket payload for gate check
   const qrPayload = JSON.stringify({
     v: 1,
     order: orderCode,
@@ -213,7 +213,7 @@ function MyTicketsContent() {
 
             <div className="text-center space-y-1 mb-4">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-primary text-[11px] font-bold">
-                <ShieldCheck className="size-3.5" /> Mã QR Ed25519 hợp lệ
+                <ShieldCheck className="size-3.5" /> Vé điện tử chính hãng • Đã xác thực
               </span>
               <h3 className="text-[17px] font-extrabold text-slate-900 pt-1">
                 {activeEvent.title}

@@ -583,7 +583,7 @@ function NewEventContent() {
                 Bước 4: Kiểm tra thông tin &amp; Xuất bản sự kiện
               </h2>
               <p className="text-[13px] text-slate-500">
-                Hệ thống sẽ tạo tự động ma trận vị trí hàng ghế, liên kết với mô hình sơ đồ vector và sinh mã xác thực vé Ed25519.
+                Hệ thống sẽ tạo tự động toàn bộ vị trí chỗ ngồi, liên kết với sơ đồ khán đài và cấp mã vé điện tử bảo mật.
               </p>
             </div>
 
@@ -676,7 +676,7 @@ function NewEventContent() {
                 <div className="p-4 rounded-[12px] bg-blue-50 border border-blue-200 text-blue-900 text-[12px] flex items-start gap-3">
                   <Info className="size-4.5 text-blue-600 shrink-0 mt-0.5" />
                   <p>
-                    Sau khi nhấn <strong>Xuất bản sự kiện</strong>, hệ thống TicketHub sẽ đồng bộ dữ liệu vào bảng <code>events</code>, khởi tạo tự động các bản ghi trong bảng <code>ticket_types</code> và <code>seats</code>, đồng thời kết nối hàng đợi ảo Redis chống nghẽn mạng khi mở bán vé.
+                    Sau khi nhấn <strong>Xuất bản sự kiện</strong>, hệ thống TicketHub sẽ tự động phân bổ số lượng vé cho từng khu vực khán đài và kích hoạt hệ thống điều phối lưu lượng chống nghẽn khi mở bán.
                   </p>
                 </div>
 

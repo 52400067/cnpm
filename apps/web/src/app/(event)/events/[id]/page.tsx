@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   Heart,
   ArrowLeft,
@@ -17,6 +17,9 @@ import {
   Eye,
   ShieldCheck,
   User,
+  Users,
+  ArrowRight,
+  Ticket,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import {
@@ -38,16 +41,24 @@ export default function EventDetailPage() {
     return getEventById(eventId) ?? EVENTS[0];
   }, [eventId]);
 
-  return <EventSplitView key={event.id} event={event} />;
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center text-[13px] text-[#606970]">Đang tải sơ đồ sự kiện...</div>}>
+      <EventSplitView key={event.id} event={event} />
+    </Suspense>
+  );
 }
 
 function EventSplitView({ event }: { event: EventItem }) {
   const mapKey = useMemo(() => getEventVenueMapKey(event), [event]);
   const allListings = useMemo(() => getEventListings(event), [event]);
+  const searchParams = useSearchParams();
 
   // Selected filters & state
   const [ticketQuantity, setTicketQuantity] = useState<number>(2);
-  const [showQtyModal, setShowQtyModal] = useState<boolean>(false);
+  // Modal automatically pops up on initial load unless disabled via query param
+  const [showQtyModal, setShowQtyModal] = useState<boolean>(
+    searchParams.get("modal") !== "false"
+  );
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
   const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<TicketListing | null>(null);
@@ -114,10 +125,12 @@ function EventSplitView({ event }: { event: EventItem }) {
 
   return (
     <div className="flex flex-col h-[calc(100vh-32px)] bg-white overflow-hidden text-[#141d23]">
-      {/* 1. Compact Event Header Bar */}
-      <header className="h-[64px] border-b border-[#dfe3e5] bg-white px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 shrink-0 z-30">
+      {/* 1. Production Venue Map Header Bar */}
+      <header className="h-[68px] border-b border-[#dfe3e5] bg-white px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 shrink-0 z-30 shadow-2xs">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-          <Logo className="hidden md:inline-flex mr-1" />
+          <Logo className="hidden lg:inline-flex shrink-0" />
+
+          <div className="hidden lg:block h-6 w-px bg-[#dfe3e5]" />
 
           <Link
             href="/"
@@ -130,20 +143,20 @@ function EventSplitView({ event }: { event: EventItem }) {
           <img
             src={event.image}
             alt={event.title}
-            className="size-11 rounded-[8px] object-cover bg-[#eff1f2] shrink-0 border border-[#dfe3e5]"
+            className="size-11 rounded-[8px] object-cover bg-[#eff1f2] shrink-0 border border-[#dfe3e5] shadow-2xs"
           />
 
           <div className="min-w-0">
-            <h1 className="text-[14px] sm:text-[16px] font-bold text-[#141d23] truncate leading-tight">
+            <h1 className="text-[15px] sm:text-[17px] font-extrabold text-[#141d23] truncate leading-tight tracking-tight">
               {event.title}
             </h1>
-            <div className="flex flex-wrap items-center gap-x-2.5 text-[11.5px] sm:text-[12px] text-[#606970] truncate">
+            <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-[#606970] truncate pt-0.5">
               <span className="inline-flex items-center gap-1 font-semibold text-[#141d23]">
                 <Calendar className="size-3.5 text-primary shrink-0" />
                 {event.fullDateTime}
               </span>
-              <span className="hidden sm:inline text-[#dfe3e5]">•</span>
-              <span className="hidden sm:inline-flex items-center gap-1 truncate">
+              <span className="hidden sm:inline text-[#cbd5e1]">•</span>
+              <span className="hidden sm:inline-flex items-center gap-1 truncate text-[#606970]">
                 <MapPin className="size-3.5 text-primary shrink-0" />
                 {event.venue}, {event.city}
               </span>
@@ -153,14 +166,32 @@ function EventSplitView({ event }: { event: EventItem }) {
 
         {/* Right actions */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Quantity Selector Pill Button */}
+          <button
+            type="button"
+            onClick={() => setShowQtyModal(true)}
+            className="h-10 px-3.5 rounded-full border border-[#dfe3e5] bg-white hover:border-primary hover:bg-emerald-50/40 text-[13px] font-bold text-[#141d23] flex items-center gap-2 transition-colors shadow-2xs"
+          >
+            <Users className="size-4 text-primary" />
+            <span>{ticketQuantity} vé</span>
+            <ChevronDown className="size-3.5 text-[#606970]" />
+          </button>
+
+          {/* FanProtect / Buyer Guarantee Badge */}
+          <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 text-[12px] font-bold">
+            <ShieldCheck className="size-4 text-emerald-600 shrink-0" />
+            <span>100% Đảm bảo vé</span>
+          </div>
+
+          {/* Favorite button */}
           <button
             type="button"
             onClick={() => setIsSaved(!isSaved)}
             aria-label={isSaved ? "Bỏ lưu sự kiện" : "Lưu vào yêu thích"}
-            className="size-9 rounded-full border border-[#dfe3e5] flex items-center justify-center text-[#141d23] hover:bg-[#f5f7f8] transition-colors"
+            className="size-10 rounded-full border border-[#dfe3e5] flex items-center justify-center text-[#141d23] hover:bg-[#f5f7f8] transition-colors"
           >
             <Heart
-              className={`size-4 ${
+              className={`size-4.5 ${
                 isSaved ? "fill-primary text-primary" : "text-[#141d23]"
               }`}
             />
@@ -168,7 +199,7 @@ function EventSplitView({ event }: { event: EventItem }) {
 
           <Link
             href="/my-tickets"
-            className="hidden md:inline-flex items-center text-[13px] font-medium text-[#141d23] hover:text-primary transition-colors px-2 py-1"
+            className="hidden md:inline-flex items-center text-[13px] font-bold text-[#141d23] hover:text-primary transition-colors px-2 py-1"
           >
             Vé của tôi
           </Link>
@@ -176,17 +207,23 @@ function EventSplitView({ event }: { event: EventItem }) {
           <Link
             href="/login"
             aria-label="Tài khoản"
-            className="size-8 rounded-full bg-[#eff1f2] hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-[#141d23] transition-colors"
+            className="size-9 rounded-full bg-[#eff1f2] hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-[#141d23] transition-colors"
           >
-            <User className="size-4 fill-current" />
+            <User className="size-4.5 fill-current" />
           </Link>
         </div>
       </header>
 
-      {/* 2. Slim Urgency / Social Proof Banner */}
-      <div className="h-[34px] bg-[#fdf2f4] border-b border-[#fcd5dc] px-4 flex items-center justify-center gap-2 text-[12px] text-[#9f1239] font-semibold shrink-0">
-        <Flame className="size-3.5 text-[#e11d48]" />
-        <span>Sắp hết vé! Hơn 70 người đang xem sự kiện này trong 1 giờ qua</span>
+      {/* 2. Slim Urgency / Social Proof Banner with Seated Together Reassurance */}
+      <div className="h-[36px] bg-[#fdf2f4] border-b border-[#fcd5dc] px-4 flex items-center justify-between text-[12px] text-[#9f1239] font-semibold shrink-0">
+        <div className="flex items-center gap-2 mx-auto sm:mx-0">
+          <Flame className="size-3.5 text-[#e11d48]" />
+          <span>Sắp hết vé! Hơn 70 người đang xem sự kiện này trong 1 giờ qua</span>
+        </div>
+        <div className="hidden sm:flex items-center gap-1.5 text-emerald-800 font-bold bg-white/70 px-2.5 py-0.5 rounded-full border border-emerald-200/50 text-[11.5px]">
+          <CheckCircle2 className="size-3.5 text-emerald-600" />
+          <span>Các ghế ngồi sẽ được xếp cạnh nhau • You&apos;ll be seated together</span>
+        </div>
       </div>
 
       {/* 3. Full-Height Split Screen Workspace */}
@@ -241,16 +278,26 @@ function EventSplitView({ event }: { event: EventItem }) {
               <button
                 type="button"
                 onClick={() => setShowQtyModal(true)}
-                className="h-9 px-3.5 rounded-[8px] border border-[#dfe3e5] hover:border-[#868f97] text-[13px] font-semibold text-[#141d23] flex items-center gap-2 transition-colors"
+                className="h-9 px-3.5 rounded-[8px] border border-[#dfe3e5] hover:border-primary hover:bg-emerald-50/40 text-[13px] font-bold text-[#141d23] flex items-center gap-2 transition-colors"
               >
+                <Users className="size-4 text-primary" />
                 <span>{ticketQuantity} vé</span>
                 <ChevronDown className="size-3.5 text-[#606970]" />
               </button>
             </div>
 
             <div className="text-[12px] text-[#606970] font-medium">
-              Tìm thấy <strong className="text-[#141d23]">{filteredListings.length}</strong> hạng vé
+              Tìm thấy <strong className="text-[#141d23]">{filteredListings.length}</strong> lựa chọn vé
             </div>
+          </div>
+
+          {/* Reassurance Substrip */}
+          <div className="px-4 py-2 bg-[#f8fafc] border-b border-[#dfe3e5] flex items-center justify-between text-[11.5px] text-[#606970]">
+            <span className="flex items-center gap-1.5 font-medium">
+              <CheckCircle2 className="size-3.5 text-emerald-600" />
+              Các vé đặt cùng lúc sẽ ngồi cạnh nhau
+            </span>
+            <span className="font-semibold text-emerald-700">Giá đã gồm phí</span>
           </div>
 
           {/* Scrollable Ticket Listings */}
@@ -318,6 +365,14 @@ function EventSplitView({ event }: { event: EventItem }) {
                         </p>
                       )}
 
+                      {/* Prominent Seated Together reassurance badge */}
+                      <div className="pt-0.5">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-[5px] border border-emerald-200/60">
+                          <Users className="size-3 text-emerald-600" />
+                          Ghế ngồi cạnh nhau • Seated together
+                        </span>
+                      </div>
+
                       <div className="space-y-0.5 pt-0.5">
                         {listing.features.map((feat, idx) => (
                           <p
@@ -361,52 +416,75 @@ function EventSplitView({ event }: { event: EventItem }) {
         </div>
       </div>
 
-      {/* 4. "How Many Tickets?" Modal */}
+      {/* 4. "How Many Tickets?" Popup Modal */}
       {showQtyModal && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150"
         >
-          <div className="w-full max-w-md bg-white rounded-[16px] shadow-2xl p-6 sm:p-7 space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="text-center space-y-1.5">
-              <h2 className="text-[20px] font-bold text-[#141d23]">
-                Bạn cần mua bao nhiêu vé?
+          <div className="w-full max-w-md bg-white rounded-[20px] shadow-2xl p-6 sm:p-7 space-y-5 animate-in zoom-in-95 duration-200 relative border border-slate-100">
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setShowQtyModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              <X className="size-5" />
+            </button>
+
+            <div className="text-center space-y-1.5 pt-1">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-primary text-[12px] font-bold">
+                <Ticket className="size-3.5" /> Chọn số lượng vé
+              </span>
+              <h2 className="text-[22px] font-extrabold text-[#141d23] tracking-tight">
+                How many tickets?
               </h2>
-              <p className="text-[13px] text-[#606970] flex items-center justify-center gap-1.5">
-                <CheckCircle2 className="size-4 text-primary" />
-                Các ghế ngồi sẽ được xếp cạnh nhau
+              <p className="text-[13px] text-[#606970]">
+                Bạn cần mua bao nhiêu vé cho sự kiện này?
               </p>
+
+              {/* Reassurance Badge: You'll be seated together */}
+              <div className="mt-3 py-2 px-3.5 rounded-[10px] bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 text-[12.5px] font-bold flex items-center justify-center gap-2">
+                <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                <span>Các ghế ngồi sẽ được xếp cạnh nhau • You&apos;ll be seated together</span>
+              </div>
             </div>
 
-            {/* 2x2 Ticket Quantity Grid */}
-            <div className="grid grid-cols-2 gap-3">
-              {[1, 2, 3, 4].map((qty) => {
+            {/* Ticket Quantity Grid: 1 through 8+ */}
+            <div className="grid grid-cols-4 gap-2.5 pt-1">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((qty) => {
                 const isSelected = ticketQuantity === qty;
                 return (
                   <button
                     key={qty}
                     type="button"
                     onClick={() => setTicketQuantity(qty)}
-                    className={`h-13 rounded-[12px] border text-[17px] font-bold transition-all ${
+                    className={`h-12 rounded-[12px] border text-[16px] font-extrabold transition-all flex items-center justify-center ${
                       isSelected
-                        ? "border-primary bg-emerald-50/50 text-primary ring-2 ring-primary/20"
-                        : "border-[#dfe3e5] bg-white text-[#141d23] hover:border-[#868f97]"
+                        ? "border-primary bg-primary text-white shadow-xs ring-2 ring-primary/20"
+                        : "border-[#dfe3e5] bg-white text-[#141d23] hover:border-primary hover:bg-emerald-50/30"
                     }`}
                   >
-                    {qty}
+                    {qty === 8 ? "8+" : qty}
                   </button>
                 );
               })}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowQtyModal(false)}
-              className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white font-bold text-[14px] transition-colors"
-            >
-              Tiếp tục
-            </button>
+            <div className="pt-2 space-y-2">
+              <button
+                type="button"
+                onClick={() => setShowQtyModal(false)}
+                className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white font-bold text-[14px] flex items-center justify-center gap-2 transition-colors shadow-xs"
+              >
+                <span>Xem danh sách vé ({ticketQuantity} vé)</span>
+                <ArrowRight className="size-4" />
+              </button>
+              <p className="text-[11.5px] text-center text-[#606970]">
+                Cam kết 100% vé chính hãng • Nhận vé điện tử ngay khi thanh toán
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -462,6 +540,12 @@ function EventSplitView({ event }: { event: EventItem }) {
               <span className="absolute bottom-2 left-2 px-2 py-1 rounded-[6px] bg-black/75 text-white text-[11px] font-semibold">
                 Góc nhìn thực tế sân khấu từ {selectedListing.section}
               </span>
+            </div>
+
+            {/* Seated Together Reassurance Note */}
+            <div className="flex items-center gap-2 p-2.5 rounded-[8px] bg-emerald-50 border border-emerald-200 text-emerald-800 text-[12px] font-semibold">
+              <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+              <span>Tất cả {ticketQuantity} ghế được xếp liền kề nhau • You&apos;ll be seated together</span>
             </div>
 
             {/* Ticket details summary */}
