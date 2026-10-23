@@ -55,7 +55,7 @@ const VENUE_TEMPLATES: VenueTemplateOption[] = [
     realVenuesExample: "SVĐ Quốc Gia Mỹ Đình, SVĐ Thống Nhất, SVĐ Cần Thơ",
     defaultZones: [
       { zoneId: "508", name: "VIP ĐỨNG (Fanzone sát sân khấu)", price: 3200000, capacity: 4000, isSeated: false },
-      { zoneId: "509", name: "SÂN CỎ ĐỨNG (General Standing)", price: 1900000, capacity: 12000, isSeated: false },
+      { zoneId: "509", name: "SÂN CỎ ĐỨNG (Khu Đứng Tự Do)", price: 1900000, capacity: 12000, isSeated: false },
       { zoneId: "510", name: "KHÁN ĐÀI TẦNG 100 (Cận cảnh)", price: 2400000, capacity: 10000, isSeated: true },
       { zoneId: "511", name: "KHÁN ĐÀI TẦNG 400 (Tầm nhìn rộng)", price: 1400000, capacity: 15000, isSeated: true },
       { zoneId: "512", name: "KHÁN ĐÀI TẦNG 600 (Toàn cảnh)", price: 750000, capacity: 12000, isSeated: true },
@@ -80,13 +80,13 @@ const VENUE_TEMPLATES: VenueTemplateOption[] = [
     title: "Sàn Thi Đấu Thể Thao (Bóng rổ / Võ thuật)",
     category: "Thể thao trong nhà / VBA",
     capacityEstimate: "3.000 - 8.000 chỗ",
-    description: "Sân đấu gỗ chuẩn quốc tế với hàng ghế Courtside sát sàn gỗ và khán đài vòng cung.",
+    description: "Sân đấu gỗ chuẩn quốc tế với hàng ghế Sát Sân và khán đài vòng cung.",
     realVenuesExample: "Nhà thi đấu Hồ Xuân Hương, Cầu Giấy, Tây Hồ, Tân Bình",
     defaultZones: [
-      { zoneId: "518", name: "COURTSIDE VIP (Sát sàn đấu)", price: 1500000, capacity: 300, isSeated: true },
-      { zoneId: "519", name: "CLUB LEVEL (Khán đài trung tâm)", price: 750000, capacity: 1200, isSeated: true },
-      { zoneId: "520", name: "LOWER BOWL (Khán đài dưới)", price: 450000, capacity: 2500, isSeated: true },
-      { zoneId: "521", name: "UPPER BOWL (Khán đài trên)", price: 250000, capacity: 3000, isSeated: true },
+      { zoneId: "518", name: "VIP SÁT SÂN (Sát sàn đấu)", price: 1500000, capacity: 300, isSeated: true },
+      { zoneId: "519", name: "KHÁN ĐÀI VIP (Trung tâm)", price: 750000, capacity: 1200, isSeated: true },
+      { zoneId: "520", name: "KHÁN ĐÀI TẦNG DƯỚI", price: 450000, capacity: 2500, isSeated: true },
+      { zoneId: "521", name: "KHÁN ĐÀI TẦNG TRÊN", price: 250000, capacity: 3000, isSeated: true },
     ],
   },
   {
@@ -98,9 +98,9 @@ const VENUE_TEMPLATES: VenueTemplateOption[] = [
     realVenuesExample: "Nhà hát Hòa Bình, Nhà hát Lớn Hà Nội, Cung Văn Hóa Việt Xô",
     defaultZones: [
       { zoneId: "518", name: "VIP CHÍNH DIỆN (Trung tâm khán phòng)", price: 1200000, capacity: 250, isSeated: true },
-      { zoneId: "519", name: "ORCHESTRA (Tầng trệt cận cảnh)", price: 800000, capacity: 800, isSeated: true },
-      { zoneId: "520", name: "MEZZANINE (Tầng lửng)", price: 500000, capacity: 600, isSeated: true },
-      { zoneId: "521", name: "BALCONY (Tầng ban công cao)", price: 300000, capacity: 500, isSeated: true },
+      { zoneId: "519", name: "KHÁN PHÒNG CHÍNH (Tầng trệt)", price: 800000, capacity: 800, isSeated: true },
+      { zoneId: "520", name: "TẦNG LỬNG (Khán phòng giữa)", price: 500000, capacity: 600, isSeated: true },
+      { zoneId: "521", name: "BAN CÔNG (Tầng cao)", price: 300000, capacity: 500, isSeated: true },
     ],
   },
 ];
