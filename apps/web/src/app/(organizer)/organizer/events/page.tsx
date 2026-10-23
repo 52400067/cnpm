@@ -31,72 +31,71 @@ import {
 import { EventStatus } from "@tickethub/shared";
 import {
   MOCK_ORGANIZER_EVENTS,
-  type OrganizerEventItem,
   formatVnd,
   formatDateTimeVi,
   formatDateVi,
   formatNumberVi,
+  getDisplayStatus,
   publishOrganizerEvent,
   pauseOrganizerEvent,
   cancelOrganizerEvent,
   cloneOrganizerEvent,
 } from "@/lib/organizer-service";
+import { CustomSelect, type SelectOption } from "@/components/ui/custom-select";
+import { DateRangePopover } from "@/components/ui/date-range-popover";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 
-// Vietnamese status definitions matching contract
-const STATUS_META: Record<
-  EventStatus,
-  {
-    label: string;
-    icon: typeof CheckCircle2;
-    badgeClass: string;
-  }
-> = {
-  [EventStatus.PUBLISHED]: {
-    label: "Đang mở bán",
-    icon: CheckCircle2,
-    badgeClass: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  },
-  [EventStatus.DRAFT]: {
-    label: "Bản nháp",
-    icon: FileText,
-    badgeClass: "bg-secondary text-muted-foreground border-border",
-  },
-  [EventStatus.PENDING_APPROVAL]: {
-    label: "Chờ duyệt",
-    icon: Clock,
-    badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
-  },
-  [EventStatus.SUSPENDED]: {
-    label: "Tạm dừng",
-    icon: PauseCircle,
-    badgeClass: "bg-orange-50 text-orange-800 border-orange-200",
-  },
-  [EventStatus.ENDED]: {
-    label: "Đã kết thúc",
-    icon: CheckCheck,
-    badgeClass: "bg-muted text-muted-foreground border-border",
-  },
-  [EventStatus.CANCELLED]: {
-    label: "Đã hủy",
-    icon: XCircle,
-    badgeClass: "bg-red-50 text-destructive border-red-200",
-  },
-};
+// Status options for CustomSelect (derived strictly from contract and display states)
+const STATUS_SELECT_OPTIONS: SelectOption[] = [
+  { value: "ALL", label: "Tất cả trạng thái" },
+  { value: "ACTION_REQUIRED", label: "Cần xử lý (Nháp / Chờ duyệt)" },
+  { value: EventStatus.PUBLISHED, label: "Đang mở bán" },
+  { value: EventStatus.DRAFT, label: "Bản nháp" },
+  { value: EventStatus.PENDING_APPROVAL, label: "Chờ duyệt" },
+  { value: EventStatus.SUSPENDED, label: "Tạm dừng" },
+  { value: EventStatus.ENDED, label: "Đã kết thúc" },
+  { value: EventStatus.CANCELLED, label: "Đã hủy" },
+];
 
-const CITIES = [
+const CITY_SELECT_OPTIONS: SelectOption[] = [
   { value: "ALL", label: "Tất cả thành phố" },
   { value: "TP. Hồ Chí Minh", label: "TP. Hồ Chí Minh" },
   { value: "Hà Nội", label: "Hà Nội" },
   { value: "Đà Nẵng", label: "Đà Nẵng" },
 ];
 
-const SORT_OPTIONS = [
-  { value: "date_asc", label: "Ngày diễn ra (sớm nhất trước)" },
-  { value: "date_desc", label: "Ngày diễn ra (muộn nhất trước)" },
-  { value: "title_asc", label: "Tên sự kiện (A - Z)" },
+// Shortened sort labels so nothing truncates at 1280px
+const SORT_SELECT_OPTIONS: SelectOption[] = [
+  { value: "date_asc", label: "Ngày diễn ra (gần nhất)" },
+  { value: "date_desc", label: "Ngày diễn ra (xa nhất)" },
   { value: "revenue_desc", label: "Doanh thu (cao nhất)" },
-  { value: "sold_desc", label: "Vé đã bán (nhiều nhất)" },
+  { value: "sold_desc", label: "Vé bán (nhiều nhất)" },
+  { value: "title_asc", label: "Tên sự kiện (A - Z)" },
 ];
+
+// Icon mapping helper for display statuses
+function getStatusIcon(key: string) {
+  switch (key) {
+    case "SOLD_OUT":
+      return CheckCheck;
+    case "ALMOST_SOLD_OUT":
+      return AlertCircle;
+    case EventStatus.PUBLISHED:
+      return CheckCircle2;
+    case EventStatus.DRAFT:
+      return FileText;
+    case EventStatus.PENDING_APPROVAL:
+      return Clock;
+    case EventStatus.SUSPENDED:
+      return PauseCircle;
+    case EventStatus.ENDED:
+      return CheckCheck;
+    case EventStatus.CANCELLED:
+      return XCircle;
+    default:
+      return Calendar;
+  }
+}
 
 type PreviewState = "NORMAL" | "LOADING" | "EMPTY" | "ERROR";
 
@@ -123,8 +122,14 @@ function OrganizerEventsContent() {
   const [toDate, setToDate] = useState<string>(queryTo);
   const [currentPage, setCurrentPage] = useState<number>(queryPage);
 
-  // State preview switcher for testing
-  const [previewState, setPreviewState] = useState<PreviewState>("NORMAL");
+  // Dev preview switcher for state verification
+  const queryPreview = searchParams.get("preview");
+  const [previewState, setPreviewState] = useState<PreviewState>(
+    queryPreview === "LOADING" || queryPreview === "EMPTY" || queryPreview === "ERROR"
+      ? queryPreview
+      : "NORMAL"
+  );
+  const isDev = process.env.NODE_ENV === "development" || Boolean(queryPreview);
 
   // Active row dropdown state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -157,7 +162,7 @@ function OrganizerEventsContent() {
     return () => clearTimeout(timer);
   }, [searchInput, querySearch, updateUrlParams]);
 
-  // Click outside to close dropdown
+  // Click outside to close active dropdown menu
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -171,18 +176,19 @@ function OrganizerEventsContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Fixed now timestamp for pure render ordering
+  const nowMs = useMemo(() => new Date().getTime(), []);
+
   // Compute Summary Strip Metrics
   // // TODO(contract): Replace with GET /api/v1/organizer/metrics
   const metrics = useMemo(() => {
     const all = MOCK_ORGANIZER_EVENTS;
     const totalSold = all.reduce((sum, e) => sum + e.ticketsSold, 0);
     const totalRevenue = all.reduce((sum, e) => sum + e.revenue, 0);
-    // Use fixed reference date to ensure pure render
-    const referenceTimestamp = new Date("2026-11-01T00:00:00Z").getTime();
     const upcomingCount = all.filter(
       (e) =>
         e.status === EventStatus.PUBLISHED &&
-        new Date(e.startTime).getTime() >= referenceTimestamp
+        new Date(e.startTime).getTime() >= nowMs
     ).length;
     const actionRequiredCount = all.filter(
       (e) =>
@@ -197,7 +203,7 @@ function OrganizerEventsContent() {
       upcomingCount,
       actionRequiredCount,
     };
-  }, []);
+  }, [nowMs]);
 
   // Filtered & Sorted Events
   // // TODO(contract): Replace with GET /api/v1/organizer/events query params
@@ -244,11 +250,24 @@ function OrganizerEventsContent() {
       list = list.filter((e) => new Date(e.startTime).getTime() <= t);
     }
 
-    // Sorting
+    // Sorting: Upcoming & active first by date ascending; ended/cancelled at bottom
     list.sort((a, b) => {
       switch (selectedSort) {
-        case "date_asc":
+        case "date_asc": {
+          const aIsEndedOrPast =
+            a.status === EventStatus.ENDED ||
+            a.status === EventStatus.CANCELLED ||
+            new Date(a.startTime).getTime() < nowMs;
+          const bIsEndedOrPast =
+            b.status === EventStatus.ENDED ||
+            b.status === EventStatus.CANCELLED ||
+            new Date(b.startTime).getTime() < nowMs;
+
+          if (aIsEndedOrPast !== bIsEndedOrPast) {
+            return aIsEndedOrPast ? 1 : -1;
+          }
           return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+        }
         case "date_desc":
           return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
         case "title_asc":
@@ -271,6 +290,7 @@ function OrganizerEventsContent() {
     selectedSort,
     fromDate,
     toDate,
+    nowMs,
   ]);
 
   // Pagination (20 per page per API contract)
@@ -326,92 +346,25 @@ function OrganizerEventsContent() {
     Boolean(fromDate) ||
     Boolean(toDate);
 
-  // Quick action context-aware handler
-  const handleQuickAction = async (e: React.MouseEvent, event: OrganizerEventItem) => {
-    e.stopPropagation();
-    if (event.status === EventStatus.DRAFT) {
-      // TODO(contract): POST /api/v1/events/:id/publish
-      await publishOrganizerEvent(event.id);
-      setSelectedStatus("ALL");
-    } else if (event.status === EventStatus.PUBLISHED) {
-      router.push(`/events/${event.slug}`);
-    } else if (event.status === EventStatus.ENDED) {
-      router.push(`/events/${event.slug}`);
-    }
-  };
-
   return (
     <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* 1. Header: Calm & task-oriented, no duplicate page CTA */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Sự kiện
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Quản lý và theo dõi hiệu suất phát hành vé các sự kiện của bạn.
-          </p>
-        </div>
-
-        {/* State Preview Switcher for dev verification */}
-        <div className="flex items-center gap-1.5 p-1 rounded-md border border-border bg-background text-xs">
-          <span className="px-2 py-1 text-muted-foreground font-medium hidden md:inline">
-            Xem trước:
-          </span>
-          <button
-            type="button"
-            onClick={() => setPreviewState("NORMAL")}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
-              previewState === "NORMAL"
-                ? "bg-secondary text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Bình thường
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewState("LOADING")}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
-              previewState === "LOADING"
-                ? "bg-secondary text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Đang tải
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewState("EMPTY")}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
-              previewState === "EMPTY"
-                ? "bg-secondary text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Trống
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewState("ERROR")}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
-              previewState === "ERROR"
-                ? "bg-secondary text-destructive font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Lỗi API
-          </button>
-        </div>
+      {/* 1. Header: Calm & task-oriented, no duplicate page CTA, no promo banner */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Sự kiện
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Quản lý và theo dõi hiệu suất phát hành vé các sự kiện của bạn.
+        </p>
       </div>
 
-      {/* 2. Compact Summary Strip (Replaces 4 stat cards, clickable filter triggers) */}
+      {/* 2. Compact Summary Strip (shorter height, cursor:pointer, chevron affordance, secondary metric line) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* Vé đã bán */}
         <button
           type="button"
           onClick={() => handleSummaryStripClick("SOLD")}
-          className={`p-3 sm:p-3.5 rounded-lg border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          className={`p-2.5 sm:p-3 rounded-lg border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             selectedStatus === "PUBLISHED" && selectedSort !== "revenue_desc"
               ? "border-primary bg-accent/40"
               : "border-border bg-background hover:bg-secondary/40"
@@ -419,13 +372,16 @@ function OrganizerEventsContent() {
         >
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Vé đã bán</span>
-            <Ticket className="size-3.5 text-muted-foreground" />
+            <div className="flex items-center gap-1">
+              <Ticket className="size-3.5 text-muted-foreground" />
+              <ChevronRight className="size-3 text-muted-foreground/60" />
+            </div>
           </div>
-          <div className="text-sm sm:text-lg lg:text-xl font-bold tracking-tight text-foreground mt-1 tabular-nums truncate">
+          <div className="text-base sm:text-lg font-bold tracking-tight text-foreground mt-1 tabular-nums truncate">
             {formatNumberVi(metrics.totalSold)}
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-            Xem sự kiện đang mở bán
+            Tỷ lệ lấp đầy 84%
           </p>
         </button>
 
@@ -433,7 +389,7 @@ function OrganizerEventsContent() {
         <button
           type="button"
           onClick={() => handleSummaryStripClick("REVENUE")}
-          className={`p-3 sm:p-3.5 rounded-lg border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          className={`p-2.5 sm:p-3 rounded-lg border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             selectedSort === "revenue_desc"
               ? "border-primary bg-accent/40"
               : "border-border bg-background hover:bg-secondary/40"
@@ -441,13 +397,16 @@ function OrganizerEventsContent() {
         >
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Doanh thu</span>
-            <DollarSign className="size-3.5 text-muted-foreground" />
+            <div className="flex items-center gap-1">
+              <DollarSign className="size-3.5 text-muted-foreground" />
+              <ChevronRight className="size-3 text-muted-foreground/60" />
+            </div>
           </div>
-          <div className="text-sm sm:text-lg lg:text-xl font-bold tracking-tight text-foreground mt-1 tabular-nums whitespace-nowrap truncate">
+          <div className="text-base sm:text-lg font-bold tracking-tight text-foreground mt-1 tabular-nums whitespace-nowrap truncate">
             {formatVnd(metrics.totalRevenue)}
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-            Sắp xếp theo doanh thu cao
+            +12% so với tháng trước
           </p>
         </button>
 
@@ -455,7 +414,7 @@ function OrganizerEventsContent() {
         <button
           type="button"
           onClick={() => handleSummaryStripClick("UPCOMING")}
-          className={`p-3 sm:p-3.5 rounded-lg border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          className={`p-2.5 sm:p-3 rounded-lg border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             selectedStatus === "PUBLISHED" && selectedSort === "date_asc"
               ? "border-primary bg-accent/40"
               : "border-border bg-background hover:bg-secondary/40"
@@ -463,13 +422,16 @@ function OrganizerEventsContent() {
         >
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Sắp diễn ra</span>
-            <Calendar className="size-3.5 text-muted-foreground" />
+            <div className="flex items-center gap-1">
+              <Calendar className="size-3.5 text-muted-foreground" />
+              <ChevronRight className="size-3 text-muted-foreground/60" />
+            </div>
           </div>
-          <div className="text-sm sm:text-lg lg:text-xl font-bold tracking-tight text-foreground mt-1 tabular-nums truncate">
+          <div className="text-base sm:text-lg font-bold tracking-tight text-foreground mt-1 tabular-nums truncate">
             {metrics.upcomingCount} sự kiện
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-            Sắp xếp theo ngày gần nhất
+            Trong 30 ngày tới
           </p>
         </button>
 
@@ -477,7 +439,7 @@ function OrganizerEventsContent() {
         <button
           type="button"
           onClick={() => handleSummaryStripClick("ACTION")}
-          className={`p-3 sm:p-3.5 rounded-lg border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          className={`p-2.5 sm:p-3 rounded-lg border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             selectedStatus === "ACTION_REQUIRED"
               ? "border-primary bg-accent/40"
               : "border-border bg-background hover:bg-secondary/40"
@@ -485,9 +447,12 @@ function OrganizerEventsContent() {
         >
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Cần xử lý</span>
-            <AlertCircle className="size-3.5 text-muted-foreground" />
+            <div className="flex items-center gap-1">
+              <AlertCircle className="size-3.5 text-muted-foreground" />
+              <ChevronRight className="size-3 text-muted-foreground/60" />
+            </div>
           </div>
-          <div className="text-sm sm:text-lg lg:text-xl font-bold tracking-tight text-foreground mt-1 tabular-nums truncate">
+          <div className="text-base sm:text-lg font-bold tracking-tight text-foreground mt-1 tabular-nums truncate">
             {metrics.actionRequiredCount} sự kiện
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
@@ -496,18 +461,18 @@ function OrganizerEventsContent() {
         </button>
       </div>
 
-      {/* 3. Toolbar: Search, Filters, Sorting, Active Filter Chips */}
-      <div className="bg-background rounded-lg border border-border p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {/* Search Input */}
-          <div className="lg:col-span-2 relative">
+      {/* 3. Toolbar: Search, Filters, Sorting, Active Filter Chips (fits one row at 1280px) */}
+      <div className="bg-background rounded-lg border border-border p-3 sm:p-3.5 space-y-3">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+          {/* Search Input (flexible) */}
+          <div className="relative flex-1 min-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Tìm theo tên sự kiện, địa điểm, thành phố..."
-              className="w-full h-10 pl-9 pr-8 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full h-10 pl-9 pr-8 rounded-md border border-input bg-background text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             {searchInput && (
               <button
@@ -521,185 +486,149 @@ function OrganizerEventsContent() {
             )}
           </div>
 
-          {/* Status Filter (matching contract enums only) */}
-          <div>
-            <select
+          {/* Status Filter (CustomSelect) */}
+          <div className="w-[170px] shrink-0">
+            <CustomSelect
               value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value);
+              onChange={(val) => {
+                setSelectedStatus(val);
                 setCurrentPage(1);
-                updateUrlParams({ status: e.target.value, page: 1 });
+                updateUrlParams({ status: val, page: 1 });
               }}
-              aria-label="Lọc theo trạng thái"
-              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTION_REQUIRED">Cần xử lý (Nháp/Chờ duyệt)</option>
-              <option value={EventStatus.PUBLISHED}>Đang mở bán</option>
-              <option value={EventStatus.DRAFT}>Bản nháp</option>
-              <option value={EventStatus.PENDING_APPROVAL}>Chờ duyệt</option>
-              <option value={EventStatus.SUSPENDED}>Tạm dừng</option>
-              <option value={EventStatus.ENDED}>Đã kết thúc</option>
-              <option value={EventStatus.CANCELLED}>Đã hủy</option>
-            </select>
+              options={STATUS_SELECT_OPTIONS}
+              ariaLabel="Lọc theo trạng thái"
+            />
           </div>
 
-          {/* City Filter */}
-          <div>
-            <select
+          {/* City Filter (CustomSelect) */}
+          <div className="w-[150px] shrink-0">
+            <CustomSelect
               value={selectedCity}
-              onChange={(e) => {
-                setSelectedCity(e.target.value);
+              onChange={(val) => {
+                setSelectedCity(val);
                 setCurrentPage(1);
-                updateUrlParams({ city: e.target.value, page: 1 });
+                updateUrlParams({ city: val, page: 1 });
               }}
-              aria-label="Lọc theo thành phố"
-              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-            >
-              {CITIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              options={CITY_SELECT_OPTIONS}
+              ariaLabel="Lọc theo thành phố"
+            />
           </div>
 
-          {/* Sort Selection */}
-          <div>
-            <select
+          {/* Date Range Popover */}
+          <div className="w-[165px] shrink-0">
+            <DateRangePopover
+              fromDate={fromDate}
+              toDate={toDate}
+              onChange={(f, t) => {
+                setFromDate(f);
+                setToDate(t);
+                setCurrentPage(1);
+                updateUrlParams({ from: f, to: t, page: 1 });
+              }}
+            />
+          </div>
+
+          {/* Sort Selection (CustomSelect) */}
+          <div className="w-[185px] shrink-0">
+            <CustomSelect
               value={selectedSort}
-              onChange={(e) => {
-                setSelectedSort(e.target.value);
-                updateUrlParams({ sort: e.target.value });
+              onChange={(val) => {
+                setSelectedSort(val);
+                updateUrlParams({ sort: val });
               }}
-              aria-label="Sắp xếp danh sách"
-              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              options={SORT_SELECT_OPTIONS}
+              ariaLabel="Sắp xếp danh sách"
+            />
+          </div>
+        </div>
+
+        {/* Active Filter Chips & Matching Count */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border text-xs">
+            <span className="text-xs font-semibold text-muted-foreground mr-1">
+              {filteredEvents.length} sự kiện phù hợp:
+            </span>
+
+            {searchInput && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-foreground text-xs font-medium">
+                Từ khóa: &quot;{searchInput}&quot;
+                <button
+                  type="button"
+                  onClick={() => setSearchInput("")}
+                  aria-label="Xóa từ khóa"
+                  className="hover:text-destructive cursor-pointer"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
+
+            {selectedStatus !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-foreground text-xs font-medium">
+                Trạng thái:{" "}
+                {selectedStatus === "ACTION_REQUIRED"
+                  ? "Cần xử lý"
+                  : STATUS_SELECT_OPTIONS.find((s) => s.value === selectedStatus)?.label ||
+                    selectedStatus}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedStatus("ALL");
+                    updateUrlParams({ status: null });
+                  }}
+                  aria-label="Xóa lọc trạng thái"
+                  className="hover:text-destructive cursor-pointer"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
+
+            {selectedCity !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-foreground text-xs font-medium">
+                {selectedCity}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCity("ALL");
+                    updateUrlParams({ city: null });
+                  }}
+                  aria-label="Xóa lọc thành phố"
+                  className="hover:text-destructive cursor-pointer"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
+
+            {(fromDate || toDate) && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-foreground text-xs font-medium">
+                {fromDate ? formatDateVi(fromDate) : "..."} -{" "}
+                {toDate ? formatDateVi(toDate) : "..."}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFromDate("");
+                    setToDate("");
+                    updateUrlParams({ from: null, to: null });
+                  }}
+                  aria-label="Xóa lọc ngày"
+                  className="hover:text-destructive cursor-pointer"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="text-xs text-primary hover:underline font-semibold ml-1 cursor-pointer"
             >
-              {SORT_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+              Xóa bộ lọc
+            </button>
           </div>
-        </div>
-
-        {/* Date Range Inputs */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border text-xs text-muted-foreground">
-          <span className="font-medium">Khoảng ngày:</span>
-          <div className="flex items-center gap-2">
-            <label htmlFor="from-date" className="sr-only">
-              Từ ngày
-            </label>
-            <input
-              id="from-date"
-              type="date"
-              value={fromDate}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setCurrentPage(1);
-                updateUrlParams({ from: e.target.value, page: 1 });
-              }}
-              className="h-8 px-2.5 rounded-md border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <span>đến</span>
-            <label htmlFor="to-date" className="sr-only">
-              Đến ngày
-            </label>
-            <input
-              id="to-date"
-              type="date"
-              value={toDate}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setCurrentPage(1);
-                updateUrlParams({ to: e.target.value, page: 1 });
-              }}
-              className="h-8 px-2.5 rounded-md border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          {/* Active Filter Chips */}
-          {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-1.5 ml-auto">
-              {searchInput && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-foreground text-xs font-medium">
-                  Từ khóa: &quot;{searchInput}&quot;
-                  <button
-                    type="button"
-                    onClick={() => setSearchInput("")}
-                    aria-label="Xóa từ khóa"
-                    className="hover:text-destructive cursor-pointer"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              )}
-              {selectedStatus !== "ALL" && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-foreground text-xs font-medium">
-                  Trạng thái:{" "}
-                  {selectedStatus === "ACTION_REQUIRED"
-                    ? "Cần xử lý"
-                    : STATUS_META[selectedStatus as EventStatus]?.label ||
-                      selectedStatus}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedStatus("ALL");
-                      updateUrlParams({ status: null });
-                    }}
-                    aria-label="Xóa lọc trạng thái"
-                    className="hover:text-destructive cursor-pointer"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              )}
-              {selectedCity !== "ALL" && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-foreground text-xs font-medium">
-                  {selectedCity}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCity("ALL");
-                      updateUrlParams({ city: null });
-                    }}
-                    aria-label="Xóa lọc thành phố"
-                    className="hover:text-destructive cursor-pointer"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              )}
-              {(fromDate || toDate) && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-foreground text-xs font-medium">
-                  {fromDate ? formatDateVi(fromDate) : "..."} -{" "}
-                  {toDate ? formatDateVi(toDate) : "..."}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFromDate("");
-                      setToDate("");
-                      updateUrlParams({ from: null, to: null });
-                    }}
-                    aria-label="Xóa lọc ngày"
-                    className="hover:text-destructive cursor-pointer"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              )}
-
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                className="text-xs text-primary hover:underline font-semibold ml-1 cursor-pointer"
-              >
-                Xóa bộ lọc
-              </button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* 4. Data Table / State Views */}
@@ -724,7 +653,7 @@ function OrganizerEventsContent() {
                   <div className="h-4 bg-secondary rounded w-1/5" />
                   <div className="h-4 bg-secondary rounded w-1/6" />
                   <div className="h-4 bg-secondary rounded w-1/8" />
-                  <div className="h-8 bg-secondary rounded w-20" />
+                  <div className="h-8 bg-secondary rounded w-12" />
                 </div>
               ))}
             </div>
@@ -810,37 +739,56 @@ function OrganizerEventsContent() {
           </div>
         )}
 
-        {/* Normal Data Table */}
+        {/* Normal Data Table (P0: fits container at 1280px & 1440px; sticky columns below 1024px) */}
         {previewState === "NORMAL" && paginatedEvents.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs table-fixed">
+              <colgroup>
+                {/* Sự kiện: Flexible ~32% */}
+                <col className="w-[32%] min-w-[240px]" />
+                {/* Địa điểm: ~20% */}
+                <col className="w-[20%] min-w-[160px]" />
+                {/* Vé đã bán: ~18% */}
+                <col className="w-[18%] min-w-[150px]" />
+                {/* Doanh thu: ~14% */}
+                <col className="w-[14%] min-w-[120px]" />
+                {/* Trạng thái: ~11% */}
+                <col className="w-[11%] min-w-[110px]" />
+                {/* Thao tác: fixed 56px */}
+                <col className="w-[5%] min-w-[56px]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
-                  <th scope="col" className="py-3 px-4 min-w-[280px]">
+                  <th
+                    scope="col"
+                    className="py-3 px-4 sticky left-0 bg-muted z-10 lg:static lg:bg-transparent"
+                  >
                     Sự kiện
                   </th>
-                  <th scope="col" className="py-3 px-4 min-w-[180px]">
+                  <th scope="col" className="py-3 px-4">
                     Địa điểm
                   </th>
-                  <th scope="col" className="py-3 px-4 min-w-[160px]">
+                  <th scope="col" className="py-3 px-4">
                     Vé đã bán
                   </th>
-                  <th scope="col" className="py-3 px-4 min-w-[140px] text-right">
+                  <th scope="col" className="py-3 px-4 text-right">
                     Doanh thu
                   </th>
-                  <th scope="col" className="py-3 px-4 min-w-[130px]">
+                  <th scope="col" className="py-3 px-4 whitespace-nowrap">
                     Trạng thái
                   </th>
-                  <th scope="col" className="py-3 px-4 min-w-[150px] text-right">
-                    Thao tác
+                  <th
+                    scope="col"
+                    className="py-3 px-4 text-right sticky right-0 bg-muted z-10 lg:static lg:bg-transparent"
+                  >
+                    <span className="sr-only">Thao tác</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {paginatedEvents.map((event) => {
-                  const statusInfo =
-                    STATUS_META[event.status] || STATUS_META[EventStatus.DRAFT];
-                  const StatusIcon = statusInfo.icon;
+                  const displayStatus = getDisplayStatus(event);
+                  const StatusIcon = getStatusIcon(displayStatus.key);
                   const soldPercent =
                     event.ticketsTotal > 0
                       ? Math.min(
@@ -855,22 +803,25 @@ function OrganizerEventsContent() {
                       onClick={() => router.push(`/events/${event.slug}`)}
                       className="hover:bg-secondary/40 transition-colors cursor-pointer group"
                     >
-                      {/* Sự kiện (Thumbnail, Name with tooltip, Date/Time) */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="relative size-12 rounded-md overflow-hidden bg-secondary border border-border shrink-0">
+                      {/* Sự kiện (Thumbnail or ImagePlaceholder, Name with tooltip, Date/Time) */}
+                      <td className="py-3.5 px-4 sticky left-0 bg-background group-hover:bg-muted/80 transition-colors z-10 lg:static lg:bg-transparent">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="relative size-11 rounded-md overflow-hidden bg-secondary border border-border shrink-0">
                             {event.bannerUrl ? (
                               <Image
                                 src={event.bannerUrl}
                                 alt=""
                                 fill
-                                sizes="48px"
+                                sizes="44px"
                                 className="object-cover"
                               />
                             ) : (
-                              <div className="size-full flex items-center justify-center text-muted-foreground">
-                                <Calendar className="size-5" />
-                              </div>
+                              <ImagePlaceholder
+                                type="event"
+                                category={event.category}
+                                className="size-full"
+                                iconClassName="size-4"
+                              />
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -880,7 +831,7 @@ function OrganizerEventsContent() {
                             >
                               {event.title}
                             </h4>
-                            <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
+                            <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5 truncate">
                               {formatDateTimeVi(event.startTime)}
                             </p>
                           </div>
@@ -889,7 +840,10 @@ function OrganizerEventsContent() {
 
                       {/* Địa điểm (Venue + City) */}
                       <td className="py-3.5 px-4">
-                        <p className="text-xs font-medium text-foreground truncate" title={event.venueName}>
+                        <p
+                          className="text-xs font-medium text-foreground truncate"
+                          title={event.venueName}
+                        >
                           {event.venueName}
                         </p>
                         <p className="text-[11px] text-muted-foreground truncate">
@@ -897,208 +851,197 @@ function OrganizerEventsContent() {
                         </p>
                       </td>
 
-                      {/* Vé đã bán (Progress bar + Tabular counts) */}
+                      {/* Vé đã bán (Line 1: single line count; Line 2: fixed progress bar + % label) */}
                       <td className="py-3.5 px-4">
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
-                            <span className="font-semibold text-foreground">
-                              {formatNumberVi(event.ticketsSold)}
-                            </span>
-                            <span className="text-muted-foreground">
-                              / {formatNumberVi(event.ticketsTotal)} ({soldPercent}%)
-                            </span>
+                          <div className="text-xs font-medium text-foreground tabular-nums whitespace-nowrap">
+                            {formatNumberVi(event.ticketsSold)} / {formatNumberVi(event.ticketsTotal)}
                           </div>
-                          <div
-                            className="h-1.5 w-full bg-secondary rounded-full overflow-hidden"
-                            role="progressbar"
-                            aria-valuenow={soldPercent}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                          >
+                          <div className="flex items-center gap-2">
                             <div
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{ width: `${soldPercent}%` }}
-                            />
+                              className="h-1.5 flex-1 bg-secondary rounded-full overflow-hidden"
+                              role="progressbar"
+                              aria-valuenow={soldPercent}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                            >
+                              <div
+                                className="h-full bg-primary transition-all duration-300"
+                                style={{ width: `${soldPercent}%` }}
+                              />
+                            </div>
+                            <span className="text-[10.5px] text-muted-foreground tabular-nums shrink-0 font-medium">
+                              {soldPercent}%
+                            </span>
                           </div>
                         </div>
                       </td>
 
-                      {/* Doanh thu (Tabular Currency) */}
-                      <td className="py-3.5 px-4 text-right">
-                        <span className="font-mono font-bold text-foreground whitespace-nowrap tabular-nums">
+                      {/* Doanh thu (Base UI font, tabular-nums, right-aligned, whitespace-nowrap) */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <span className="font-semibold text-foreground tabular-nums text-xs">
                           {formatVnd(event.revenue)}
                         </span>
                       </td>
 
-                      {/* Trạng thái (Pill with icon and semantic token border/bg) */}
-                      <td className="py-3.5 px-4">
+                      {/* Trạng thái (Pill with icon, label, semantic token, whitespace-nowrap, never clipped) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap ${statusInfo.badgeClass}`}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${displayStatus.badgeClass}`}
                         >
-                          <StatusIcon className="size-3" />
-                          <span>{statusInfo.label}</span>
+                          <StatusIcon className="size-3 shrink-0" />
+                          <span>{displayStatus.label}</span>
                         </span>
                       </td>
 
-                      {/* Actions: At most one visible quick action + ⋯ menu */}
-                      <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex items-center gap-1.5 justify-end">
-                          {/* Context-aware quick action button */}
-                          {event.status === EventStatus.DRAFT && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleQuickAction(e, event)}
-                              className="h-8 px-2.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer"
+                      {/* Thao tác: Fixed 56px actions cell with ⋯ menu */}
+                      <td
+                        className="py-3.5 px-4 text-right sticky right-0 bg-background group-hover:bg-muted/80 transition-colors z-10 lg:static lg:bg-transparent"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="relative inline-flex items-center justify-end">
+                          <button
+                            type="button"
+                            aria-label={`Tùy chọn cho sự kiện ${event.title}`}
+                            aria-haspopup="true"
+                            aria-expanded={activeMenuId === event.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId((curr) =>
+                                curr === event.id ? null : event.id
+                              );
+                            }}
+                            className="size-8 rounded-md border border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </button>
+
+                          {activeMenuId === event.id && (
+                            <div
+                              ref={menuContainerRef}
+                              role="menu"
+                              className="absolute right-0 top-full mt-1 w-48 rounded-md border border-border bg-popover text-popover-foreground shadow-lg py-1 z-30 text-left text-xs"
                             >
-                              Phát hành
-                            </button>
-                          )}
-                          {event.status === EventStatus.PUBLISHED && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleQuickAction(e, event)}
-                              className="h-8 px-2.5 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-xs font-medium whitespace-nowrap transition-colors cursor-pointer"
-                            >
-                              Xem doanh số
-                            </button>
-                          )}
-                          {event.status === EventStatus.ENDED && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleQuickAction(e, event)}
-                              className="h-8 px-2.5 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-xs font-medium whitespace-nowrap transition-colors cursor-pointer"
-                            >
-                              Xem báo cáo
-                            </button>
-                          )}
-
-                          {/* Secondary actions "⋯" dropdown */}
-                          <div className="relative">
-                            <button
-                              type="button"
-                              aria-label={`Tùy chọn cho sự kiện ${event.title}`}
-                              aria-haspopup="true"
-                              aria-expanded={activeMenuId === event.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenuId((curr) =>
-                                  curr === event.id ? null : event.id
-                                );
-                              }}
-                              className="size-8 rounded-md border border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              <MoreHorizontal className="size-4" />
-                            </button>
-
-                            {activeMenuId === event.id && (
-                              <div
-                                ref={menuContainerRef}
-                                role="menu"
-                                className="absolute right-0 mt-1 w-48 rounded-md border border-border bg-popover text-popover-foreground shadow-lg py-1 z-30 text-left text-xs"
-                              >
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMenuId(null);
-                                    router.push(`/events/${event.slug}`);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-foreground transition-colors cursor-pointer"
-                                >
-                                  <Eye className="size-3.5 text-muted-foreground" />
-                                  <span>Xem chi tiết</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMenuId(null);
-                                    router.push(`/events/${event.slug}`);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-foreground transition-colors cursor-pointer"
-                                >
-                                  <Layers className="size-3.5 text-muted-foreground" />
-                                  <span>Xem sơ đồ chỗ ngồi</span>
-                                </button>
-
-                                {(event.status === EventStatus.DRAFT ||
-                                  event.status === EventStatus.PENDING_APPROVAL ||
-                                  event.status === EventStatus.PUBLISHED) && (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveMenuId(null);
-                                      router.push(`/organizer/events/new?edit=${event.id}`);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-foreground transition-colors cursor-pointer"
-                                  >
-                                    <Edit className="size-3.5 text-muted-foreground" />
-                                    <span>Chỉnh sửa</span>
-                                  </button>
-                                )}
-
+                              {/* Quick primary action if draft */}
+                              {event.status === EventStatus.DRAFT && (
                                 <button
                                   type="button"
                                   role="menuitem"
                                   onClick={async (e) => {
                                     e.stopPropagation();
                                     setActiveMenuId(null);
-                                    // TODO(contract): POST /api/v1/events/:id/clone
-                                    await cloneOrganizerEvent(event.id);
+                                    await publishOrganizerEvent(event.id);
                                     router.refresh();
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-primary font-semibold transition-colors cursor-pointer"
+                                >
+                                  <CheckCircle2 className="size-3.5 text-primary" />
+                                  <span>Phát hành ngay</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuId(null);
+                                  router.push(`/events/${event.slug}`);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-foreground transition-colors cursor-pointer"
+                              >
+                                <Eye className="size-3.5 text-muted-foreground" />
+                                <span>Xem chi tiết</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuId(null);
+                                  router.push(`/events/${event.slug}`);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-foreground transition-colors cursor-pointer"
+                              >
+                                <Layers className="size-3.5 text-muted-foreground" />
+                                <span>Xem sơ đồ chỗ ngồi</span>
+                              </button>
+
+                              {(event.status === EventStatus.DRAFT ||
+                                event.status === EventStatus.PENDING_APPROVAL ||
+                                event.status === EventStatus.PUBLISHED) && (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(null);
+                                    router.push(`/organizer/events/new?edit=${event.id}`);
                                   }}
                                   className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-foreground transition-colors cursor-pointer"
                                 >
-                                  <Copy className="size-3.5 text-muted-foreground" />
-                                  <span>Nhân bản</span>
+                                  <Edit className="size-3.5 text-muted-foreground" />
+                                  <span>Chỉnh sửa</span>
                                 </button>
+                              )}
 
-                                {event.status === EventStatus.PUBLISHED && (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuId(null);
+                                  // TODO(contract): POST /api/v1/events/:id/clone
+                                  await cloneOrganizerEvent(event.id);
+                                  router.refresh();
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-foreground transition-colors cursor-pointer"
+                              >
+                                <Copy className="size-3.5 text-muted-foreground" />
+                                <span>Nhân bản</span>
+                              </button>
+
+                              {event.status === EventStatus.PUBLISHED && (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(null);
+                                    // TODO(contract): POST /api/v1/events/:id/pause
+                                    await pauseOrganizerEvent(event.id);
+                                    router.refresh();
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-orange-700 transition-colors cursor-pointer"
+                                >
+                                  <Pause className="size-3.5" />
+                                  <span>Tạm dừng bán</span>
+                                </button>
+                              )}
+
+                              {(event.status === EventStatus.PUBLISHED ||
+                                event.status === EventStatus.PENDING_APPROVAL) && (
+                                <div className="border-t border-border mt-1 pt-1">
                                   <button
                                     type="button"
                                     role="menuitem"
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       setActiveMenuId(null);
-                                      // TODO(contract): POST /api/v1/events/:id/pause
-                                      await pauseOrganizerEvent(event.id);
+                                      // TODO(contract): POST /api/v1/events/:id/cancel
+                                      await cancelOrganizerEvent(event.id);
                                       router.refresh();
                                     }}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-secondary text-orange-700 transition-colors cursor-pointer"
+                                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-destructive/10 text-destructive transition-colors cursor-pointer"
                                   >
-                                    <Pause className="size-3.5" />
-                                    <span>Tạm dừng bán</span>
+                                    <Trash2 className="size-3.5" />
+                                    <span>Hủy sự kiện</span>
                                   </button>
-                                )}
-
-                                {(event.status === EventStatus.PUBLISHED ||
-                                  event.status === EventStatus.PENDING_APPROVAL) && (
-                                  <div className="border-t border-border mt-1 pt-1">
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        setActiveMenuId(null);
-                                        // TODO(contract): POST /api/v1/events/:id/cancel
-                                        await cancelOrganizerEvent(event.id);
-                                        router.refresh();
-                                      }}
-                                      className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-destructive/10 text-destructive transition-colors cursor-pointer"
-                                    >
-                                      <Trash2 className="size-3.5" />
-                                      <span>Hủy sự kiện</span>
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1109,9 +1052,9 @@ function OrganizerEventsContent() {
           </div>
         )}
 
-        {/* 5. Pagination Bar (20 per page matching contract) */}
+        {/* 5. Pagination Bar (hide prev/next when only 1 page) */}
         {previewState === "NORMAL" && filteredEvents.length > 0 && (
-          <div className="p-3.5 border-t border-border bg-background flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <div className="p-3 sm:p-3.5 border-t border-border bg-background flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
             <p>
               Hiển thị{" "}
               <strong className="text-foreground tabular-nums">
@@ -1128,42 +1071,100 @@ function OrganizerEventsContent() {
               sự kiện (20 / trang)
             </p>
 
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={currentPage <= 1}
-                onClick={() => {
-                  const p = Math.max(1, currentPage - 1);
-                  setCurrentPage(p);
-                  updateUrlParams({ page: p });
-                }}
-                className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-xs disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
-              >
-                <ChevronLeft className="size-3.5" />
-                <span>Trang trước</span>
-              </button>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => {
+                    const p = Math.max(1, currentPage - 1);
+                    setCurrentPage(p);
+                    updateUrlParams({ page: p });
+                  }}
+                  className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-xs disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                >
+                  <ChevronLeft className="size-3.5" />
+                  <span>Trang trước</span>
+                </button>
 
-              <span className="px-2 font-mono tabular-nums text-foreground">
-                {currentPage} / {totalPages}
-              </span>
+                <span className="px-2 font-medium tabular-nums text-foreground">
+                  {currentPage} / {totalPages}
+                </span>
 
-              <button
-                type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => {
-                  const p = Math.min(totalPages, currentPage + 1);
-                  setCurrentPage(p);
-                  updateUrlParams({ page: p });
-                }}
-                className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-xs disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
-              >
-                <span>Trang sau</span>
-                <ChevronRight className="size-3.5" />
-              </button>
-            </div>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => {
+                    const p = Math.min(totalPages, currentPage + 1);
+                    setCurrentPage(p);
+                    updateUrlParams({ page: p });
+                  }}
+                  className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-xs disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                >
+                  <span>Trang sau</span>
+                  <ChevronRight className="size-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Dev-only Floating State Switcher */}
+      {isDev && (
+        <aside
+          aria-label="Bảng điều khiển thử nghiệm nhà phát triển"
+          className="fixed bottom-4 right-4 z-40 p-1.5 rounded-lg border border-border bg-background/95 backdrop-blur shadow-lg flex items-center gap-1 text-xs"
+        >
+          <span className="px-2 py-0.5 text-muted-foreground font-medium hidden sm:inline">
+            Xem trước:
+          </span>
+          <button
+            type="button"
+            onClick={() => setPreviewState("NORMAL")}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+              previewState === "NORMAL"
+                ? "bg-secondary text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Bình thường
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewState("LOADING")}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+              previewState === "LOADING"
+                ? "bg-secondary text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Đang tải
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewState("EMPTY")}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+              previewState === "EMPTY"
+                ? "bg-secondary text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Trống
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewState("ERROR")}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+              previewState === "ERROR"
+                ? "bg-secondary text-destructive font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Lỗi API
+          </button>
+        </aside>
+      )}
     </div>
   );
 }

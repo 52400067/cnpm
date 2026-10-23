@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect, Suspense, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  Building2,
   Check,
   CheckCircle2,
   ArrowRight,
@@ -34,6 +33,9 @@ import {
   clearSavedEventDraft,
   type EventDraftData,
 } from "@/lib/organizer-service";
+import { CustomSelect, type SelectOption } from "@/components/ui/custom-select";
+import { DatePicker, TimePicker } from "@/components/ui/date-picker";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 
 const CITY_TABS: Array<{ id: VietnamCity | "ALL"; label: string; count: number }> = [
   { id: "ALL", label: "Tất cả", count: 11 },
@@ -42,12 +44,12 @@ const CITY_TABS: Array<{ id: VietnamCity | "ALL"; label: string; count: number }
   { id: "Đà Nẵng", label: "Đà Nẵng", count: 3 },
 ];
 
-const CATEGORIES = [
-  "Âm nhạc",
-  "Thể thao",
-  "Sân khấu & Nghệ thuật",
-  "Hội thảo & Sự kiện",
-  "Khác",
+const CATEGORY_OPTIONS: SelectOption[] = [
+  { value: "Âm nhạc", label: "Âm nhạc" },
+  { value: "Thể thao", label: "Thể thao" },
+  { value: "Sân khấu & Nghệ thuật", label: "Sân khấu & Nghệ thuật" },
+  { value: "Hội thảo & Sự kiện", label: "Hội thảo & Sự kiện" },
+  { value: "Khác", label: "Khác" },
 ];
 
 interface FormErrors {
@@ -85,7 +87,7 @@ function CreateEventWizardContent() {
   const [endDate, setEndDate] = useState("");
   const [endTime, setEndTime] = useState("");
 
-  // Touched state for blur validation
+  // Touched state for validation feedback
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Step 2: Seating Layout selection
@@ -103,6 +105,15 @@ function CreateEventWizardContent() {
 
   // Venue list container reference for scrolling
   const venuePickerRef = useRef<HTMLDivElement>(null);
+
+  // ISO string for today minDate
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
 
   // Check saved draft on mount cleanly
   useEffect(() => {
@@ -140,6 +151,18 @@ function CreateEventWizardContent() {
         const minutes = String(d.getMinutes()).padStart(2, "0");
         setStartDate(`${year}-${month}-${day}`);
         setStartTime(`${hours}:${minutes}`);
+      }
+    }
+    if (pendingDraft.endTime) {
+      const d = new Date(pendingDraft.endTime);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const hours = String(d.getHours()).padStart(2, "0");
+        const minutes = String(d.getMinutes()).padStart(2, "0");
+        setEndDate(`${year}-${month}-${day}`);
+        setEndTime(`${hours}:${minutes}`);
       }
     }
     if (pendingDraft.venueId) {
@@ -196,7 +219,7 @@ function CreateEventWizardContent() {
     );
   }, [selectedLayoutKey]);
 
-  // Inline Validation Rules matching contract (pure useMemo)
+  // Inline Validation Rules (start not in past, end after start, plain Vietnamese)
   const errors = useMemo<FormErrors>(() => {
     const errs: FormErrors = {};
 
@@ -218,11 +241,23 @@ function CreateEventWizardContent() {
       errs.startTime = "Vui lòng chọn giờ bắt đầu.";
     }
 
+    // Start not in the past
+    if (startDate && startTime) {
+      const startDateTime = new Date(`${startDate}T${startTime}`);
+      const now = new Date();
+      if (!isNaN(startDateTime.getTime()) && startDateTime.getTime() < now.getTime()) {
+        errs.startDate = "Thời gian bắt đầu không được ở trong quá khứ.";
+      }
+    }
+
+    // End must be after start
     if (endDate && endTime && startDate && startTime) {
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
-      if (endDateTime <= startDateTime) {
-        errs.endDate = "Thời gian kết thúc phải diễn ra sau thời gian bắt đầu.";
+      if (!isNaN(startDateTime.getTime()) && !isNaN(endDateTime.getTime())) {
+        if (endDateTime.getTime() <= startDateTime.getTime()) {
+          errs.endDate = "Thời gian kết thúc phải diễn ra sau thời gian bắt đầu.";
+        }
       }
     }
 
@@ -239,6 +274,7 @@ function CreateEventWizardContent() {
     Boolean(startDate) &&
     Boolean(startTime) &&
     Boolean(selectedVenueId) &&
+    !errors.startDate &&
     !errors.endDate;
 
   // Helper text explaining what is missing
@@ -249,10 +285,11 @@ function CreateEventWizardContent() {
     if (!title.trim() || title.trim().length < 5) missing.push("tên sự kiện (≥5 ký tự)");
     if (!category) missing.push("thể loại");
     if (!startDate || !startTime) missing.push("thời gian bắt đầu");
-    if (errors.endDate) missing.push("thời gian kết thúc hợp lệ");
+    if (errors.startDate) missing.push(errors.startDate);
+    if (errors.endDate) missing.push(errors.endDate);
 
     return `Vui lòng hoàn thành: ${missing.join(", ")} để tiếp tục.`;
-  }, [isValidStep1, selectedVenueId, title, category, startDate, startTime, errors.endDate]);
+  }, [isValidStep1, selectedVenueId, title, category, startDate, startTime, errors.startDate, errors.endDate]);
 
   // Debounced Autosave to localStorage
   useEffect(() => {
@@ -407,7 +444,7 @@ function CreateEventWizardContent() {
       )}
 
       {/* 1. Header & Stepper */}
-      <div className="space-y-6">
+      <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -436,9 +473,9 @@ function CreateEventWizardContent() {
           </div>
         </div>
 
-        {/* Stepper: Numbered circles, check on completed, emphasized current, muted future */}
+        {/* Stepper: Compact cards, readable contrast (>= 4.5:1) while muted */}
         <nav aria-label="Các bước thiết lập sự kiện" className="w-full">
-          <ol className="grid grid-cols-4 gap-2 sm:gap-4">
+          <ol className="grid grid-cols-4 gap-2 sm:gap-3">
             {[
               { num: 1, title: "Thông tin & Địa điểm" },
               { num: 2, title: "Sơ đồ chỗ ngồi" },
@@ -455,35 +492,37 @@ function CreateEventWizardContent() {
                     type="button"
                     disabled={isFuture}
                     onClick={() => handleStepClick(s.num as 1 | 2 | 3 | 4)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    className={`w-full text-left p-2 sm:p-2.5 rounded-lg border transition-all ${
                       isCurrent
                         ? "border-primary bg-background shadow-2xs"
                         : isCompleted
                         ? "border-border bg-background hover:bg-secondary/40 cursor-pointer"
-                        : "border-border/60 bg-muted/20 opacity-60 cursor-not-allowed"
+                        : "border-border/80 bg-secondary/30 text-foreground cursor-not-allowed"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 sm:gap-2.5">
                       <div
-                        className={`size-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                        className={`size-6 sm:size-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                           isCompleted
                             ? "bg-primary text-primary-foreground"
                             : isCurrent
                             ? "border-2 border-primary text-primary bg-background"
-                            : "bg-secondary text-muted-foreground"
+                            : "bg-secondary text-foreground border border-border"
                         }`}
                       >
                         {isCompleted ? <Check className="size-3.5" /> : s.num}
                       </div>
                       <div className="min-w-0 flex-1 hidden sm:block">
-                        <p className="text-[11px] text-muted-foreground leading-tight">
+                        <p className="text-[10px] text-muted-foreground leading-tight font-medium">
                           Bước {s.num}
                         </p>
                         <p
                           className={`text-xs truncate ${
                             isCurrent
                               ? "font-bold text-foreground"
-                              : "font-medium text-muted-foreground"
+                              : isCompleted
+                              ? "font-medium text-foreground"
+                              : "font-medium text-foreground/80"
                           }`}
                         >
                           {s.title}
@@ -503,7 +542,7 @@ function CreateEventWizardContent() {
           ======================================================== */}
       {step === 1 && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Venue Picker (7 columns) */}
+          {/* Left Column: Venue Picker (7 columns, compact horizontal cards) */}
           <div
             ref={venuePickerRef}
             className="lg:col-span-7 space-y-4"
@@ -517,7 +556,7 @@ function CreateEventWizardContent() {
               </p>
             </div>
 
-            {/* City Tabs with counts (Pills only for filter tabs) */}
+            {/* City Tabs with counts */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
               {CITY_TABS.map((tab) => {
                 const active = selectedCity === tab.id;
@@ -546,7 +585,7 @@ function CreateEventWizardContent() {
                 value={venueSearch}
                 onChange={(e) => setVenueSearch(e.target.value)}
                 placeholder="Tìm kiếm địa điểm theo tên, quận huyện, địa chỉ..."
-                className="w-full h-10 pl-9 pr-8 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full h-10 pl-9 pr-8 rounded-md border border-input bg-background text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
               {venueSearch && (
                 <button
@@ -559,8 +598,8 @@ function CreateEventWizardContent() {
               )}
             </div>
 
-            {/* Venue Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Compact Horizontal Venue Cards Grid (All 11 fit in ~1 scroll at 1280px) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filteredVenues.map((venue) => {
                 const isSelected = selectedVenueId === venue.id;
 
@@ -579,53 +618,59 @@ function CreateEventWizardContent() {
                         setSelectedVenueId(venue.id);
                       }
                     }}
-                    className={`rounded-lg border bg-background overflow-hidden transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring relative group ${
+                    className={`flex items-center rounded-lg border bg-background overflow-hidden transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring relative group h-24 ${
                       isSelected
-                        ? "border-primary ring-2 ring-primary/20 bg-accent/20"
-                        : "border-border hover:border-foreground/40"
+                        ? "border-primary bg-accent/20"
+                        : "border-border hover:border-foreground/30 hover:bg-secondary/20"
                     }`}
                   >
                     {/* Selected Checkmark Badge */}
                     {isSelected && (
-                      <div className="absolute top-2.5 right-2.5 z-10 size-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
-                        <Check className="size-3.5" />
+                      <div className="absolute top-2 right-2 z-10 size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
+                        <Check className="size-3" />
                       </div>
                     )}
 
-                    {/* Image or Neutral Placeholder */}
-                    <div className="relative aspect-[16/10] w-full bg-secondary overflow-hidden">
+                    {/* Left Thumbnail ~96px */}
+                    <div className="relative w-24 h-full bg-secondary shrink-0 overflow-hidden border-r border-border">
                       {venue.thumbnailUrl ? (
                         <Image
                           src={venue.thumbnailUrl}
                           alt=""
                           fill
-                          sizes="(max-width: 640px) 100vw, 360px"
-                          className="object-cover group-hover:scale-102 transition-transform duration-300"
+                          sizes="96px"
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (
-                        <div className="size-full flex items-center justify-center text-muted-foreground">
-                          <Building2 className="size-8" />
-                        </div>
+                        <ImagePlaceholder
+                          type="venue"
+                          category={venue.category}
+                          className="size-full"
+                          iconClassName="size-5"
+                        />
                       )}
                     </div>
 
-                    {/* Text below image (high contrast, no filler description) */}
-                    <div className="p-3.5 space-y-2">
+                    {/* Right Info: 2 lines name with tooltip, district+city, capacity & N sơ đồ */}
+                    <div className="p-2.5 min-w-0 flex-1 flex flex-col justify-between h-full">
                       <div>
-                        <h3 className="text-sm font-bold text-foreground leading-snug line-clamp-1">
+                        <h3
+                          className="text-xs font-bold text-foreground leading-snug line-clamp-2 pr-6"
+                          title={venue.name}
+                        >
                           {venue.name}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                           {venue.district}, {venue.city}
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border text-[11px] text-muted-foreground">
-                        <span className="font-semibold text-foreground tabular-nums">
+                      <div className="flex items-center gap-2 text-[10.5px] text-muted-foreground tabular-nums">
+                        <span className="font-semibold text-foreground">
                           {venue.totalCapacity}
                         </span>
                         <span aria-hidden="true">•</span>
-                        <span>{venue.layouts.length} sơ đồ chỗ ngồi</span>
+                        <span>{venue.layouts.length} sơ đồ</span>
                       </div>
                     </div>
                   </div>
@@ -682,12 +727,20 @@ function CreateEventWizardContent() {
                     <p className="text-muted-foreground text-[11.5px] leading-relaxed">
                       {selectedVenue.address}
                     </p>
-                    <p className="text-muted-foreground text-[11.5px]">
-                      Thành phố:{" "}
-                      <strong className="text-foreground font-semibold">
-                        {selectedVenue.city}
-                      </strong>
-                    </p>
+                    <div className="flex items-center justify-between text-muted-foreground text-[11.5px] pt-1 border-t border-border/50">
+                      <span>
+                        Thành phố:{" "}
+                        <strong className="text-foreground font-semibold">
+                          {selectedVenue.city}
+                        </strong>
+                      </span>
+                      <span>
+                        Sức chứa:{" "}
+                        <strong className="text-foreground font-semibold tabular-nums">
+                          {selectedVenue.totalCapacity}
+                        </strong>
+                      </span>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-muted-foreground py-2 text-center text-xs">
@@ -727,28 +780,24 @@ function CreateEventWizardContent() {
                   )}
                 </div>
 
-                {/* Thể loại */}
+                {/* Thể loại (CustomSelect) */}
                 <div className="space-y-1.5">
                   <label
-                    htmlFor="event-category"
+                    id="event-category-label"
                     className="block text-xs font-semibold text-foreground"
                   >
                     Thể loại <span className="text-destructive">*</span>
                   </label>
-                  <select
-                    id="event-category"
+                  <CustomSelect
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    onBlur={() => setTouched((p) => ({ ...p, category: true }))}
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-                  >
-                    <option value="">-- Chọn thể loại --</option>
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => {
+                      setCategory(val);
+                      setTouched((p) => ({ ...p, category: true }));
+                    }}
+                    options={CATEGORY_OPTIONS}
+                    placeholder="Chọn thể loại"
+                    ariaLabel="Chọn thể loại sự kiện"
+                  />
                   {touched.category && errors.category && (
                     <p className="text-xs text-destructive font-medium">
                       {errors.category}
@@ -756,75 +805,76 @@ function CreateEventWizardContent() {
                   )}
                 </div>
 
-                {/* Thời gian bắt đầu (dd/mm/yyyy 24h) */}
+                {/* Thời gian bắt đầu (DatePicker dd/mm/yyyy & TimePicker 24h 15-min) */}
                 <div className="space-y-1.5">
-                  <label
-                    htmlFor="event-start-date"
-                    className="block text-xs font-semibold text-foreground"
-                  >
+                  <span className="block text-xs font-semibold text-foreground">
                     Thời gian bắt đầu <span className="text-destructive">*</span>
-                  </label>
+                  </span>
                   <div className="grid grid-cols-2 gap-2">
-                    <input
-                      id="event-start-date"
-                      type="date"
+                    <DatePicker
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      onBlur={() =>
-                        setTouched((p) => ({ ...p, startDate: true }))
-                      }
-                      className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onChange={(val) => {
+                        setStartDate(val);
+                        setTouched((p) => ({ ...p, startDate: true }));
+                      }}
+                      minDate={todayStr}
+                      placeholder="dd/mm/yyyy"
+                      ariaLabel="Ngày bắt đầu"
                     />
-                    <input
-                      id="event-start-time"
-                      type="time"
+                    <TimePicker
                       value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      onBlur={() =>
-                        setTouched((p) => ({ ...p, startTime: true }))
-                      }
-                      className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onChange={(val) => {
+                        setStartTime(val);
+                        setTouched((p) => ({ ...p, startTime: true }));
+                      }}
+                      placeholder="HH:mm"
+                      ariaLabel="Giờ bắt đầu"
                     />
                   </div>
-                  {startDate && startTime && (
+                  {startDate && startTime && !errors.startDate && (
                     <p className="text-[11px] text-muted-foreground tabular-nums">
                       Bắt đầu: {formatDateTimeVi(`${startDate}T${startTime}`)}
                     </p>
                   )}
-                  {touched.startDate && (errors.startDate || errors.startTime) && (
+                  {touched.startDate && errors.startDate && (
                     <p className="text-xs text-destructive font-medium">
-                      {errors.startDate || errors.startTime}
+                      {errors.startDate}
+                    </p>
+                  )}
+                  {touched.startTime && !errors.startDate && errors.startTime && (
+                    <p className="text-xs text-destructive font-medium">
+                      {errors.startTime}
                     </p>
                   )}
                 </div>
 
-                {/* Thời gian kết thúc (Tùy chọn) */}
+                {/* Thời gian kết thúc (Tùy chọn: DatePicker & TimePicker) */}
                 <div className="space-y-1.5">
-                  <label
-                    htmlFor="event-end-date"
-                    className="block text-xs font-semibold text-foreground"
-                  >
+                  <span className="block text-xs font-semibold text-foreground">
                     Thời gian kết thúc (tùy chọn)
-                  </label>
+                  </span>
                   <div className="grid grid-cols-2 gap-2">
-                    <input
-                      id="event-end-date"
-                      type="date"
+                    <DatePicker
                       value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      onBlur={() => setTouched((p) => ({ ...p, endDate: true }))}
-                      className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onChange={(val) => {
+                        setEndDate(val);
+                        setTouched((p) => ({ ...p, endDate: true }));
+                      }}
+                      minDate={startDate || todayStr}
+                      placeholder="dd/mm/yyyy"
+                      ariaLabel="Ngày kết thúc"
                     />
-                    <input
-                      id="event-end-time"
-                      type="time"
+                    <TimePicker
                       value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      onBlur={() => setTouched((p) => ({ ...p, endTime: true }))}
-                      className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onChange={(val) => {
+                        setEndTime(val);
+                        setTouched((p) => ({ ...p, endTime: true }));
+                      }}
+                      placeholder="HH:mm"
+                      ariaLabel="Giờ kết thúc"
                     />
                   </div>
-                  {endDate && endTime && (
+                  {endDate && endTime && !errors.endDate && (
                     <p className="text-[11px] text-muted-foreground tabular-nums">
                       Kết thúc: {formatDateTimeVi(`${endDate}T${endTime}`)}
                     </p>
@@ -1042,13 +1092,13 @@ function CreateEventWizardContent() {
 
               <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
                 <span>Trạng thái: Khán đài đã tối ưu tỷ lệ</span>
-                <span className="font-mono">
+                <span className="tabular-nums font-medium text-foreground">
                   {zones.length} khu vực hoạt động
                 </span>
               </div>
             </div>
 
-            {/* Right: Zone Config Table */}
+            {/* Right: Zone Config Table (No monospace; base UI font with tabular-nums) */}
             <div className="lg:col-span-6 space-y-3">
               <div className="rounded-lg border border-border bg-background overflow-hidden">
                 <table className="w-full text-left text-xs">
@@ -1098,7 +1148,7 @@ function CreateEventWizardContent() {
                                   parseInt(e.target.value, 10) || 0
                                 )
                               }
-                              className="w-full h-8 px-2.5 rounded-md border border-input bg-background font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring tabular-nums"
+                              className="w-full h-8 px-2.5 rounded-md border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring tabular-nums"
                             />
                             <span className="text-[10.5px] text-muted-foreground tabular-nums block mt-0.5">
                               {formatVnd(zone.price)}
@@ -1117,7 +1167,7 @@ function CreateEventWizardContent() {
                                   parseInt(e.target.value, 10) || 10
                                 )
                               }
-                              className="w-24 h-8 px-2.5 rounded-md border border-input bg-background font-mono text-xs text-right text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring tabular-nums inline-block"
+                              className="w-24 h-8 px-2.5 rounded-md border border-input bg-background text-xs text-right text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring tabular-nums inline-block"
                             />
                             <span className="text-[10.5px] text-muted-foreground tabular-nums block mt-0.5">
                               vé
@@ -1130,17 +1180,17 @@ function CreateEventWizardContent() {
                 </table>
               </div>
 
-              {/* Financial Summary */}
+              {/* Financial Summary (Base UI font, tabular-nums) */}
               <div className="p-3.5 rounded-lg border border-border bg-background flex items-center justify-between text-xs">
                 <div>
                   <span className="text-muted-foreground">Tổng số vé phát hành:</span>{" "}
-                  <strong className="text-foreground font-mono tabular-nums">
+                  <strong className="text-foreground tabular-nums font-semibold">
                     {formatNumberVi(totalEventCapacity)}
                   </strong>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Doanh thu dự kiến:</span>{" "}
-                  <strong className="text-foreground font-mono font-bold tabular-nums">
+                  <strong className="text-foreground tabular-nums font-bold">
                     {formatVnd(totalProjectedRevenue)}
                   </strong>
                 </div>
@@ -1214,7 +1264,7 @@ function CreateEventWizardContent() {
               </div>
             </div>
 
-            {/* Ticket Breakdown */}
+            {/* Ticket Breakdown (Base UI font, tabular-nums) */}
             <div className="space-y-2">
               <span className="text-xs font-semibold text-foreground">
                 Cấu hình các phân khu vé
@@ -1235,13 +1285,13 @@ function CreateEventWizardContent() {
                         <td className="py-2 px-3 font-medium text-foreground">
                           {z.name}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono tabular-nums">
+                        <td className="py-2 px-3 text-right tabular-nums font-medium">
                           {formatVnd(z.price)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono tabular-nums">
+                        <td className="py-2 px-3 text-right tabular-nums font-medium">
                           {formatNumberVi(z.capacity)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono font-semibold tabular-nums text-foreground">
+                        <td className="py-2 px-3 text-right tabular-nums font-semibold text-foreground">
                           {formatVnd(z.capacity * z.price)}
                         </td>
                       </tr>
@@ -1251,10 +1301,10 @@ function CreateEventWizardContent() {
                     <tr className="border-t border-border bg-muted/30 font-bold text-foreground">
                       <td className="py-2.5 px-3">Tổng cộng</td>
                       <td className="py-2.5 px-3" />
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                      <td className="py-2.5 px-3 text-right tabular-nums">
                         {formatNumberVi(totalEventCapacity)} vé
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-primary font-bold">
+                      <td className="py-2.5 px-3 text-right tabular-nums text-primary font-bold">
                         {formatVnd(totalProjectedRevenue)}
                       </td>
                     </tr>

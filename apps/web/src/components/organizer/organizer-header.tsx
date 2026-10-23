@@ -45,6 +45,7 @@ export function OrganizerHeader() {
   const isEventsActive =
     pathname.startsWith("/organizer/events") &&
     pathname !== "/organizer/events/new";
+  const isCreatePage = pathname.startsWith("/organizer/events/new");
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-xs">
@@ -53,13 +54,10 @@ export function OrganizerHeader() {
         <div className="flex items-center gap-4 sm:gap-6">
           <Logo />
           <span className="h-4 w-px bg-border hidden sm:block" aria-hidden="true" />
-          <span className="text-sm font-bold text-foreground hidden sm:inline tracking-tight">
-            Ban Tổ Chức
-          </span>
 
           <nav
             aria-label="Điều hướng chính Ban tổ chức"
-            className="flex items-center gap-1 sm:ml-2 text-sm font-medium"
+            className="flex items-center gap-1 text-sm font-medium"
           >
             <Link
               href="/organizer/events"
@@ -166,15 +164,17 @@ export function OrganizerHeader() {
             )}
           </div>
 
-          {/* Exactly one primary CTA in the header */}
-          <Link
-            href="/organizer/events/new"
-            className="inline-flex items-center justify-center gap-1.5 h-9 sm:h-10 px-3 sm:px-4 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 shrink-0"
-          >
-            <Plus className="size-3.5 sm:size-4" />
-            <span className="hidden sm:inline">Tạo sự kiện</span>
-            <span className="sm:hidden">Tạo</span>
-          </Link>
+          {/* Exactly one primary CTA in the header (hidden on create page) */}
+          {!isCreatePage && (
+            <Link
+              href="/organizer/events/new"
+              className="inline-flex items-center justify-center gap-1.5 h-9 sm:h-10 px-3 sm:px-4 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 shrink-0"
+            >
+              <Plus className="size-3.5 sm:size-4" />
+              <span className="hidden sm:inline">Tạo sự kiện</span>
+              <span className="sm:hidden">Tạo</span>
+            </Link>
+          )}
         </div>
       </div>
     </header>

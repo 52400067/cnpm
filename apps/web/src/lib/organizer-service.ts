@@ -100,14 +100,92 @@ export function formatDateTimeVi(date: Date | string): string {
   if (!date) return "";
   const d = typeof date === "string" ? new Date(date) : date;
   if (isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("vi-VN", {
+  const datePart = new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+  }).format(d);
+  const timePart = new Intl.DateTimeFormat("vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   }).format(d);
+  return `${datePart} · ${timePart}`;
+}
+
+// ==========================================
+// 2b. Display Status Selector (Derived)
+// ==========================================
+
+// TODO(contract): API lacks SOLD_OUT and ALMOST_SOLD_OUT enum values; derived in frontend selector
+export interface DisplayStatusMeta {
+  key: string;
+  label: string;
+  badgeClass: string;
+}
+
+export function getDisplayStatus(event: OrganizerEventItem): DisplayStatusMeta {
+  if (event.status === EventStatus.PUBLISHED) {
+    if (event.ticketsTotal > 0 && event.ticketsSold >= event.ticketsTotal) {
+      return {
+        key: "SOLD_OUT",
+        label: "Hết vé",
+        badgeClass: "bg-slate-100 text-slate-700 border-slate-300",
+      };
+    }
+    if (event.ticketsTotal > 0 && event.ticketsSold >= event.ticketsTotal * 0.9) {
+      return {
+        key: "ALMOST_SOLD_OUT",
+        label: "Sắp hết vé",
+        badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
+      };
+    }
+  }
+
+  switch (event.status) {
+    case EventStatus.PUBLISHED:
+      return {
+        key: EventStatus.PUBLISHED,
+        label: "Đang mở bán",
+        badgeClass: "bg-emerald-50 text-emerald-800 border-emerald-200",
+      };
+    case EventStatus.DRAFT:
+      return {
+        key: EventStatus.DRAFT,
+        label: "Bản nháp",
+        badgeClass: "bg-secondary text-muted-foreground border-border",
+      };
+    case EventStatus.PENDING_APPROVAL:
+      return {
+        key: EventStatus.PENDING_APPROVAL,
+        label: "Chờ duyệt",
+        badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
+      };
+    case EventStatus.SUSPENDED:
+      return {
+        key: EventStatus.SUSPENDED,
+        label: "Tạm dừng",
+        badgeClass: "bg-orange-50 text-orange-800 border-orange-200",
+      };
+    case EventStatus.ENDED:
+      return {
+        key: EventStatus.ENDED,
+        label: "Đã kết thúc",
+        badgeClass: "bg-muted text-muted-foreground border-border",
+      };
+    case EventStatus.CANCELLED:
+      return {
+        key: EventStatus.CANCELLED,
+        label: "Đã hủy",
+        badgeClass: "bg-red-50 text-destructive border-red-200",
+      };
+    default:
+      return {
+        key: "UNKNOWN",
+        label: event.status,
+        badgeClass: "bg-secondary text-muted-foreground border-border",
+      };
+  }
 }
 
 export function formatTimeVi(date: Date | string): string {
@@ -226,7 +304,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Live Concert Mùa Thu Hà Nội - Thu Ca",
     slug: "live-concert-mua-thu-ha-noi-thu-ca",
     category: "Âm nhạc",
-    bannerUrl: "/images/events/vn/nha-hat-lon-hn.jpg",
+    bannerUrl: "/images/events/vn/chillies.jpg",
     venueId: "vn-hn-dien-kinh",
     venueName: "Cung Thể Thao Điền Kinh Trong Nhà Hà Nội",
     venueAddress: "Đường Trần Hữu Dực, Phường Cầu Diễn, Quận Nam Từ Liêm",
@@ -244,7 +322,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Giao Hưởng Thính Phòng Mùa Đông: Beethoven Symphony No. 9",
     slug: "giao-huong-thinh-phong-mua-dong-beethoven",
     category: "Sân khấu",
-    bannerUrl: "/images/events/vn/nha-hat-lon-hn.jpg",
+    bannerUrl: "/images/events/vn/dan-nhac-giao-huong.jpg",
     venueId: "vn-hn-nha-hat-lon",
     venueName: "Nhà Hát Lớn Hà Nội",
     venueAddress: "Số 1 Tràng Tiền, Phường Phan Chu Trinh, Quận Hoàn Kiếm",
@@ -262,7 +340,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Danang International Music Fest 2026",
     slug: "danang-international-music-fest-2026",
     category: "Âm nhạc",
-    bannerUrl: "/images/events/vn/monsoon-festival.jpg",
+    bannerUrl: "/images/events/vn/hozo.jpg",
     venueId: "vn-dn-hoa-xuan",
     venueName: "Sân Vận Động Hòa Xuân",
     venueAddress: "Đường 29 Tháng 3, Phường Hòa Xuân, Quận Cẩm Lệ",
@@ -280,7 +358,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Chung Kết Giải Quần Vợt Quốc Gia 2026",
     slug: "chung-ket-quan-vot-quoc-gia-2026",
     category: "Thể thao",
-    bannerUrl: "/images/events/vn/vba-saigon-heat.jpg",
+    bannerUrl: "/images/events/vn/vietnam-football.jpg",
     venueId: "vn-dn-quan-ngua",
     venueName: "Trung Tâm Thể Thao Chi Lăng",
     venueAddress: "38 Ngô Gia Tự, Phường Hải Châu 1, Quận Hải Châu",
@@ -298,7 +376,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Hài Kịch Cuối Năm: Táo Quân Hội Ngộ",
     slug: "tao-quan-hoi-ngo-2027",
     category: "Sân khấu",
-    bannerUrl: "/images/events/vn/kich-idecaf.jpg",
+    bannerUrl: "/images/events/vn/saigon-teu.jpg",
     venueId: "vn-hcm-hoa-binh",
     venueName: "Nhà Hát Hòa Bình",
     venueAddress: "240 Đường 3 Tháng 2, Phường 12, Quận 10",
@@ -316,7 +394,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Đêm Nhạc Acoustic: Khúc Giao Mùa",
     slug: "acoustic-khuc-giao-mua",
     category: "Âm nhạc",
-    bannerUrl: "/images/events/vn/anh-trai.jpg",
+    bannerUrl: "/images/events/vn/ha-anh-tuan.jpg",
     venueId: "vn-hcm-ben-thanh",
     venueName: "Nhà Hát Bến Thành",
     venueAddress: "6 Mạc Đĩnh Chi, Phường Bến Nghé, Quận 1",
@@ -334,7 +412,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Liveshow Rock Việt: Bão Lửa 2026",
     slug: "rock-viet-bao-lua-2026",
     category: "Âm nhạc",
-    bannerUrl: "/images/events/vn/monsoon-festival.jpg",
+    bannerUrl: "/images/events/vn/buc-tuong.jpg",
     venueId: "vn-hcm-thong-nhat",
     venueName: "Sân Vận Động Thống Nhất",
     venueAddress: "138 Đào Duy Từ, Phường 6, Quận 10",
@@ -353,7 +431,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Giải Bóng Rổ Sinh Viên Toàn Quốc - Vòng Chung Kết",
     slug: "giai-bong-ro-sinh-vien-toan-quoc-vck",
     category: "Thể thao",
-    bannerUrl: "/images/events/vn/vba-saigon-heat.jpg",
+    bannerUrl: "",
     venueId: "vn-hn-quan-ngua",
     venueName: "Cung Thể Thao Quần Ngựa",
     venueAddress: "30 Văn Cao, Phường Liễu Giai, Quận Ba Đình",
@@ -371,7 +449,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     title: "Đêm Nhạc Trịnh: Biển Nhớ & Mùa Thu",
     slug: "dem-nhac-trinh-bien-nho-mua-thu",
     category: "Âm nhạc",
-    bannerUrl: "/images/events/vn/nha-hat-lon-hn.jpg",
+    bannerUrl: "/images/events/vn/my-tam.jpg",
     venueId: "vn-dn-trung-vuong",
     venueName: "Nhà Hát Tuồng Nguyễn Hiển Dĩnh & Trưng Vương",
     venueAddress: "86 Hùng Vương, Phường Hải Châu 1, Quận Hải Châu",
@@ -379,9 +457,9 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     startTime: "2026-12-15T19:30:00Z",
     endTime: "2026-12-15T22:00:00Z",
     status: EventStatus.PUBLISHED,
-    ticketsSold: 1150,
+    ticketsSold: 1140,
     ticketsTotal: 1200,
-    revenue: 575000000,
+    revenue: 570000000,
     version: 2,
   },
 ];
@@ -462,8 +540,22 @@ export async function getOrganizerEvents(
   // Sorting
   filtered.sort((a, b) => {
     switch (sort) {
-      case "date_asc":
+      case "date_asc": {
+        const nowMs = Date.now();
+        const aIsEndedOrPast =
+          a.status === EventStatus.ENDED ||
+          a.status === EventStatus.CANCELLED ||
+          new Date(a.startTime).getTime() < nowMs;
+        const bIsEndedOrPast =
+          b.status === EventStatus.ENDED ||
+          b.status === EventStatus.CANCELLED ||
+          new Date(b.startTime).getTime() < nowMs;
+
+        if (aIsEndedOrPast !== bIsEndedOrPast) {
+          return aIsEndedOrPast ? 1 : -1;
+        }
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+      }
       case "date_desc":
         return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
       case "title_asc":

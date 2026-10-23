@@ -218,7 +218,7 @@ export const CURATED_VENUES: CuratedVenue[] = [
     category: "stadium",
     categoryLabel: "Sân vận động quốc gia",
     totalCapacity: "40.000 chỗ",
-    thumbnailUrl: "/images/events/vn/vleague-cahn.jpg",
+    thumbnailUrl: "/images/events/vn/vietnam-football.jpg",
     description: "Công trình thể thao và biểu diễn quy mô lớn nhất Việt Nam với 4 khán đài đồ sộ, từng đón tiếp các siêu sao quốc tế.",
     featuredEvents: "Đội tuyển Quốc gia Việt Nam, Born Pink World Tour, Concert BlackPink",
     layouts: [
@@ -236,7 +236,7 @@ export const CURATED_VENUES: CuratedVenue[] = [
     category: "arena",
     categoryLabel: "Cung thể thao mái vòm",
     totalCapacity: "10.000 chỗ",
-    thumbnailUrl: "/images/events/vn/anh-trai.jpg",
+    thumbnailUrl: "/images/events/vn/den-vau.jpg",
     description: "Cung thể thao hiện đại bậc nhất Thủ đô với kiến trúc mái vòm, địa điểm tổ chức các concert âm nhạc hoành tráng.",
     featuredEvents: "Show Của Đen Vâu, Vũ - Bảo Tàng Của Nuối Tiếc Live Concert",
     layouts: [
@@ -254,7 +254,7 @@ export const CURATED_VENUES: CuratedVenue[] = [
     category: "stadium",
     categoryLabel: "Sân bóng đá trung tâm",
     totalCapacity: "22.000 chỗ",
-    thumbnailUrl: "/images/events/vn/vleague-cahn.jpg",
+    thumbnailUrl: "/images/events/vn/thecong-hanoi.jpg",
     description: "Sân vận động lịch sử nằm ngay giữa lòng Hà Nội, cái nôi của bóng đá Thủ đô với bầu không khí cuồng nhiệt.",
     featuredEvents: "Trận Derby Hà Nội FC vs Thể Công Viettel, Công An Hà Nội",
     layouts: [
@@ -271,7 +271,7 @@ export const CURATED_VENUES: CuratedVenue[] = [
     category: "theater",
     categoryLabel: "Nhà hát thính phòng Opera",
     totalCapacity: "1.200 chỗ",
-    thumbnailUrl: "/images/events/vn/ha-anh-tuan.jpg",
+    thumbnailUrl: "/images/events/vn/dan-nhac-giao-huong.jpg",
     description: "Biểu tượng kiến trúc và văn hóa Pháp cổ điển, khán phòng âm nhạc cổ điển và các vở nhạc kịch đỉnh cao.",
     featuredEvents: "Hòa Nhạc Giao Hưởng Quốc Gia, Đêm Nhạc Cổ Điển Toyota Concert",
     layouts: [
@@ -290,7 +290,7 @@ export const CURATED_VENUES: CuratedVenue[] = [
     category: "arena",
     categoryLabel: "Cung thể thao đa năng",
     totalCapacity: "7.500 chỗ",
-    thumbnailUrl: "/images/events/vn/anh-trai.jpg",
+    thumbnailUrl: "",
     description: "Kiến trúc độc đáo hình đĩa bay nổi tiếng bên bờ sông Hàn, địa điểm tổ chức sự kiện biểu diễn và thể thao lớn nhất miền Trung.",
     featuredEvents: "Đại Nhạc Hội Festival Đà Nẵng, Giải Bóng Rổ Quốc Tế Danang Open",
     layouts: [
@@ -308,7 +308,7 @@ export const CURATED_VENUES: CuratedVenue[] = [
     category: "stadium",
     categoryLabel: "Sân vận động bóng đá hiện đại",
     totalCapacity: "20.000 chỗ",
-    thumbnailUrl: "/images/events/vn/vleague-cahn.jpg",
+    thumbnailUrl: "",
     description: "Sân vận động hiện đại không đường piste, khán đài dốc sát mặt cỏ đem lại góc nhìn cực nét cho cả thể thao và concert ngoài trời.",
     featuredEvents: "Giải Bóng Đá V-League SHB Đà Nẵng, Festival Âm Nhạc Bãi Biển Miền Trung",
     layouts: [
@@ -326,7 +326,7 @@ export const CURATED_VENUES: CuratedVenue[] = [
     category: "theater",
     categoryLabel: "Nhà hát nghệ thuật trung tâm",
     totalCapacity: "1.500 chỗ",
-    thumbnailUrl: "/images/events/vn/ha-anh-tuan.jpg",
+    thumbnailUrl: "",
     description: "Trung tâm văn hóa nghệ thuật tiêu biểu của thành phố Đà Nẵng, không gian thính phòng ấm cúng và chuyên nghiệp.",
     featuredEvents: "Đêm Nhạc Trịnh Công Sơn Đà Nẵng, Vở Kịch Broadway Chuyển Thể",
     layouts: [
