@@ -112,13 +112,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase repository owner
+        id: repo
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/ha1nz9vk/ticket-hub-api:unstable
-            ghcr.io/ha1nz9vk/ticket-hub-api:sha-${{ github.sha }}
+            ghcr.io/${{ steps.repo.outputs.owner }}/ticket-hub-api:unstable
+            ghcr.io/${{ steps.repo.outputs.owner }}/ticket-hub-api:sha-${{ github.sha }}
           labels: |
-            org.opencontainers.image.source=https://github.com/ha1nz9vk/ticket-hub
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
