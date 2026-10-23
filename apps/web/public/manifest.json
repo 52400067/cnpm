@@ -1,0 +1,61 @@
+{
+  "name": "TicketHub — Mua vé sự kiện trực tuyến",
+  "short_name": "TicketHub",
+  "description": "Nền tảng mua và soát vé sự kiện chính thức tại Việt Nam",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#059669",
+  "orientation": "portrait-primary",
+  "lang": "vi",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/screenshot-seatmap.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Sơ đồ ghế tương tác SVG"
+    },
+    {
+      "src": "/images/screenshot-gate.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Ứng dụng soát vé QR cổng"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Soát vé cổng",
+      "short_name": "Gate",
+      "description": "Mở ứng dụng soát vé QR cho nhân viên cổng",
+      "url": "/gate-scanner",
+      "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Vé của tôi",
+      "short_name": "Vé",
+      "description": "Xem vé điện tử đã mua",
+      "url": "/my-tickets",
+      "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["entertainment", "lifestyle", "shopping"],
+  "scope": "/",
+  "prefer_related_applications": false
+}

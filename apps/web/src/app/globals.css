@@ -26,6 +26,14 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* SeatMap Status Tokens */
+  --color-seat-available: var(--seat-available);
+  --color-seat-selected: var(--seat-selected);
+  --color-seat-held: var(--seat-held);
+  --color-seat-sold: var(--seat-sold);
+  --color-vip: var(--seat-vip);
+
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -54,12 +62,46 @@
   --ring: #10b981;
   --radius: 12px;
   --auth-stage-offset: 0px;
+
+  /* SeatMap domain tokens */
+  --seat-available: #10b981;
+  --seat-selected: #f97316;
+  --seat-held: #d97706;
+  --seat-sold: #64748b;
+  --seat-vip: #eab308;
 }
 
 @media (min-width: 1024px) and (min-height: 850px) {
   :root {
     --auth-stage-offset: -3vh;
   }
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+  --popover: #1e293b;
+  --popover-foreground: #f8fafc;
+  --primary: #10b981;
+  --primary-foreground: #0f172a;
+  --secondary: #334155;
+  --secondary-foreground: #f8fafc;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #065f46;
+  --accent-foreground: #ecfdf5;
+  --destructive: #ef4444;
+  --border: #334155;
+  --input: #334155;
+  --ring: #10b981;
+
+  --seat-available: #10b981;
+  --seat-selected: #f97316;
+  --seat-held: #b45309;
+  --seat-sold: #475569;
+  --seat-vip: #facc15;
 }
 
 @layer base {
@@ -94,4 +136,39 @@
 }
 .ticket-notch-horizontal::after {
   right: -11px;
+}
+
+/* Touch and viewport utilities for SeatMap pan/zoom */
+@layer utilities {
+  .touch-none {
+    touch-action: none;
+  }
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .gpu-layer {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* Gate scanner laser sweep animation */
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
+  box-shadow: 0 0 8px 1px var(--primary);
+}
+
+@keyframes scan-sweep {
+  0% { top: 5%; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { top: 95%; opacity: 0; }
 }
