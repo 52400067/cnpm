@@ -49,7 +49,7 @@ pnpm dev
 ## Cấu trúc thư mục
 
 ```
-ticket-hub/
+tickethub/
 ├── apps/
 │   ├── api/          # Dịch vụ backend dùng NestJS và Fastify
 │   └── web/          # Ứng dụng web dùng Next.js App Router
