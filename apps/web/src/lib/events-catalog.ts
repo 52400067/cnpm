@@ -1,40 +1,5 @@
 export type CategoryCode = "ALL" | "CONCERT" | "SPORT" | "THEATER" | "FESTIVAL";
 
-export type SeatStatus = "AVAILABLE" | "HELD" | "SOLD";
-
-export interface SeatItem {
-  id: string;
-  seatNumber: string;
-  rowLabel: string;
-  zoneId: string;
-  zoneName: string;
-  status: SeatStatus;
-  price: number;
-}
-
-export interface SeatRow {
-  rowLabel: string;
-  seats: SeatItem[];
-}
-
-export interface EventZone {
-  zoneId: string;
-  zoneName: string;
-  description: string;
-  isSeated: boolean;
-  ticketTypeId: string;
-  price: number;
-  maxPerOrder: number;
-  availableCount: number;
-  rows: SeatRow[];
-  layoutPosition:
-    | "FRONT_LEFT"
-    | "FRONT_RIGHT"
-    | "CENTER_STANDING"
-    | "LOWER_TIER"
-    | "UPPER_TIER";
-}
-
 export interface EventItem {
   id: string;
   title: string;
@@ -469,357 +434,458 @@ export function getEventById(id: string): EventItem | undefined {
   return EVENTS.find((ev) => ev.id === id);
 }
 
-/**
- * Deterministic hash so SSR and CSR always render the exact same seat availability
- */
-function deterministicSeatStatus(
-  eventId: string,
-  zoneId: string,
-  rowLabel: string,
-  seatIndex: number
-): SeatStatus {
-  const seed = `${eventId}:${zoneId}:${rowLabel}:${seatIndex}`;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) % 10007;
-  }
-  const mod = hash % 20;
-  if (mod === 0 || mod === 1 || mod === 2) return "SOLD";
-  if (mod === 3 || mod === 4) return "HELD";
-  return "AVAILABLE";
+
+import { VenueMapKey } from "./venue-svg.generated";
+
+export interface TicketListing {
+  id: string;
+  eventId: string;
+  zoneId: string;
+  zoneName: string;
+  section: string;
+  row?: string;
+  seatInfo: string;
+  price: number;
+  originalPrice?: number;
+  availableTickets: number;
+  dealScore: number;
+  dealLabel: "Tuyệt vời" | "Rất tốt" | "Tốt";
+  features: string[];
+  viewFromSeatUrl: string;
+  isLastTickets?: boolean;
+  isStanding?: boolean;
 }
 
-function buildRows(
-  eventId: string,
-  zoneId: string,
-  zoneName: string,
-  rowLabels: string[],
-  seatsPerRow: number,
-  price: number
-): SeatRow[] {
-  return rowLabels.map((rowLabel) => {
-    const seats: SeatItem[] = [];
-    for (let i = 1; i <= seatsPerRow; i++) {
-      const seatNumber = String(i).padStart(2, "0");
-      seats.push({
-        id: `${eventId}-${zoneId}-${rowLabel}-${seatNumber}`,
-        seatNumber,
-        rowLabel,
-        zoneId,
-        zoneName,
-        status: deterministicSeatStatus(eventId, zoneId, rowLabel, i),
-        price,
-      });
-    }
-    return { rowLabel, seats };
-  });
-}
-
-function countAvailableSeats(rows: SeatRow[]): number {
-  return rows.reduce(
-    (sum, r) => sum + r.seats.filter((s) => s.status === "AVAILABLE").length,
-    0
-  );
-}
-
-export function getEventSeatMap(event: EventItem): EventZone[] {
-  const base = event.minPriceNumber;
-
+export function getEventVenueMapKey(event: EventItem): VenueMapKey {
   if (event.category === "SPORT") {
-    const vipPrice = Math.round((base * 2.5) / 10000) * 10000;
-    const cat1Price = Math.round((base * 1.8) / 10000) * 10000;
-    const standingPrice = Math.round((base * 1.2) / 10000) * 10000;
-    const cat2Price = base;
-
-    const vipALeftRows = buildRows(
-      event.id,
-      "zone-vip-a",
-      "Khán đài A VIP (Tây)",
-      ["A", "B", "C", "D"],
-      10,
-      vipPrice
-    );
-    const vipBRightRows = buildRows(
-      event.id,
-      "zone-vip-b",
-      "Khán đài A1 (Đông)",
-      ["A", "B", "C", "D"],
-      10,
-      cat1Price
-    );
-    const lowerRows = buildRows(
-      event.id,
-      "zone-lower",
-      "Khán đài B Trung tâm",
-      ["E", "F", "G", "H"],
-      14,
-      cat1Price
-    );
-    const upperRows = buildRows(
-      event.id,
-      "zone-upper",
-      "Khán đài C & D Phổ thông",
-      ["J", "K", "L"],
-      14,
-      cat2Price
-    );
-
-    return [
-      {
-        zoneId: "zone-vip-a",
-        zoneName: "Khán đài A VIP (Tây)",
-        description: "Ghế ngồi có mái che, tầm nhìn trực diện vạch giữa sân",
-        isSeated: true,
-        ticketTypeId: `tt-${event.id}-vip-a`,
-        price: vipPrice,
-        maxPerOrder: 6,
-        availableCount: countAvailableSeats(vipALeftRows),
-        rows: vipALeftRows,
-        layoutPosition: "FRONT_LEFT",
-      },
-      {
-        zoneId: "zone-vip-b",
-        zoneName: "Khán đài A1 (Đông)",
-        description: "Ghế ngồi tiêu chuẩn khu vực khán đài A, lối vào cổng ưu tiên",
-        isSeated: true,
-        ticketTypeId: `tt-${event.id}-vip-b`,
-        price: cat1Price,
-        maxPerOrder: 6,
-        availableCount: countAvailableSeats(vipBRightRows),
-        rows: vipBRightRows,
-        layoutPosition: "FRONT_RIGHT",
-      },
-      {
-        zoneId: "zone-standing",
-        zoneName: "Khu Hội Cổ Động Viên (Vé đứng)",
-        description: "Khu vực cổ vũ sôi động phía sau cầu môn, không đánh số ghế",
-        isSeated: false,
-        ticketTypeId: `tt-${event.id}-standing`,
-        price: standingPrice,
-        maxPerOrder: 6,
-        availableCount: 96,
-        rows: [],
-        layoutPosition: "CENTER_STANDING",
-      },
-      {
-        zoneId: "zone-lower",
-        zoneName: "Khán đài B Trung tâm",
-        description: "Ghế ngồi đánh số tầm nhìn toàn cảnh mặt sân thi đấu",
-        isSeated: true,
-        ticketTypeId: `tt-${event.id}-lower`,
-        price: cat1Price,
-        maxPerOrder: 6,
-        availableCount: countAvailableSeats(lowerRows),
-        rows: lowerRows,
-        layoutPosition: "LOWER_TIER",
-      },
-      {
-        zoneId: "zone-upper",
-        zoneName: "Khán đài C & D Phổ thông",
-        description: "Ghế ngồi tầng cao giá tiết kiệm, góc nhìn bao quát",
-        isSeated: true,
-        ticketTypeId: `tt-${event.id}-upper`,
-        price: cat2Price,
-        maxPerOrder: 6,
-        availableCount: countAvailableSeats(upperRows),
-        rows: upperRows,
-        layoutPosition: "UPPER_TIER",
-      },
-    ];
+    if (event.id.includes("vba") || event.id.includes("saigon-heat")) {
+      return "arena-basketball";
+    }
+    return "stadium-football";
   }
-
   if (event.category === "THEATER") {
-    const vipPrice = Math.round((base * 2.2) / 50000) * 50000;
-    const parterrePrice = Math.round((base * 1.5) / 50000) * 50000;
-    const balconyPrice = base;
+    return "theater";
+  }
+  if (
+    event.id === "evt-ha-anh-tuan-sketch-a-rose" ||
+    event.id === "evt-nhung-thanh-pho-mo-mang" ||
+    event.id === "evt-my-tam-tri-am"
+  ) {
+    return "stadium-concert";
+  }
+  return "arena-t-stage";
+}
 
-    const vipLeftRows = buildRows(
-      event.id,
-      "zone-vip-a",
-      "Hạng Nhất VIP (Trái)",
-      ["A", "B", "C", "D"],
-      10,
-      vipPrice
-    );
-    const vipRightRows = buildRows(
-      event.id,
-      "zone-vip-b",
-      "Hạng Nhất VIP (Phải)",
-      ["A", "B", "C", "D"],
-      10,
-      vipPrice
-    );
-    const lowerRows = buildRows(
-      event.id,
-      "zone-lower",
-      "Hạng Nhì (Khán phòng chính)",
-      ["E", "F", "G", "H"],
-      14,
-      parterrePrice
-    );
-    const upperRows = buildRows(
-      event.id,
-      "zone-upper",
-      "Hạng Ba (Ban công tầng 2)",
-      ["J", "K", "L"],
-      14,
-      balconyPrice
-    );
+export function getEventListings(event: EventItem): TicketListing[] {
+  const mapKey = getEventVenueMapKey(event);
+  const base = event.minPriceNumber;
+  const roundVnd = (num: number) => Math.round(num / 10000) * 10000;
 
+  if (mapKey === "arena-t-stage") {
     return [
       {
-        zoneId: "zone-vip-a",
-        zoneName: "Hạng Nhất VIP (Trái)",
-        description: "Hàng ghế đầu sát sân khấu, âm thanh và tầm nhìn tốt nhất",
-        isSeated: true,
-        ticketTypeId: `tt-${event.id}-vip-a`,
-        price: vipPrice,
-        maxPerOrder: 6,
-        availableCount: countAvailableSeats(vipLeftRows),
-        rows: vipLeftRows,
-        layoutPosition: "FRONT_LEFT",
+        id: `${event.id}-ult-vip`,
+        eventId: event.id,
+        zoneId: "5715",
+        zoneName: "VIP Đặc Biệt",
+        section: "Ultimate VIP",
+        row: "Hàng A",
+        seatInfo: "Ghế 01 - 02",
+        price: roundVnd(base * 2.8),
+        originalPrice: roundVnd(base * 3.1),
+        availableTickets: 2,
+        dealScore: 10,
+        dealLabel: "Tuyệt vời",
+        features: ["2 vé ngồi cạnh nhau", "Gói VIP & Quà lưu niệm", "Lối vào ưu tiên"],
+        viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
+        isLastTickets: true,
       },
       {
-        zoneId: "zone-vip-b",
-        zoneName: "Hạng Nhất VIP (Phải)",
-        description: "Hàng ghế đầu sát sân khấu, tặng kèm chương trình lưu niệm",
-        isSeated: true,
-        ticketTypeId: `tt-${event.id}-vip-b`,
-        price: vipPrice,
-        maxPerOrder: 6,
-        availableCount: countAvailableSeats(vipRightRows),
-        rows: vipRightRows,
-        layoutPosition: "FRONT_RIGHT",
+        id: `${event.id}-gold-vip`,
+        eventId: event.id,
+        zoneId: "27859",
+        zoneName: "VIP Vàng",
+        section: "Gold VIP",
+        row: "Hàng B",
+        seatInfo: "Ghế 14 - 15",
+        price: roundVnd(base * 2.4),
+        availableTickets: 4,
+        dealScore: 9,
+        dealLabel: "Rất tốt",
+        features: ["2 vé ngồi cạnh nhau", "Tầm nhìn trực diện sân khấu", "Quà tặng lightstick"],
+        viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
       },
       {
-        zoneId: "zone-lower",
-        zoneName: "Hạng Nhì (Khán phòng chính)",
-        description: "Ghế ngồi trung tâm tầng 1 với góc nhìn cân đối",
-        isSeated: true,
-        ticketTypeId: `tt-${event.id}-lower`,
-        price: parterrePrice,
-        maxPerOrder: 6,
-        availableCount: countAvailableSeats(lowerRows),
-        rows: lowerRows,
-        layoutPosition: "LOWER_TIER",
+        id: `${event.id}-silver-vip`,
+        eventId: event.id,
+        zoneId: "2196",
+        zoneName: "VIP Bạc",
+        section: "Silver VIP",
+        row: "Hàng C",
+        seatInfo: "Ghế 08 - 09",
+        price: roundVnd(base * 2.0),
+        availableTickets: 2,
+        dealScore: 9,
+        dealLabel: "Rất tốt",
+        features: ["2 vé ngồi cạnh nhau", "Tầm nhìn không bị chắn", "Vòng tay check-in VIP"],
+        viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
+        isLastTickets: true,
       },
       {
-        zoneId: "zone-upper",
-        zoneName: "Hạng Ba (Ban công tầng 2)",
-        description: "Ghế ngồi ban công tầng 2 nhìn bao quát toàn bộ sân khấu",
-        isSeated: true,
-        ticketTypeId: `tt-${event.id}-upper`,
-        price: balconyPrice,
-        maxPerOrder: 6,
-        availableCount: countAvailableSeats(upperRows),
-        rows: upperRows,
-        layoutPosition: "UPPER_TIER",
+        id: `${event.id}-standing`,
+        eventId: event.id,
+        zoneId: "349",
+        zoneName: "Khu Đứng Fanzone",
+        section: "Standing Pit",
+        seatInfo: "Vé đứng tự do sát catwalk",
+        price: roundVnd(base * 1.55),
+        availableTickets: 6,
+        dealScore: 10,
+        dealLabel: "Tuyệt vời",
+        features: ["Khu vực đứng sát sàn diễn", "Tầm nhìn trực diện nghệ sĩ", "Tự do di chuyển"],
+        viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
+        isStanding: true,
+      },
+      {
+        id: `${event.id}-cat-a`,
+        eventId: event.id,
+        zoneId: "495",
+        zoneName: "Hạng A (Category A)",
+        section: "Category A",
+        row: "Hàng D",
+        seatInfo: "Ghế 10 - 11",
+        price: roundVnd(base * 1.35),
+        availableTickets: 4,
+        dealScore: 8,
+        dealLabel: "Tốt",
+        features: ["2 vé ngồi cạnh nhau", "Tầm nhìn khán đài trung tâm"],
+        viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
+      },
+      {
+        id: `${event.id}-cat-b`,
+        eventId: event.id,
+        zoneId: "496",
+        zoneName: "Hạng B (Category B)",
+        section: "Category B",
+        row: "Hàng F",
+        seatInfo: "Ghế 19 - 20",
+        price: roundVnd(base * 1.15),
+        availableTickets: 4,
+        dealScore: 8,
+        dealLabel: "Tốt",
+        features: ["2 vé ngồi cạnh nhau", "Tầm nhìn bao quát sân khấu"],
+        viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
+      },
+      {
+        id: `${event.id}-cat-c`,
+        eventId: event.id,
+        zoneId: "497",
+        zoneName: "Hạng C (Category C)",
+        section: "Category C",
+        row: "Hàng H",
+        seatInfo: "Ghế 05 - 06",
+        price: roundVnd(base * 1.0),
+        availableTickets: 4,
+        dealScore: 8,
+        dealLabel: "Tốt",
+        features: ["2 vé ngồi cạnh nhau", "Giá vé tiết kiệm"],
+        viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
+      },
+      {
+        id: `${event.id}-cat-d`,
+        eventId: event.id,
+        zoneId: "504",
+        zoneName: "Hạng D (Category D)",
+        section: "Category D",
+        row: "Hàng K",
+        seatInfo: "Ghế 12 - 13",
+        price: roundVnd(base * 0.85),
+        availableTickets: 2,
+        dealScore: 9,
+        dealLabel: "Rất tốt",
+        features: ["2 vé ngồi cạnh nhau", "Góc nhìn khán đài tầng trên"],
+        viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
       },
     ];
   }
 
-  // Default: CONCERT & FESTIVAL
-  const svipPrice = Math.round((base * 2.8) / 50000) * 50000;
-  const fanzonePrice = Math.round((base * 1.75) / 50000) * 50000;
-  const cat1Price = Math.round((base * 1.35) / 50000) * 50000;
-  const cat2Price = base;
+  if (mapKey === "stadium-concert") {
+    return [
+      {
+        id: `${event.id}-priority-standing`,
+        eventId: event.id,
+        zoneId: "11448",
+        zoneName: "Đứng Ưu Tiên",
+        section: "Priority Standing",
+        seatInfo: "Khu vực ưu tiên sát sân khấu",
+        price: roundVnd(base * 2.2),
+        availableTickets: 4,
+        dealScore: 10,
+        dealLabel: "Tuyệt vời",
+        features: ["Vào cửa sớm trước 30 phút", "Khu đứng sát vách sân khấu chính", "Quà lưu niệm"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+        isLastTickets: true,
+        isStanding: true,
+      },
+      {
+        id: `${event.id}-standing-pen`,
+        eventId: event.id,
+        zoneId: "682",
+        zoneName: "Khu Đứng (Standing Pen)",
+        section: "Standing Pen",
+        seatInfo: "Vé đứng tự do lòng sân vận động",
+        price: roundVnd(base * 1.6),
+        availableTickets: 6,
+        dealScore: 9,
+        dealLabel: "Rất tốt",
+        features: ["Không khí cuồng nhiệt", "Tự do chọn vị trí đứng"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+        isStanding: true,
+      },
+      {
+        id: `${event.id}-lvl-100`,
+        eventId: event.id,
+        zoneId: "520",
+        zoneName: "Khán Đài Tầng 100",
+        section: "Level 100 - Khu 140",
+        row: "Hàng E",
+        seatInfo: "Ghế 04 - 05",
+        price: roundVnd(base * 1.4),
+        availableTickets: 4,
+        dealScore: 8,
+        dealLabel: "Tốt",
+        features: ["2 vé ngồi cạnh nhau", "Tầm nhìn trực diện sân khấu"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+      },
+      {
+        id: `${event.id}-lvl-400`,
+        eventId: event.id,
+        zoneId: "782",
+        zoneName: "Khán Đài Tầng 400",
+        section: "Level 400 - Khu 410",
+        row: "Hàng M",
+        seatInfo: "Ghế 12 - 13",
+        price: roundVnd(base * 1.0),
+        availableTickets: 4,
+        dealScore: 9,
+        dealLabel: "Rất tốt",
+        features: ["2 vé ngồi cạnh nhau", "Toàn cảnh hiệu ứng ánh sáng"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+      },
+      {
+        id: `${event.id}-lvl-600`,
+        eventId: event.id,
+        zoneId: "1219",
+        zoneName: "Khán Đài Tầng 600",
+        section: "Level 600 - Khu 612",
+        row: "Hàng R",
+        seatInfo: "Ghế 08 - 09",
+        price: roundVnd(base * 0.75),
+        availableTickets: 4,
+        dealScore: 8,
+        dealLabel: "Tốt",
+        features: ["2 vé ngồi cạnh nhau", "Giá vé tiết kiệm nhất"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+      },
+    ];
+  }
 
-  const vipARows = buildRows(
-    event.id,
-    "zone-vip-a",
-    "Khu VIP A (Ngồi)",
-    ["A", "B", "C", "D"],
-    10,
-    svipPrice
-  );
-  const vipBRows = buildRows(
-    event.id,
-    "zone-vip-b",
-    "Khu VIP B (Ngồi)",
-    ["A", "B", "C", "D"],
-    10,
-    svipPrice
-  );
-  const lowerRows = buildRows(
-    event.id,
-    "zone-lower",
-    "Khán đài Hạng A (CAT 1)",
-    ["E", "F", "G", "H"],
-    14,
-    cat1Price
-  );
-  const upperRows = buildRows(
-    event.id,
-    "zone-upper",
-    "Khán đài Phổ thông (CAT 2)",
-    ["J", "K", "L"],
-    14,
-    cat2Price
-  );
+  if (mapKey === "stadium-football") {
+    return [
+      {
+        id: `${event.id}-stand-a-vip`,
+        eventId: event.id,
+        zoneId: "520",
+        zoneName: "Khán Đài A (Tây) VIP",
+        section: "Khán đài A - Khu 145",
+        row: "Hàng D",
+        seatInfo: "Ghế 12 - 13",
+        price: roundVnd(base * 2.2),
+        originalPrice: roundVnd(base * 2.5),
+        availableTickets: 2,
+        dealScore: 10,
+        dealLabel: "Tuyệt vời",
+        features: ["2 vé ngồi cạnh nhau", "Ghế có mái che", "Tầm nhìn vạch giữa sân"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+        isLastTickets: true,
+      },
+      {
+        id: `${event.id}-stand-b`,
+        eventId: event.id,
+        zoneId: "520",
+        zoneName: "Khán Đài B (Đông)",
+        section: "Khán đài B - Khu 112",
+        row: "Hàng J",
+        seatInfo: "Ghế 08 - 09",
+        price: roundVnd(base * 1.4),
+        availableTickets: 4,
+        dealScore: 9,
+        dealLabel: "Rất tốt",
+        features: ["2 vé ngồi cạnh nhau", "Khu hội cổ động viên sôi động"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+      },
+      {
+        id: `${event.id}-stand-cd-lvl2`,
+        eventId: event.id,
+        zoneId: "782",
+        zoneName: "Khán Đài C & D (Tầng 2)",
+        section: "Khán đài C - Khu 408",
+        row: "Hàng G",
+        seatInfo: "Ghế 15 - 16",
+        price: roundVnd(base * 1.1),
+        availableTickets: 4,
+        dealScore: 8,
+        dealLabel: "Tốt",
+        features: ["2 vé ngồi cạnh nhau", "Tầm nhìn góc cầu môn"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+      },
+      {
+        id: `${event.id}-stand-upper`,
+        eventId: event.id,
+        zoneId: "1219",
+        zoneName: "Khán Đài Tầng Cao",
+        section: "Khán đài D - Khu 610",
+        row: "Hàng N",
+        seatInfo: "Ghế 22 - 23",
+        price: roundVnd(base * 1.0),
+        availableTickets: 4,
+        dealScore: 8,
+        dealLabel: "Tốt",
+        features: ["2 vé ngồi cạnh nhau", "Bao quát toàn bộ mặt cỏ"],
+        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
+      },
+    ];
+  }
 
+  if (mapKey === "arena-basketball") {
+    return [
+      {
+        id: `${event.id}-courtside`,
+        eventId: event.id,
+        zoneId: "682",
+        zoneName: "Ghế Sát Sân (Courtside)",
+        section: "Courtside - Khu 1",
+        row: "Hàng 1",
+        seatInfo: "Ghế 04 - 05",
+        price: roundVnd(base * 2.8),
+        availableTickets: 2,
+        dealScore: 10,
+        dealLabel: "Tuyệt vời",
+        features: ["2 vé ngồi cạnh nhau", "Sát đường biên cầu thủ", "Phục vụ đồ uống tận nơi"],
+        viewFromSeatUrl: "/images/venues/view-arena-1.jpg",
+        isLastTickets: true,
+      },
+      {
+        id: `${event.id}-club`,
+        eventId: event.id,
+        zoneId: "1724",
+        zoneName: "Khu VIP Club",
+        section: "Club C109",
+        row: "Hàng B",
+        seatInfo: "Ghế 08 - 09",
+        price: roundVnd(base * 2.0),
+        availableTickets: 4,
+        dealScore: 9,
+        dealLabel: "Rất tốt",
+        features: ["2 vé ngồi cạnh nhau", "Lối vào sảnh VIP riêng", "Ghế đệm êm ái"],
+        viewFromSeatUrl: "/images/venues/view-arena-2.jpg",
+      },
+      {
+        id: `${event.id}-lower-bowl`,
+        eventId: event.id,
+        zoneId: "594",
+        zoneName: "Khán Đài Tầng 100",
+        section: "Khu 120",
+        row: "Hàng G",
+        seatInfo: "Ghế 11 - 12",
+        price: roundVnd(base * 1.4),
+        availableTickets: 4,
+        dealScore: 9,
+        dealLabel: "Rất tốt",
+        features: ["2 vé ngồi cạnh nhau", "Tầm nhìn trung tâm bảng rổ"],
+        viewFromSeatUrl: "/images/venues/view-arena-3.jpg",
+      },
+      {
+        id: `${event.id}-upper-bowl`,
+        eventId: event.id,
+        zoneId: "407",
+        zoneName: "Khán Đài Tầng 200",
+        section: "Khu 224",
+        row: "Hàng K",
+        seatInfo: "Ghế 16 - 17",
+        price: roundVnd(base * 1.0),
+        availableTickets: 4,
+        dealScore: 8,
+        dealLabel: "Tốt",
+        features: ["2 vé ngồi cạnh nhau", "Giá vé phổ thông"],
+        viewFromSeatUrl: "/images/venues/view-arena-3.jpg",
+      },
+    ];
+  }
+
+  // Theater
   return [
     {
-      zoneId: "zone-vip-a",
-      zoneName: "Khu VIP A (Ngồi)",
-      description:
-        "Ghế ngồi đánh số sát sân khấu cánh trái, kèm bộ quà tặng lightstick và lối check-in riêng",
-      isSeated: true,
-      ticketTypeId: `tt-${event.id}-vip-a`,
-      price: svipPrice,
-      maxPerOrder: 6,
-      availableCount: countAvailableSeats(vipARows),
-      rows: vipARows,
-      layoutPosition: "FRONT_LEFT",
+      id: `${event.id}-theater-vip`,
+      eventId: event.id,
+      zoneId: "vip",
+      zoneName: "VIP Sân Khấu",
+      section: "VIP Trung tâm",
+      row: "Hàng A",
+      seatInfo: "Ghế 07 - 08",
+      price: roundVnd(base * 2.2),
+      availableTickets: 2,
+      dealScore: 10,
+      dealLabel: "Tuyệt vời",
+      features: ["2 vé ngồi cạnh nhau", "Hàng đầu sát sân khấu", "Âm thanh thính phòng tốt nhất"],
+      viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
+      isLastTickets: true,
     },
     {
-      zoneId: "zone-vip-b",
-      zoneName: "Khu VIP B (Ngồi)",
-      description:
-        "Ghế ngồi đánh số sát sân khấu cánh phải, kèm bộ quà tặng lightstick và lối check-in riêng",
-      isSeated: true,
-      ticketTypeId: `tt-${event.id}-vip-b`,
-      price: svipPrice,
-      maxPerOrder: 6,
-      availableCount: countAvailableSeats(vipBRows),
-      rows: vipBRows,
-      layoutPosition: "FRONT_RIGHT",
+      id: `${event.id}-theater-orch`,
+      eventId: event.id,
+      zoneId: "orch",
+      zoneName: "Khán Phòng Chính (Hạng Nhì)",
+      section: "Hạng Nhì - Cánh Giữa",
+      row: "Hàng E",
+      seatInfo: "Ghế 14 - 15",
+      price: roundVnd(base * 1.4),
+      availableTickets: 4,
+      dealScore: 9,
+      dealLabel: "Rất tốt",
+      features: ["2 vé ngồi cạnh nhau", "Tầm nhìn trực diện cân đối"],
+      viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
     },
     {
-      zoneId: "zone-standing",
-      zoneName: "Fanzone Đứng (GA)",
-      description:
-        "Khu vực vé đứng sát đường dẫn catwalk trung tâm, tự do di chuyển trong khu vực Fanzone",
-      isSeated: false,
-      ticketTypeId: `tt-${event.id}-standing`,
-      price: fanzonePrice,
-      maxPerOrder: 6,
-      availableCount: 84,
-      rows: [],
-      layoutPosition: "CENTER_STANDING",
+      id: `${event.id}-theater-box`,
+      eventId: event.id,
+      zoneId: "box",
+      zoneName: "Loge Khách Quý",
+      section: "Loge L2",
+      row: "Hàng 1",
+      seatInfo: "Ghế 01 - 02",
+      price: roundVnd(base * 1.7),
+      availableTickets: 2,
+      dealScore: 9,
+      dealLabel: "Rất tốt",
+      features: ["Không gian riêng tư", "Lối đi riêng cho khách quý"],
+      viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
+      isLastTickets: true,
     },
     {
-      zoneId: "zone-lower",
-      zoneName: "Khán đài Hạng A (CAT 1)",
-      description: "Ghế ngồi tầng 1 tầm nhìn trực diện sân khấu chính",
-      isSeated: true,
-      ticketTypeId: `tt-${event.id}-lower`,
-      price: cat1Price,
-      maxPerOrder: 6,
-      availableCount: countAvailableSeats(lowerRows),
-      rows: lowerRows,
-      layoutPosition: "LOWER_TIER",
-    },
-    {
-      zoneId: "zone-upper",
-      zoneName: "Khán đài Phổ thông (CAT 2)",
-      description: "Ghế ngồi khán đài tầng 2 bao quát toàn bộ hiệu ứng ánh sáng",
-      isSeated: true,
-      ticketTypeId: `tt-${event.id}-upper`,
-      price: cat2Price,
-      maxPerOrder: 6,
-      availableCount: countAvailableSeats(upperRows),
-      rows: upperRows,
-      layoutPosition: "UPPER_TIER",
+      id: `${event.id}-theater-balc`,
+      eventId: event.id,
+      zoneId: "balc",
+      zoneName: "Ban Công Tầng 2",
+      section: "Ban Công Giữa",
+      row: "Hàng B",
+      seatInfo: "Ghế 10 - 11",
+      price: roundVnd(base * 1.0),
+      availableTickets: 4,
+      dealScore: 8,
+      dealLabel: "Tốt",
+      features: ["2 vé ngồi cạnh nhau", "Bao quát toàn cảnh sân khấu"],
+      viewFromSeatUrl: "/images/venues/view-concert-red.jpg",
     },
   ];
 }
