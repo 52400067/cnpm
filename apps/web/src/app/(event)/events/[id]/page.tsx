@@ -17,7 +17,6 @@ import {
   Users,
   Search,
   Sparkles,
-  Lock,
 } from "lucide-react";
 import {
   EVENTS,
@@ -232,12 +231,7 @@ function EventSplitView({ event }: { event: EventItem }) {
             <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white px-3 py-1.5 rounded-[8px] border border-[#dfe3e5] shadow-xs text-[12px]">
               <span className="text-[#606970]">Đang lọc:</span>
               <strong className="text-primary font-bold">
-                {zoneInfoMap[activeZoneId]?.name ||
-                  (activeZoneId === "11448"
-                    ? "Khu Đứng Ưu Tiên (Vé BTC)"
-                    : activeZoneId === "885"
-                    ? "Khu Kỹ Thuật (Không mở bán)"
-                    : `Khu ${activeZoneId}`)}
+                {zoneInfoMap[activeZoneId]?.name || `Khu ${activeZoneId}`}
               </strong>
               <button
                 type="button"
@@ -272,12 +266,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                 <span>
                   Đang xem:{" "}
                   <strong className="text-[#141d23]">
-                    {zoneInfoMap[activeZoneId]?.name ||
-                      (activeZoneId === "11448"
-                        ? "Khu Đứng Ưu Tiên (BTC)"
-                        : activeZoneId === "885"
-                        ? "Khu Kỹ Thuật"
-                        : `Khu ${activeZoneId}`)}
+                    {zoneInfoMap[activeZoneId]?.name || `Khu ${activeZoneId}`}
                   </strong>
                 </span>
               ) : (
@@ -311,28 +300,12 @@ function EventSplitView({ event }: { event: EventItem }) {
           <div className="flex-1 overflow-y-auto divide-y divide-[#dfe3e5]">
             {filteredListings.length === 0 ? (
               <div className="p-8 text-center space-y-3">
-                {activeZoneId === "11448" || activeZoneId === "885" ? (
-                  <>
-                    <div className="size-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-                      <Lock className="size-5" />
-                    </div>
-                    <h3 className="text-[15px] font-bold text-[#141d23]">
-                      Khu vực Ban tổ chức &amp; Khách mời
-                    </h3>
-                    <p className="text-[13px] text-[#606970] max-w-xs mx-auto">
-                      Khu vực ưu tiên này do Ban tổ chức giữ chỗ (khách mời ngoại giao, nhà tài trợ hoặc kỹ thuật sân khấu), không mở bán vé trực tuyến.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-[15px] font-bold text-[#141d23]">
-                      Khu vực đã chọn hiện chưa có vé phù hợp
-                    </h3>
-                    <p className="text-[13px] text-[#606970] max-w-xs mx-auto">
-                      Khu vực này hiện đã bán hết hoặc không đủ số lượng vé bạn chọn. Quý khách vui lòng chọn các khu vực khác.
-                    </p>
-                  </>
-                )}
+                <h3 className="text-[15px] font-bold text-[#141d23]">
+                  Khu vực đã chọn hiện chưa có vé phù hợp
+                </h3>
+                <p className="text-[13px] text-[#606970] max-w-xs mx-auto">
+                  Khu vực này hiện đã bán hết hoặc không đủ số lượng vé bạn chọn. Quý khách vui lòng chọn các khu vực khác.
+                </p>
                 <button
                   type="button"
                   onClick={() => setActiveZoneId(null)}

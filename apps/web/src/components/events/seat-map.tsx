@@ -5,10 +5,7 @@ import { Plus, Minus, Maximize2 } from "lucide-react";
 import { VENUE_SVG, type VenueMapKey } from "@/lib/venue-svg.generated";
 import { formatVnd } from "@/lib/events-catalog";
 
-const RESERVED_ZONES: Record<string, string> = {
-  "11448": "Khu Đứng Ưu Tiên (Vé Ban Tổ Chức)",
-  "885": "Khu Vực Kỹ Thuật (Không mở bán)",
-};
+const NON_SELLING_ZONES = new Set(["11448", "885"]);
 
 interface SeatMapProps {
   mapKey: VenueMapKey;
@@ -40,11 +37,8 @@ function SeatMapView({
   const panStartRef = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<{
-    zoneId: string;
-    name: string;
     price: number;
-    isReserved?: boolean;
-    isSoldOut?: boolean;
+    isSoldOut: boolean;
     x: number;
     y: number;
   } | null>(null);
@@ -81,35 +75,26 @@ function SeatMapView({
       if (target) {
         const zid = target.getAttribute("data-zone");
         if (zid) {
+          // If non-selling or priority seat, do not highlight or show tooltip
+          if (NON_SELLING_ZONES.has(zid)) {
+            onHoverZone(null);
+            setTooltip(null);
+            return;
+          }
+
           onHoverZone(zid);
           const rect = containerRef.current?.getBoundingClientRect();
           if (rect) {
             if (zoneInfoMap[zid]) {
               setTooltip({
-                zoneId: zid,
-                name: zoneInfoMap[zid].name,
                 price: zoneInfoMap[zid].minPrice,
-                isReserved: false,
-                isSoldOut: false,
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top,
-              });
-            } else if (RESERVED_ZONES[zid]) {
-              setTooltip({
-                zoneId: zid,
-                name: RESERVED_ZONES[zid],
-                price: 0,
-                isReserved: true,
                 isSoldOut: false,
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top,
               });
             } else {
               setTooltip({
-                zoneId: zid,
-                name: `Khu ${zid}`,
                 price: 0,
-                isReserved: false,
                 isSoldOut: true,
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top,
@@ -136,13 +121,14 @@ function SeatMapView({
     const target = (e.target as Element).closest("[data-zone]");
     if (target) {
       const zid = target.getAttribute("data-zone");
-      if (zid) {
+      // Do not allow clicking non-selling/priority seats or sold-out seats
+      if (zid && !NON_SELLING_ZONES.has(zid) && zoneInfoMap[zid]) {
         onSelectZone(activeZoneId === zid ? null : zid);
+        return;
       }
-    } else {
-      // Clicked on empty space / backdrop
-      onSelectZone(null);
     }
+    // Clicked on empty space, non-selling seat, or sold-out seat
+    onSelectZone(null);
   };
 
   return (
@@ -198,7 +184,7 @@ function SeatMapView({
         </button>
       </div>
 
-      {/* Floating Hover Tooltip */}
+      {/* Floating Hover Tooltip: Price only or "Hết vé" */}
       {tooltip && (
         <div
           style={{
@@ -206,15 +192,12 @@ function SeatMapView({
             top: `${tooltip.y - 36}px`,
             pointerEvents: "none",
           }}
-          className="absolute z-30 transform -translate-y-full bg-[#141d23] text-white text-[12px] px-3 py-1.5 rounded-[8px] shadow-lg whitespace-nowrap flex items-center gap-2"
+          className="absolute z-30 transform -translate-y-full bg-[#141d23] text-white text-[12px] px-2.5 py-1 rounded-[6px] shadow-md whitespace-nowrap"
         >
-          <span className="font-semibold">{tooltip.name}</span>
-          {tooltip.isReserved ? (
-            <span className="text-amber-400 font-medium">Vé Ban Tổ Chức (Không mở bán)</span>
-          ) : tooltip.isSoldOut ? (
-            <span className="text-red-400 font-medium">Hết vé</span>
+          {tooltip.isSoldOut ? (
+            <span className="font-semibold text-[#f1f5f9]">Hết vé</span>
           ) : (
-            <span className="text-[#a7f3d0] font-bold">{formatVnd(tooltip.price)}</span>
+            <span className="font-bold text-[#a7f3d0]">{formatVnd(tooltip.price)}</span>
           )}
         </div>
       )}
@@ -248,17 +231,22 @@ function SeatMapView({
           cursor: pointer;
         }
 
-        /* Reserved & Host-only sections (Priority / Technical / Not for sale) */
+        /* Non-selling & Priority seats (simply gray and not clickable) */
+        g[data-zone="11448"],
+        g[data-zone="885"] {
+          cursor: not-allowed !important;
+        }
         g[data-zone="11448"] .sec,
         g[data-zone="885"] .sec {
-          fill: #f1f5f9 !important;
+          fill: #e2e8f0 !important;
           stroke: #cbd5e1 !important;
-          stroke-dasharray: 6 4 !important;
-          cursor: pointer !important;
+          stroke-dasharray: none !important;
+          cursor: not-allowed !important;
         }
         g[data-zone="11448"] text,
         g[data-zone="885"] text {
           fill: #94a3b8 !important;
+          font-weight: 500 !important;
         }
 
         /* Default for sections without active tickets */
