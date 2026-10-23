@@ -20,9 +20,11 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
       {/* Main Two-Column Container */}
       <div className="flex-1 flex flex-col lg:flex-row items-stretch">
         {/* ========================================================
-            LEFT COLUMN: Header, Form (Vertically Centered), Footer
+            LEFT COLUMN: Header, Form (Shared Top Offset), Footer
             Logo and form share the exact same left edge.
             Header row matches the form column width and padding.
+            Title placed at one token-based distance below header.
+            Footer pinned to bottom.
             ======================================================== */}
         <div className="w-full lg:w-[48%] xl:w-[45%] 2xl:w-[42%] flex flex-col justify-between px-6 sm:px-8 lg:px-12 shrink-0 min-h-[100dvh]">
           {/* Header row: shares exact width and alignment with the form container */}
@@ -37,8 +39,8 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
             </Link>
           </header>
 
-          {/* Form Content: vertically centered within the left column as one group */}
-          <main className="flex-1 flex flex-col justify-center items-center w-full py-4 sm:py-6">
+          {/* Form Content: identical top offset below header on both Login and Register */}
+          <main className="flex-1 flex flex-col items-center w-full pt-6 sm:pt-8 lg:pt-10 pb-4">
             <div className="w-full max-w-[440px] mx-auto">{children}</div>
           </main>
 

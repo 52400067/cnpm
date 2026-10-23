@@ -60,8 +60,8 @@ export default function LoginPage() {
   };
 
   return (
-    <Card className="border border-border rounded-xl bg-card text-card-foreground shadow-xs ring-0 p-5 sm:p-6 lg:border-0 lg:ring-0 lg:shadow-none lg:bg-transparent lg:rounded-none lg:p-0">
-      <CardHeader className="space-y-1.5 text-left p-0 pb-4 lg:p-0 lg:pb-4">
+    <Card className="border-0 shadow-none bg-transparent rounded-none p-0">
+      <CardHeader className="space-y-1 text-left p-0 pb-6">
         <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
           Đăng nhập
         </CardTitle>
@@ -71,7 +71,7 @@ export default function LoginPage() {
       </CardHeader>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <CardContent className="space-y-3.5 p-0 lg:p-0">
+        <CardContent className="space-y-4 p-0">
           {/* Top-of-form server error alert */}
           {serverError && (
             <div
@@ -85,7 +85,7 @@ export default function LoginPage() {
 
           {/* Email field */}
           <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-xs font-semibold text-foreground">
+            <Label htmlFor="email" className="text-sm font-medium text-foreground">
               Địa chỉ Email
             </Label>
             <div className="relative">
@@ -94,8 +94,14 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
+                required
+                aria-required="true"
                 placeholder="Ví dụ: nguyenan@example.com"
-                className="h-10 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={`h-11 pl-9 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  errors.email
+                    ? "border-destructive focus-visible:border-destructive"
+                    : "border-input"
+                }`}
                 aria-invalid={!!errors.email}
                 aria-describedby={errors.email ? "email-error" : undefined}
                 {...register("email")}
@@ -105,7 +111,7 @@ export default function LoginPage() {
               <p
                 id="email-error"
                 role="alert"
-                className="flex items-center gap-1.5 text-xs text-destructive font-medium"
+                className="mt-1.5 flex items-center gap-1.5 text-xs text-destructive font-medium"
               >
                 <AlertCircle className="size-3.5 shrink-0" />
                 <span>{errors.email.message}</span>
@@ -116,7 +122,7 @@ export default function LoginPage() {
           {/* Password field */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="password" className="text-xs font-semibold text-foreground">
+              <Label htmlFor="password" className="text-sm font-medium text-foreground">
                 Mật khẩu
               </Label>
               <Link
@@ -132,8 +138,14 @@ export default function LoginPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
+                required
+                aria-required="true"
                 placeholder="Nhập mật khẩu"
-                className="h-10 pl-9 pr-10 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={`h-11 pl-9 pr-10 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  errors.password
+                    ? "border-destructive focus-visible:border-destructive"
+                    : "border-input"
+                }`}
                 aria-invalid={!!errors.password}
                 aria-describedby={errors.password ? "password-error" : undefined}
                 {...register("password")}
@@ -155,7 +167,7 @@ export default function LoginPage() {
               <p
                 id="password-error"
                 role="alert"
-                className="flex items-center gap-1.5 text-xs text-destructive font-medium"
+                className="mt-1.5 flex items-center gap-1.5 text-xs text-destructive font-medium"
               >
                 <AlertCircle className="size-3.5 shrink-0" />
                 <span>{errors.password.message}</span>
@@ -183,11 +195,11 @@ export default function LoginPage() {
           </div>
         </CardContent>
 
-        <CardFooter className="flex flex-col gap-3.5 bg-transparent border-t-0 pt-3 pb-2 px-0 lg:px-0">
+        <CardFooter className="flex flex-col bg-transparent border-t-0 pt-5 pb-0 px-0">
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 rounded-lg font-semibold text-sm shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:opacity-50"
+            className="w-full h-11 rounded-lg font-semibold text-sm bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:opacity-50"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -199,7 +211,7 @@ export default function LoginPage() {
             )}
           </Button>
 
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-sm text-muted-foreground mt-4">
             Chưa có tài khoản TicketHub?{" "}
             <Link
               href="/register"

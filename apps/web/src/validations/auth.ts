@@ -32,13 +32,8 @@ export const registerSchema = z
       .string()
       .min(8, "Mật khẩu phải có tối thiểu 8 ký tự")
       .max(100, "Mật khẩu tối đa 100 ký tự"),
-    confirmPassword: z.string().min(1, "Vui lòng nhập lại mật khẩu xác nhận"),
     role: z.enum([UserRole.BUYER, UserRole.ORGANIZER]),
     organizationName: z.string().optional(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Mật khẩu xác nhận không khớp",
-    path: ["confirmPassword"],
   })
   .refine(
     (data) => {
