@@ -77,7 +77,7 @@ export default function OrganizerEventsPage() {
 
         <div className="bg-white p-5 rounded-[14px] border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-slate-500 text-[13px]">
-            <span>Vé quét QR Ed25519</span>
+            <span>Bảo mật chống vé giả</span>
             <ShieldCheck className="size-4 text-primary" />
           </div>
           <div className="text-[28px] font-extrabold text-slate-900">100%</div>
