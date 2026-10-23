@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   Heart,
-  ArrowLeft,
   Calendar,
   MapPin,
   Flame,
@@ -18,10 +17,8 @@ import {
   ShieldCheck,
   User,
   Users,
-  ArrowRight,
-  Ticket,
+  Search,
 } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
 import {
   EVENTS,
   getEventById,
@@ -125,105 +122,103 @@ function EventSplitView({ event }: { event: EventItem }) {
 
   return (
     <div className="flex flex-col h-[calc(100vh-32px)] bg-white overflow-hidden text-[#141d23]">
-      {/* 1. Production Venue Map Header Bar */}
-      <header className="h-[68px] border-b border-[#dfe3e5] bg-white px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 shrink-0 z-30 shadow-2xs">
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-          <Logo className="hidden lg:inline-flex shrink-0" />
-
-          <div className="hidden lg:block h-6 w-px bg-[#dfe3e5]" />
-
+      {/* 1. Clean Top Header Bar */}
+      <header className="h-[64px] border-b border-[#dfe3e5] bg-white px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-30">
+        {/* Left: Event thumbnail + Title + Date & Venue */}
+        <div className="flex items-center gap-3.5 min-w-0">
           <Link
             href="/"
-            aria-label="Quay lại danh sách sự kiện"
-            className="size-9 rounded-full border border-[#dfe3e5] flex items-center justify-center text-[#141d23] hover:bg-[#f5f7f8] transition-colors shrink-0"
+            className="size-11 rounded-[8px] overflow-hidden bg-[#eff1f2] shrink-0 border border-[#dfe3e5] hover:opacity-90 transition-opacity"
+            title="Về trang chủ"
           >
-            <ArrowLeft className="size-4" />
+            <img
+              src={event.image}
+              alt={event.title}
+              className="w-full h-full object-cover"
+            />
           </Link>
 
-          <img
-            src={event.image}
-            alt={event.title}
-            className="size-11 rounded-[8px] object-cover bg-[#eff1f2] shrink-0 border border-[#dfe3e5] shadow-2xs"
-          />
-
           <div className="min-w-0">
-            <h1 className="text-[15px] sm:text-[17px] font-extrabold text-[#141d23] truncate leading-tight tracking-tight">
+            <h1 className="text-[15px] sm:text-[16px] font-bold text-[#141d23] truncate leading-tight">
               {event.title}
             </h1>
             <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-[#606970] truncate pt-0.5">
-              <span className="inline-flex items-center gap-1 font-semibold text-[#141d23]">
-                <Calendar className="size-3.5 text-primary shrink-0" />
-                {event.fullDateTime}
-              </span>
+              <span>{event.fullDateTime}</span>
               <span className="hidden sm:inline text-[#cbd5e1]">•</span>
-              <span className="hidden sm:inline-flex items-center gap-1 truncate text-[#606970]">
-                <MapPin className="size-3.5 text-primary shrink-0" />
+              <span className="hidden sm:inline truncate text-[#868f97]">
                 {event.venue}, {event.city}
               </span>
             </div>
           </div>
-        </div>
 
-        {/* Right actions */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Quantity Selector Pill Button */}
-          <button
-            type="button"
-            onClick={() => setShowQtyModal(true)}
-            className="h-10 px-3.5 rounded-full border border-[#dfe3e5] bg-white hover:border-primary hover:bg-emerald-50/40 text-[13px] font-bold text-[#141d23] flex items-center gap-2 transition-colors shadow-2xs"
-          >
-            <Users className="size-4 text-primary" />
-            <span>{ticketQuantity} vé</span>
-            <ChevronDown className="size-3.5 text-[#606970]" />
-          </button>
-
-          {/* FanProtect / Buyer Guarantee Badge */}
-          <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 text-[12px] font-bold">
-            <ShieldCheck className="size-4 text-emerald-600 shrink-0" />
-            <span>100% Đảm bảo vé</span>
-          </div>
-
-          {/* Favorite button */}
           <button
             type="button"
             onClick={() => setIsSaved(!isSaved)}
             aria-label={isSaved ? "Bỏ lưu sự kiện" : "Lưu vào yêu thích"}
-            className="size-10 rounded-full border border-[#dfe3e5] flex items-center justify-center text-[#141d23] hover:bg-[#f5f7f8] transition-colors"
+            className="size-8 rounded-full border border-[#dfe3e5] hover:bg-[#f5f7f8] flex items-center justify-center text-[#141d23] transition-colors ml-1 shrink-0"
           >
             <Heart
-              className={`size-4.5 ${
-                isSaved ? "fill-primary text-primary" : "text-[#141d23]"
+              className={`size-4 ${
+                isSaved ? "fill-primary text-primary" : "text-[#606970]"
               }`}
             />
           </button>
+        </div>
+
+        {/* Center: Global Search Bar */}
+        <div className="hidden md:flex flex-1 max-w-md mx-4">
+          <div className="w-full h-10 px-4 rounded-full bg-[#f5f7f8] border border-[#dfe3e5] text-[13px] text-[#606970] flex items-center gap-2.5 focus-within:border-primary focus-within:bg-white transition-all">
+            <Search className="size-4 text-[#868f97] shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm sự kiện, nghệ sĩ, địa điểm..."
+              className="w-full bg-transparent border-none outline-none text-[#141d23] placeholder:text-[#868f97]"
+            />
+          </div>
+        </div>
+
+        {/* Right: Region + Links + User Profile */}
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-[13px] font-medium text-[#141d23]">
+          <div className="hidden lg:flex items-center gap-1 text-[#606970] hover:text-[#141d23] cursor-pointer">
+            <span>VND | VI</span>
+            <ChevronDown className="size-3.5" />
+          </div>
+
+          <Link
+            href="/organizer/events/new"
+            className="hidden sm:inline-block hover:text-primary transition-colors text-[13px]"
+          >
+            Bán vé
+          </Link>
 
           <Link
             href="/my-tickets"
-            className="hidden md:inline-flex items-center text-[13px] font-bold text-[#141d23] hover:text-primary transition-colors px-2 py-1"
+            className="hover:text-primary transition-colors text-[13px]"
           >
             Vé của tôi
           </Link>
 
           <Link
             href="/login"
-            aria-label="Tài khoản"
-            className="size-9 rounded-full bg-[#eff1f2] hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-[#141d23] transition-colors"
+            className="hidden sm:inline-block hover:text-primary transition-colors text-[13px]"
           >
-            <User className="size-4.5 fill-current" />
+            Đăng nhập
+          </Link>
+
+          <Link
+            href="/login"
+            aria-label="Tài khoản"
+            className="size-8 rounded-full bg-[#eff1f2] hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-[#141d23] transition-colors shrink-0"
+          >
+            <User className="size-4 fill-current" />
           </Link>
         </div>
       </header>
 
-      {/* 2. Slim Urgency / Social Proof Banner with Seated Together Reassurance */}
-      <div className="h-[36px] bg-[#fdf2f4] border-b border-[#fcd5dc] px-4 flex items-center justify-between text-[12px] text-[#9f1239] font-semibold shrink-0">
-        <div className="flex items-center gap-2 mx-auto sm:mx-0">
-          <Flame className="size-3.5 text-[#e11d48]" />
-          <span>Sắp hết vé! Hơn 70 người đang xem sự kiện này trong 1 giờ qua</span>
-        </div>
-        <div className="hidden sm:flex items-center gap-1.5 text-emerald-800 font-bold bg-white/70 px-2.5 py-0.5 rounded-full border border-emerald-200/50 text-[11.5px]">
-          <CheckCircle2 className="size-3.5 text-emerald-600" />
-          <span>Các ghế ngồi sẽ được xếp cạnh nhau</span>
-        </div>
+      {/* 2. Slim Urgency Strip */}
+      <div className="h-[32px] bg-[#fdf2f4] border-b border-[#fee2e2] px-4 sm:px-6 flex items-center gap-2 text-[12px] text-[#991b1b] font-medium shrink-0">
+        <Flame className="size-3.5 text-[#e11d48] shrink-0" />
+        <span>Sắp hết vé! Hơn 70 người đang xem sự kiện này trong 1 giờ qua</span>
       </div>
 
       {/* 3. Full-Height Split Screen Workspace */}
@@ -416,24 +411,24 @@ function EventSplitView({ event }: { event: EventItem }) {
         </div>
       </div>
 
-      {/* 4. "Bạn cần bao nhiêu vé?" Popup Modal */}
+      {/* 4. "Bạn cần bao nhiêu vé?" Minimalist Popup Modal */}
       {showQtyModal && (
         <div
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150"
         >
-          <div className="w-full max-w-[360px] bg-white rounded-[16px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 relative">
+          <div className="w-full max-w-[360px] bg-white rounded-[20px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 relative">
             {/* Close button */}
             <button
               type="button"
               onClick={() => setShowQtyModal(false)}
-              className="absolute top-4 right-4 p-1 rounded-full text-[#606970] hover:text-[#141d23] hover:bg-[#f5f7f8] transition-colors"
+              className="absolute top-4 right-4 p-1.5 rounded-full text-[#606970] hover:text-[#141d23] hover:bg-[#f5f7f8] transition-colors"
             >
               <X className="size-5" />
             </button>
 
-            <div className="text-center space-y-1">
+            <div className="text-center space-y-1 pt-1">
               <h2 className="text-[20px] font-extrabold text-[#141d23]">
                 Bạn cần bao nhiêu vé?
               </h2>
@@ -443,7 +438,7 @@ function EventSplitView({ event }: { event: EventItem }) {
             </div>
 
             {/* 2x2 Ticket Quantity Grid: 1, 2, 3, 4 */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 pt-1">
               {[1, 2, 3, 4].map((qty) => {
                 const isSelected = ticketQuantity === qty;
                 return (
@@ -466,7 +461,7 @@ function EventSplitView({ event }: { event: EventItem }) {
             <button
               type="button"
               onClick={() => setShowQtyModal(false)}
-              className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white font-bold text-[14px] transition-colors"
+              className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white font-bold text-[14px] transition-colors shadow-xs"
             >
               Tiếp tục
             </button>
