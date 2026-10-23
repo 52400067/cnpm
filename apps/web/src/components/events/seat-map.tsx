@@ -164,17 +164,18 @@ function SeatMapView({
         </button>
       </div>
 
-      {/* Floating Hover Tooltip: Only shown when hovering available seats with active tickets */}
+      {/* Floating Hover Tooltip: Positioned directly above cursor and aligned center */}
       {tooltip && (
         <div
           style={{
-            left: `${tooltip.x + 12}px`,
-            top: `${tooltip.y - 36}px`,
+            left: `${tooltip.x}px`,
+            top: `${tooltip.y - 10}px`,
             pointerEvents: "none",
           }}
-          className="absolute z-30 transform -translate-y-full bg-[#141d23] text-white text-[12px] px-2.5 py-1 rounded-[6px] shadow-md whitespace-nowrap"
+          className="absolute z-30 transform -translate-x-1/2 -translate-y-full bg-[#141d23] text-white text-[12px] px-2.5 py-1 rounded-[6px] shadow-lg whitespace-nowrap pointer-events-none select-none"
         >
           <span className="font-bold text-[#a7f3d0]">{formatVnd(tooltip.price)}</span>
+          <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#141d23]" />
         </div>
       )}
 
