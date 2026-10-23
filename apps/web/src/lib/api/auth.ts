@@ -1,5 +1,5 @@
 // apps/web/src/lib/api/auth.ts
-import { apiClient, setAccessToken } from "./client";
+import { apiClient, setAccessToken, ApiError } from "./client";
 import type {
   LoginRequest,
   RegisterRequest,
@@ -27,7 +27,88 @@ export interface RegisterResponseData {
   message: string;
 }
 
+export interface CheckIdentifierResult {
+  exists: boolean;
+  methods: ("password" | "otp" | "oauth")[];
+}
+
+export class AuthRateLimitError extends Error {
+  status = 429;
+  retryAfter: number;
+  constructor(message: string, retryAfter = 30) {
+    super(message);
+    this.name = "AuthRateLimitError";
+    this.retryAfter = retryAfter;
+  }
+}
+
+export class AuthNetworkError extends Error {
+  status = 503;
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthNetworkError";
+  }
+}
+
+// Feature flag for phone authentication
+// TODO(contract): API_CONTRACT.md only supports email credentials in POST /api/v1/auth/login.
+export const FEATURE_PHONE_AUTH = false;
+
 export const authApi = {
+  // TODO(contract): POST /api/v1/auth/check-identifier -> { exists: boolean, methods: [...] }
+  // Endpoint not defined in API_CONTRACT.md. Implemented behind service layer with mock behavior.
+  checkIdentifier: async (
+    rawIdentifier: string,
+  ): Promise<CheckIdentifierResult> => {
+    const identifier = rawIdentifier.trim().toLowerCase();
+
+    // Mock network latency (150ms)
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // Mock edge case: Network error
+    if (
+      identifier === "error@example.com" ||
+      identifier === "network-error@example.com" ||
+      identifier.startsWith("error")
+    ) {
+      throw new AuthNetworkError(
+        "Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra mạng và thử lại.",
+      );
+    }
+
+    // Mock edge case: Rate limit (429)
+    if (
+      identifier === "ratelimit@example.com" ||
+      identifier === "429@example.com" ||
+      identifier.startsWith("429")
+    ) {
+      throw new AuthRateLimitError(
+        "Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút",
+        30,
+      );
+    }
+
+    // Mock existing accounts (e.g. demo*, *existing.com, seed accounts)
+    const knownExisting = [
+      "buyer@tickethub.com",
+      "organizer@tickethub.com",
+      "admin@tickethub.com",
+      "nguyenan@example.com",
+      "existing@example.com",
+    ];
+
+    const exists =
+      knownExisting.includes(identifier) ||
+      identifier.startsWith("demo") ||
+      identifier.endsWith("@existing.com") ||
+      identifier.endsWith("@tickethub.com");
+
+    return {
+      exists,
+      methods: ["password"],
+    };
+  },
+
   login: async (body: LoginRequest): Promise<LoginResponseData> => {
     const result = await apiClient<LoginResponseData>("/auth/login", {
       method: "POST",
@@ -40,6 +121,15 @@ export const authApi = {
   },
 
   register: async (body: RegisterRequest): Promise<RegisterResponseData> => {
+    // Mock edge case: Duplicate registration race
+    if (body.email === "duplicate@example.com") {
+      throw new ApiError(
+        409,
+        "CONFLICT",
+        "Email này đã được sử dụng. Vui lòng đăng nhập.",
+      );
+    }
+
     return apiClient<RegisterResponseData>("/auth/register", {
       method: "POST",
       body: JSON.stringify(body),
