@@ -478,10 +478,10 @@ function RegisterFormContent() {
             <Button
               type="submit"
               aria-disabled={!isAgreed || isSubmitting}
-              className={`w-full h-10 rounded-lg font-semibold text-sm shadow-xs transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+              className={`w-full h-10 rounded-lg font-semibold text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
                 !isAgreed
-                  ? "opacity-60 cursor-not-allowed"
-                  : "cursor-pointer"
+                  ? "bg-secondary text-secondary-foreground border border-border cursor-not-allowed hover:bg-secondary"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
               }`}
               aria-describedby={!isAgreed ? "consent-submit-hint" : undefined}
             >
