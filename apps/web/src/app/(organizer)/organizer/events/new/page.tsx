@@ -1,796 +1,1127 @@
 "use client";
 
-import { useState, useMemo, Suspense } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useState, useMemo, useEffect, Suspense, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  Layers,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  Sparkles,
-  Info,
-  MapPin,
-  Search,
   Building2,
   Check,
-  Compass,
+  CheckCircle2,
+  ArrowRight,
+  ArrowLeft,
+  Search,
+  Save,
+  Info,
+  X,
 } from "lucide-react";
 import { SeatMap } from "@/components/events/seat-map";
 import { type VenueMapKey } from "@/lib/venue-svg.generated";
-import { formatVnd } from "@/lib/events-catalog";
 import {
   CURATED_VENUES,
   CURATED_LAYOUT_TEMPLATES,
   type VietnamCity,
-  type VenueCategory,
   type CuratedVenue,
   type CuratedZoneConfig,
+  type CuratedLayoutOption,
 } from "@/lib/curated-venues";
+import {
+  formatVnd,
+  formatTimeVi,
+  formatDateTimeVi,
+  formatNumberVi,
+  saveEventDraft,
+  getSavedEventDraft,
+  clearSavedEventDraft,
+  type EventDraftData,
+} from "@/lib/organizer-service";
 
-const CITY_FILTERS: Array<{ id: VietnamCity | "ALL"; label: string }> = [
-  { id: "ALL", label: "Tất cả thành phố (11)" },
-  { id: "TP. Hồ Chí Minh", label: "TP. Hồ Chí Minh (4)" },
-  { id: "Hà Nội", label: "Hà Nội (4)" },
-  { id: "Đà Nẵng", label: "Đà Nẵng (3)" },
+const CITY_TABS: Array<{ id: VietnamCity | "ALL"; label: string; count: number }> = [
+  { id: "ALL", label: "Tất cả", count: 11 },
+  { id: "TP. Hồ Chí Minh", label: "TP. Hồ Chí Minh", count: 4 },
+  { id: "Hà Nội", label: "Hà Nội", count: 4 },
+  { id: "Đà Nẵng", label: "Đà Nẵng", count: 3 },
 ];
 
-const CATEGORY_FILTERS: Array<{ id: VenueCategory | "ALL"; label: string }> = [
-  { id: "ALL", label: "Tất cả danh mục" },
-  { id: "stadium", label: "Sân vận động" },
-  { id: "arena", label: "Nhà thi đấu" },
-  { id: "theater", label: "Nhà hát" },
-  { id: "sports", label: "Thể thao" },
+const CATEGORIES = [
+  "Âm nhạc",
+  "Thể thao",
+  "Sân khấu & Nghệ thuật",
+  "Hội thảo & Sự kiện",
+  "Khác",
 ];
 
-function NewEventContent() {
-  const searchParams = useSearchParams();
-  const initialStep = Math.min(
-    4,
-    Math.max(1, parseInt(searchParams.get("step") ?? "1", 10) || 1)
-  ) as 1 | 2 | 3 | 4;
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialStep);
+interface FormErrors {
+  title?: string;
+  category?: string;
+  startDate?: string;
+  startTime?: string;
+  endDate?: string;
+  endTime?: string;
+  venue?: string;
+}
 
-  // Curated Venue Filtering State
+function CreateEventWizardContent() {
+  const router = useRouter();
+
+  // Stepper state: 1 to 4
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Draft autosave status
+  const [savedAtTime, setSavedAtTime] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [hasDraftBanner, setHasDraftBanner] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<EventDraftData | null>(null);
+
+  // Step 1: Venue selection (NOTHING preselected)
   const [selectedCity, setSelectedCity] = useState<VietnamCity | "ALL">("ALL");
-  const [selectedCategory, setSelectedCategory] = useState<VenueCategory | "ALL">("ALL");
-  const [venueSearchQuery, setVenueSearchQuery] = useState("");
-  const [selectedVenueId, setSelectedVenueId] = useState<string>("vn-hn-dien-kinh");
+  const [venueSearch, setVenueSearch] = useState("");
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
 
-  // Step 1: Event Basic Info
-  const [title, setTitle] = useState("Live Concert Mùa Thu Hà Nội");
-  const [category, setCategory] = useState("Âm nhạc");
-  const [venueName, setVenueName] = useState("Cung Thể Thao Điền Kinh Trong Nhà Hà Nội");
-  const [venueAddress, setVenueAddress] = useState(
-    "Đường Trần Hữu Dực, Phường Cầu Diễn, Quận Nam Từ Liêm, Hà Nội"
+  // Step 1: Event basic form fields (EMPTY at start)
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [endTime, setEndTime] = useState("");
+
+  // Touched state for blur validation
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Step 2: Seating Layout selection
+  const [selectedLayoutKey, setSelectedLayoutKey] =
+    useState<VenueMapKey>("arena-t-stage");
+
+  // Step 3: Zone Pricing & Capacity
+  const [zones, setZones] = useState<CuratedZoneConfig[]>(
+    () => CURATED_LAYOUT_TEMPLATES["arena-t-stage"]?.defaultZones ?? []
   );
-  const [city, setCity] = useState("Hà Nội");
-  const [eventDate, setEventDate] = useState("2027-11-20T19:30");
+  const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
 
-  // Step 2: Venue Layout Template
-  const [selectedLayoutKey, setSelectedLayoutKey] = useState<VenueMapKey>("arena-t-stage");
-  const [showAllLayouts, setShowAllLayouts] = useState(false);
+  // Step 4: Published state
+  const [isPublished, setIsPublished] = useState(false);
 
-  // Currently selected venue object
-  const currentVenue = useMemo<CuratedVenue | undefined>(
-    () => CURATED_VENUES.find((v) => v.id === selectedVenueId),
-    [selectedVenueId]
-  );
+  // Venue list container reference for scrolling
+  const venuePickerRef = useRef<HTMLDivElement>(null);
 
-  // Filtered venues based on City, Category, Search Query
+  // Check saved draft on mount cleanly
+  useEffect(() => {
+    const existing = getSavedEventDraft();
+    if (existing && existing.title) {
+      const animId = requestAnimationFrame(() => {
+        setPendingDraft(existing);
+        setHasDraftBanner(true);
+      });
+      return () => cancelAnimationFrame(animId);
+    }
+  }, []);
+
+  // Update layout and sync default zones
+  const handleSelectLayout = (layoutKey: VenueMapKey) => {
+    setSelectedLayoutKey(layoutKey);
+    const tmpl = CURATED_LAYOUT_TEMPLATES[layoutKey];
+    if (tmpl) {
+      setZones(tmpl.defaultZones);
+    }
+  };
+
+  // Restore draft handler
+  const handleRestoreDraft = () => {
+    if (!pendingDraft) return;
+    setTitle(pendingDraft.title || "");
+    setCategory(pendingDraft.category || "");
+    if (pendingDraft.startTime) {
+      const d = new Date(pendingDraft.startTime);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const hours = String(d.getHours()).padStart(2, "0");
+        const minutes = String(d.getMinutes()).padStart(2, "0");
+        setStartDate(`${year}-${month}-${day}`);
+        setStartTime(`${hours}:${minutes}`);
+      }
+    }
+    if (pendingDraft.venueId) {
+      setSelectedVenueId(pendingDraft.venueId);
+    }
+    setSavedAtTime(formatTimeVi(pendingDraft.savedAt));
+    setHasDraftBanner(false);
+  };
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const isDirty = Boolean(title || selectedVenueId || startDate);
+      if (isDirty && !isPublished) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [title, selectedVenueId, startDate, isPublished]);
+
+  // Selected venue object
+  const selectedVenue = useMemo<CuratedVenue | null>(() => {
+    if (!selectedVenueId) return null;
+    return CURATED_VENUES.find((v) => v.id === selectedVenueId) || null;
+  }, [selectedVenueId]);
+
+  // Filtered venues based on city and search keyword
   const filteredVenues = useMemo(() => {
     return CURATED_VENUES.filter((venue) => {
       const matchCity = selectedCity === "ALL" || venue.city === selectedCity;
-      const matchCategory = selectedCategory === "ALL" || venue.category === selectedCategory;
-      const q = venueSearchQuery.trim().toLowerCase();
+      const q = venueSearch.trim().toLowerCase();
       const matchSearch =
         q === "" ||
         venue.name.toLowerCase().includes(q) ||
         venue.shortName.toLowerCase().includes(q) ||
         venue.district.toLowerCase().includes(q) ||
-        venue.address.toLowerCase().includes(q) ||
-        venue.featuredEvents.toLowerCase().includes(q);
-
-      return matchCity && matchCategory && matchSearch;
+        venue.address.toLowerCase().includes(q);
+      return matchCity && matchSearch;
     });
-  }, [selectedCity, selectedCategory, venueSearchQuery]);
+  }, [selectedCity, venueSearch]);
 
-  // Current layout template
+  // Available layouts for chosen venue
+  const availableLayouts = useMemo<CuratedLayoutOption[]>(() => {
+    if (!selectedVenue) return [];
+    return selectedVenue.layouts;
+  }, [selectedVenue]);
+
+  // Active layout template
   const currentLayoutTemplate = useMemo(() => {
     return (
-      CURATED_LAYOUT_TEMPLATES[selectedLayoutKey] ??
+      CURATED_LAYOUT_TEMPLATES[selectedLayoutKey] ||
       CURATED_LAYOUT_TEMPLATES["arena-t-stage"]
     );
   }, [selectedLayoutKey]);
 
-  // Step 3: Zone Pricing & Capacity
-  const [zones, setZones] = useState<CuratedZoneConfig[]>(
-    CURATED_LAYOUT_TEMPLATES["arena-t-stage"].defaultZones
-  );
-  const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
-  const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
+  // Inline Validation Rules matching contract (pure useMemo)
+  const errors = useMemo<FormErrors>(() => {
+    const errs: FormErrors = {};
 
-  // Handle selecting a curated venue card
-  const handleSelectCuratedVenue = (venue: CuratedVenue) => {
-    setSelectedVenueId(venue.id);
-    setVenueName(venue.name);
-    setVenueAddress(venue.address);
-    setCity(venue.city);
+    if (!title.trim()) {
+      errs.title = "Vui lòng nhập tên sự kiện.";
+    } else if (title.trim().length < 5) {
+      errs.title = "Tên sự kiện phải có ít nhất 5 ký tự.";
+    }
 
-    const firstLayout = venue.layouts[0] ?? CURATED_LAYOUT_TEMPLATES["arena-t-stage"];
-    setSelectedLayoutKey(firstLayout.mapKey);
-    setZones(firstLayout.defaultZones);
-    setActiveZoneId(null);
-  };
+    if (!category) {
+      errs.category = "Vui lòng chọn thể loại sự kiện.";
+    }
 
-  // Handle switching layout template
-  const handleSelectLayout = (mapKey: VenueMapKey) => {
-    setSelectedLayoutKey(mapKey);
-    const tmpl =
-      CURATED_LAYOUT_TEMPLATES[mapKey] ?? CURATED_LAYOUT_TEMPLATES["arena-t-stage"];
-    setZones(tmpl.defaultZones);
-    setActiveZoneId(null);
-  };
+    if (!startDate) {
+      errs.startDate = "Vui lòng chọn ngày bắt đầu.";
+    }
 
-  const handleUpdateZone = (
-    zoneId: string,
-    field: "price" | "capacity",
-    value: number
-  ) => {
+    if (!startTime) {
+      errs.startTime = "Vui lòng chọn giờ bắt đầu.";
+    }
+
+    if (endDate && endTime && startDate && startTime) {
+      const startDateTime = new Date(`${startDate}T${startTime}`);
+      const endDateTime = new Date(`${endDate}T${endTime}`);
+      if (endDateTime <= startDateTime) {
+        errs.endDate = "Thời gian kết thúc phải diễn ra sau thời gian bắt đầu.";
+      }
+    }
+
+    if (!selectedVenueId) {
+      errs.venue = "Vui lòng chọn một địa điểm tổ chức.";
+    }
+
+    return errs;
+  }, [title, category, startDate, startTime, endDate, endTime, selectedVenueId]);
+
+  const isValidStep1 =
+    Boolean(title.trim().length >= 5) &&
+    Boolean(category) &&
+    Boolean(startDate) &&
+    Boolean(startTime) &&
+    Boolean(selectedVenueId) &&
+    !errors.endDate;
+
+  // Helper text explaining what is missing
+  const step1HelperMessage = useMemo(() => {
+    if (isValidStep1) return "";
+    const missing: string[] = [];
+    if (!selectedVenueId) missing.push("chọn địa điểm");
+    if (!title.trim() || title.trim().length < 5) missing.push("tên sự kiện (≥5 ký tự)");
+    if (!category) missing.push("thể loại");
+    if (!startDate || !startTime) missing.push("thời gian bắt đầu");
+    if (errors.endDate) missing.push("thời gian kết thúc hợp lệ");
+
+    return `Vui lòng hoàn thành: ${missing.join(", ")} để tiếp tục.`;
+  }, [isValidStep1, selectedVenueId, title, category, startDate, startTime, errors.endDate]);
+
+  // Debounced Autosave to localStorage
+  useEffect(() => {
+    if (!title && !selectedVenueId) return;
+
+    const timer = setTimeout(() => {
+      setIsSavingDraft(true);
+      const startIso =
+        startDate && startTime ? `${startDate}T${startTime}:00Z` : "";
+      const endIso =
+        endDate && endTime ? `${endDate}T${endTime}:00Z` : undefined;
+
+      const res = saveEventDraft({
+        title,
+        category,
+        startTime: startIso,
+        endTime: endIso,
+        venueId: selectedVenue?.id,
+        venueName: selectedVenue?.name,
+        venueAddress: selectedVenue?.address,
+        city: selectedVenue?.city,
+      });
+
+      setSavedAtTime(formatTimeVi(res.savedAt));
+      setIsSavingDraft(false);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [
+    title,
+    category,
+    startDate,
+    startTime,
+    endDate,
+    endTime,
+    selectedVenue,
+    selectedVenueId,
+  ]);
+
+  // Update Zone Price handler
+  const handleZonePriceChange = (zoneId: string, newPrice: number) => {
     setZones((prev) =>
-      prev.map((z) => (z.zoneId === zoneId ? { ...z, [field]: value } : z))
+      prev.map((z) => (z.zoneId === zoneId ? { ...z, price: Math.max(0, newPrice) } : z))
     );
   };
 
-  // Build zoneInfoMap for the SVG map preview
-  const zoneInfoMap = useMemo(() => {
-    const map: Record<string, { name: string; minPrice: number; count: number }> = {};
-    for (const z of zones) {
-      map[z.zoneId] = {
-        name: z.name,
-        minPrice: z.price,
-        count: z.capacity,
-      };
-    }
-    return map;
-  }, [zones]);
+  // Update Zone Capacity handler
+  const handleZoneCapacityChange = (zoneId: string, newCap: number) => {
+    setZones((prev) =>
+      prev.map((z) => (z.zoneId === zoneId ? { ...z, capacity: Math.max(1, newCap) } : z))
+    );
+  };
 
-  // Aggregate stats
-  const totalCapacity = useMemo(
+  // Step click handler (only completed steps are clickable)
+  const handleStepClick = (targetStep: 1 | 2 | 3 | 4) => {
+    if (targetStep < step) {
+      setStep(targetStep);
+    }
+  };
+
+  // Step 1 to Step 2
+  const handleProceedToStep2 = () => {
+    if (!isValidStep1) {
+      setTouched({
+        title: true,
+        category: true,
+        startDate: true,
+        startTime: true,
+        venue: true,
+      });
+      return;
+    }
+    // Set default layout to first layout of chosen venue
+    if (availableLayouts.length > 0 && availableLayouts[0]) {
+      handleSelectLayout(availableLayouts[0].mapKey);
+    }
+    setStep(2);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Step 2 to Step 3
+  const handleProceedToStep3 = () => {
+    setStep(3);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Step 3 to Step 4
+  const handleProceedToStep4 = () => {
+    setStep(4);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Final Publish Handler
+  const handleFinalPublish = () => {
+    setIsPublished(true);
+    clearSavedEventDraft();
+    // Simulate API delay
+    setTimeout(() => {
+      router.push("/organizer/events");
+    }, 1200);
+  };
+
+  // Computed summary for Step 4
+  const totalEventCapacity = useMemo(
     () => zones.reduce((sum, z) => sum + z.capacity, 0),
     [zones]
   );
-  const projectedRevenue = useMemo(
-    () => zones.reduce((sum, z) => sum + z.price * z.capacity, 0),
+  const totalProjectedRevenue = useMemo(
+    () => zones.reduce((sum, z) => sum + z.capacity * z.price, 0),
     [zones]
   );
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-
-  const handleSubmitEvent = () => {
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSubmitted(true);
-    }, 800);
-  };
-
   return (
-    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-7 space-y-6">
-      {/* Top Header & Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-[12px] text-[#606970] font-medium mb-1">
-            <Link
-              href="/organizer/events"
-              className="hover:text-primary transition-colors"
-            >
-              Sự kiện của tôi
-            </Link>
-            <span>/</span>
-            <span className="text-[#141d23] font-bold">Tạo sự kiện mới</span>
+    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 space-y-8">
+      {/* Draft Notification Banner */}
+      {hasDraftBanner && pendingDraft && (
+        <div
+          role="region"
+          aria-label="Thông báo bản nháp"
+          className="flex items-center justify-between p-3.5 rounded-lg border border-border bg-background text-xs text-foreground shadow-2xs"
+        >
+          <div className="flex items-center gap-2.5">
+            <Info className="size-4 text-primary shrink-0" />
+            <p>
+              Bạn có một bản nháp chưa hoàn tất:{" "}
+              <strong className="font-semibold text-foreground">
+                &quot;{pendingDraft.title || "Sự kiện chưa đặt tên"}&quot;
+              </strong>{" "}
+              được lưu lúc {formatDateTimeVi(pendingDraft.savedAt)}.
+            </p>
           </div>
-          <h1 className="text-[24px] sm:text-[26px] font-extrabold tracking-[-0.02em] text-[#141d23]">
-            Tạo sự kiện &amp; Chọn Địa điểm Chuẩn (Curated Venues)
-          </h1>
-          <p className="text-[13.5px] text-[#606970]">
-            Chọn địa điểm thực tế tại TP. Hồ Chí Minh, Hà Nội, Đà Nẵng với sơ đồ khán đài SVG đã được kiểm duyệt.
-          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleRestoreDraft}
+              className="h-7 px-2.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              Khôi phục bản nháp
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setHasDraftBanner(false);
+                clearSavedEventDraft();
+              }}
+              className="h-7 px-2.5 rounded-md border border-border text-muted-foreground hover:text-foreground text-xs transition-colors cursor-pointer"
+            >
+              Bỏ qua
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 1. Header & Stepper */}
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Tạo sự kiện
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Thiết lập địa điểm, sơ đồ chỗ ngồi và cấu hình giá vé cho sự kiện mới.
+            </p>
+          </div>
+
+          {/* Draft Autosave Indicator */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground self-start sm:self-auto">
+            {isSavingDraft ? (
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+                Đang lưu nháp...
+              </span>
+            ) : savedAtTime ? (
+              <span className="flex items-center gap-1.5 text-foreground font-medium">
+                <Check className="size-3.5 text-primary" />
+                Đã lưu nháp lúc {savedAtTime}
+              </span>
+            ) : (
+              <span>Chưa lưu nháp</span>
+            )}
+          </div>
         </div>
 
-        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 text-[#065f46] border border-emerald-200 text-[12px] font-bold self-start sm:self-auto shrink-0">
-          <CheckCircle2 className="size-3.5 text-primary" />
-          11 Địa điểm chuẩn • 3 Thành phố
-        </span>
+        {/* Stepper: Numbered circles, check on completed, emphasized current, muted future */}
+        <nav aria-label="Các bước thiết lập sự kiện" className="w-full">
+          <ol className="grid grid-cols-4 gap-2 sm:gap-4">
+            {[
+              { num: 1, title: "Thông tin & Địa điểm" },
+              { num: 2, title: "Sơ đồ chỗ ngồi" },
+              { num: 3, title: "Hạng vé & Giá bán" },
+              { num: 4, title: "Xem trước & Xuất bản" },
+            ].map((s) => {
+              const isCompleted = s.num < step;
+              const isCurrent = s.num === step;
+              const isFuture = s.num > step;
+
+              return (
+                <li key={s.num} className="relative">
+                  <button
+                    type="button"
+                    disabled={isFuture}
+                    onClick={() => handleStepClick(s.num as 1 | 2 | 3 | 4)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                      isCurrent
+                        ? "border-primary bg-background shadow-2xs"
+                        : isCompleted
+                        ? "border-border bg-background hover:bg-secondary/40 cursor-pointer"
+                        : "border-border/60 bg-muted/20 opacity-60 cursor-not-allowed"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className={`size-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                          isCompleted
+                            ? "bg-primary text-primary-foreground"
+                            : isCurrent
+                            ? "border-2 border-primary text-primary bg-background"
+                            : "bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        {isCompleted ? <Check className="size-3.5" /> : s.num}
+                      </div>
+                      <div className="min-w-0 flex-1 hidden sm:block">
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                          Bước {s.num}
+                        </p>
+                        <p
+                          className={`text-xs truncate ${
+                            isCurrent
+                              ? "font-bold text-foreground"
+                              : "font-medium text-muted-foreground"
+                          }`}
+                        >
+                          {s.title}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
       </div>
 
-      {/* Stepper Pill Bar */}
-      <div className="bg-white rounded-[12px] border border-[#dfe3e5] p-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {[
-          { num: 1, title: "1. Địa điểm & Thông tin" },
-          { num: 2, title: "2. Chọn mẫu sơ đồ SVG" },
-          { num: 3, title: "3. Cấu hình giá & Sơ đồ" },
-          { num: 4, title: "4. Hoàn tất & Mở bán" },
-        ].map((s) => {
-          const isCurrent = step === s.num;
-          const isDone = step > s.num;
-          return (
-            <button
-              key={s.num}
-              type="button"
-              onClick={() => setStep(s.num as 1 | 2 | 3 | 4)}
-              className={`py-2.5 px-3.5 rounded-[8px] font-bold text-[12.5px] text-left transition-colors flex items-center justify-between gap-2 ${
-                isCurrent
-                  ? "bg-[#141d23] text-white"
-                  : isDone
-                  ? "bg-emerald-50 text-[#065f46] hover:bg-emerald-100/70"
-                  : "bg-transparent text-[#606970] hover:bg-[#f5f7f8] hover:text-[#141d23]"
-              }`}
-            >
-              <span className="truncate">{s.title}</span>
-              {isDone && <Check className="size-3.5 text-primary shrink-0" />}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* STEP 1: Curated Venue Picker & Event Details */}
+      {/* ========================================================
+          STEP 1: Thông tin & Địa điểm (Desktop 2 Columns)
+          ======================================================== */}
       {step === 1 && (
-        <div className="space-y-6">
-          {/* Curated Venues Section */}
-          <div className="bg-white rounded-[12px] border border-[#dfe3e5] p-5 sm:p-6 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#dfe3e5] pb-4">
-              <div>
-                <h2 className="text-[17px] font-extrabold text-[#141d23] flex items-center gap-2">
-                  <Building2 className="size-4.5 text-primary" />
-                  Chọn địa điểm tiêu chuẩn đã kiểm duyệt (Curated Venues)
-                </h2>
-                <p className="text-[13px] text-[#606970]">
-                  Nhấp chọn 1-click để tự động điền địa chỉ, thành phố và nạp sơ đồ khán đài SVG tương ứng.
-                </p>
-              </div>
-              {currentVenue && (
-                <div className="px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[#065f46] text-[12px] font-semibold flex items-center gap-1.5 self-start sm:self-auto shrink-0">
-                  <Check className="size-3.5 text-primary" />
-                  <span>
-                    Đang chọn: <strong>{currentVenue.shortName}</strong>
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* City Pill Filters + Search + Category */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-                {CITY_FILTERS.map((tab) => {
-                  const isSelected = selectedCity === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setSelectedCity(tab.id)}
-                      className={`px-3.5 py-1.5 rounded-full text-[12.5px] font-bold whitespace-nowrap transition-colors ${
-                        isSelected
-                          ? "bg-[#141d23] text-white"
-                          : "bg-[#eff1f2] text-[#141d23] hover:bg-[#dfe3e5]"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                <div className="relative flex-1 sm:w-64">
-                  <Search className="size-4 text-[#606970] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={venueSearchQuery}
-                    onChange={(e) => setVenueSearchQuery(e.target.value)}
-                    placeholder="Tìm sân, quận, địa chỉ..."
-                    className="w-full h-9 pl-9 pr-3.5 rounded-full border border-[#dfe3e5] bg-[#f5f7f8] focus:bg-white text-[#141d23] text-[12.5px] font-medium placeholder:text-[#606970] focus:outline-none focus:border-primary"
-                  />
-                </div>
-
-                <select
-                  value={selectedCategory}
-                  onChange={(e) =>
-                    setSelectedCategory(e.target.value as VenueCategory | "ALL")
-                  }
-                  className="h-9 px-3.5 rounded-full border border-[#dfe3e5] bg-[#f5f7f8] text-[#141d23] text-[12.5px] font-semibold focus:outline-none focus:border-primary"
-                >
-                  {CATEGORY_FILTERS.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Curated Venues Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
-              {filteredVenues.length === 0 ? (
-                <div className="col-span-full py-10 text-center text-[#606970] text-[13px]">
-                  Không tìm thấy địa điểm phù hợp trong bộ lọc hiện tại. Vui lòng thử từ khóa khác hoặc chuyển thành phố.
-                </div>
-              ) : (
-                filteredVenues.map((v) => {
-                  const isSelected = v.id === selectedVenueId;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => handleSelectCuratedVenue(v)}
-                      className={`cursor-pointer rounded-[12px] border overflow-hidden transition-all text-left flex flex-col ${
-                        isSelected
-                          ? "border-primary bg-emerald-50/30 ring-2 ring-primary"
-                          : "border-[#dfe3e5] bg-white hover:border-[#141d23]/40"
-                      }`}
-                    >
-                      {/* Image header with category pill */}
-                      <div className="relative h-28 w-full bg-[#eff1f2] overflow-hidden shrink-0">
-                        <Image
-                          src={v.thumbnailUrl}
-                          alt={v.name}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, 33vw"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                          <span className="px-2.5 py-0.5 rounded-full bg-black/65 backdrop-blur-xs text-white text-[10.5px] font-bold">
-                            {v.categoryLabel}
-                          </span>
-                        </div>
-                        <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-white text-[11px] font-semibold">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="size-3 text-emerald-400" />
-                            {v.city}
-                          </span>
-                          <span className="text-white/90">{v.totalCapacity}</span>
-                        </div>
-                      </div>
-
-                      {/* Content */}
-                      <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2 w-full">
-                        <div>
-                          <div className="flex items-start justify-between gap-1.5">
-                            <h3 className="font-extrabold text-[#141d23] text-[14px] leading-tight line-clamp-1">
-                              {v.name}
-                            </h3>
-                            {isSelected && (
-                              <span className="p-0.5 rounded-full bg-primary text-white shrink-0 mt-0.5">
-                                <Check className="size-3" />
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11.5px] text-[#606970] mt-0.5 line-clamp-1">
-                            {v.district} • {v.address}
-                          </p>
-                          <p className="text-[11.5px] text-[#2b343a] mt-1.5 line-clamp-2">
-                            {v.description}
-                          </p>
-                        </div>
-
-                        <div className="pt-2 border-t border-[#dfe3e5] flex items-center justify-between text-[11.5px]">
-                          <span className="text-[#606970] font-medium">
-                            {v.layouts.length} sơ đồ khán đài SVG
-                          </span>
-                          <span
-                            className={`font-bold ${
-                              isSelected ? "text-primary" : "text-[#141d23]"
-                            }`}
-                          >
-                            {isSelected ? "Đang chọn" : "Chọn địa điểm"}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Event Details Form */}
-          <div className="bg-white rounded-[12px] border border-[#dfe3e5] p-5 sm:p-6 space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Venue Picker (7 columns) */}
+          <div
+            ref={venuePickerRef}
+            className="lg:col-span-7 space-y-4"
+          >
             <div className="space-y-1">
-              <h2 className="text-[17px] font-extrabold text-[#141d23]">
-                Thông tin chương trình &amp; Địa chỉ tổ chức
+              <h2 className="text-base font-bold text-foreground">
+                Chọn địa điểm
               </h2>
-              <p className="text-[13px] text-[#606970]">
-                Thông tin địa điểm đã được tự động điền theo lựa chọn ở trên. Bạn có thể tùy chỉnh chi tiết chương trình.
+              <p className="text-xs text-muted-foreground">
+                Lựa chọn nhà thi đấu, sân vận động hoặc nhà hát đã chuẩn hóa sơ đồ.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13px]">
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="font-bold text-[#141d23]">
-                  Tên sự kiện / Chương trình *
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="VD: Live Concert Vũ - Bảo Tàng Của Nuối Tiếc"
-                  className="w-full h-10.5 px-3.5 rounded-[8px] border border-[#dfe3e5] text-[#141d23] font-medium focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-[#141d23]">Thể loại sự kiện *</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full h-10.5 px-3.5 rounded-[8px] border border-[#dfe3e5] text-[#141d23] font-medium bg-white focus:outline-none focus:border-primary"
-                >
-                  <option value="Âm nhạc">Âm nhạc / Live Concert</option>
-                  <option value="Thể thao">Thể thao / Bóng đá / Bóng rổ</option>
-                  <option value="Sân khấu">Sân khấu / Hài kịch / Nghệ thuật</option>
-                  <option value="Festival">Lễ hội âm nhạc / EDM Festival</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-[#141d23]">Thời gian bắt đầu *</label>
-                <input
-                  type="datetime-local"
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                  className="w-full h-10.5 px-3.5 rounded-[8px] border border-[#dfe3e5] text-[#141d23] font-medium focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-[#141d23]">
-                  Tên địa điểm tổ chức *
-                </label>
-                <input
-                  type="text"
-                  value={venueName}
-                  onChange={(e) => setVenueName(e.target.value)}
-                  placeholder="VD: Cung Điền Kinh Hà Nội, SVĐ Mỹ Đình..."
-                  className="w-full h-10.5 px-3.5 rounded-[8px] border border-[#dfe3e5] text-[#141d23] font-medium focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-[#141d23]">Thành phố *</label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full h-10.5 px-3.5 rounded-[8px] border border-[#dfe3e5] text-[#141d23] font-medium bg-white focus:outline-none focus:border-primary"
-                >
-                  <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                  <option value="Hà Nội">Hà Nội</option>
-                  <option value="Đà Nẵng">Đà Nẵng</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="font-bold text-[#141d23]">Địa chỉ chi tiết *</label>
-                <input
-                  type="text"
-                  value={venueAddress}
-                  onChange={(e) => setVenueAddress(e.target.value)}
-                  placeholder="Số đường, phường/xã, quận/huyện..."
-                  className="w-full h-10.5 px-3.5 rounded-[8px] border border-[#dfe3e5] text-[#141d23] font-medium focus:outline-none focus:border-primary"
-                />
-              </div>
+            {/* City Tabs with counts (Pills only for filter tabs) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {CITY_TABS.map((tab) => {
+                const active = selectedCity === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSelectedCity(tab.id)}
+                    className={`h-8 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      active
+                        ? "bg-foreground text-background"
+                        : "bg-background border border-border text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                    }`}
+                  >
+                    {tab.label} ({tab.count})
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-[#dfe3e5]">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="inline-flex items-center gap-2 px-6 h-10 rounded-full bg-primary hover:bg-emerald-700 text-white text-[13px] font-bold transition-colors shadow-2xs"
-              >
-                <span>Tiếp tục: Chọn mẫu sơ đồ SVG</span>
-                <ArrowRight className="size-4" />
-              </button>
+            {/* Venue Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={venueSearch}
+                onChange={(e) => setVenueSearch(e.target.value)}
+                placeholder="Tìm kiếm địa điểm theo tên, quận huyện, địa chỉ..."
+                className="w-full h-10 pl-9 pr-8 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              {venueSearch && (
+                <button
+                  type="button"
+                  onClick={() => setVenueSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Venue Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {filteredVenues.map((venue) => {
+                const isSelected = selectedVenueId === venue.id;
+
+                return (
+                  <div
+                    key={venue.id}
+                    role="radio"
+                    aria-checked={isSelected}
+                    tabIndex={0}
+                    onClick={() => {
+                      setSelectedVenueId(venue.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedVenueId(venue.id);
+                      }
+                    }}
+                    className={`rounded-lg border bg-background overflow-hidden transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring relative group ${
+                      isSelected
+                        ? "border-primary ring-2 ring-primary/20 bg-accent/20"
+                        : "border-border hover:border-foreground/40"
+                    }`}
+                  >
+                    {/* Selected Checkmark Badge */}
+                    {isSelected && (
+                      <div className="absolute top-2.5 right-2.5 z-10 size-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
+                        <Check className="size-3.5" />
+                      </div>
+                    )}
+
+                    {/* Image or Neutral Placeholder */}
+                    <div className="relative aspect-[16/10] w-full bg-secondary overflow-hidden">
+                      {venue.thumbnailUrl ? (
+                        <Image
+                          src={venue.thumbnailUrl}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 100vw, 360px"
+                          className="object-cover group-hover:scale-102 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="size-full flex items-center justify-center text-muted-foreground">
+                          <Building2 className="size-8" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Text below image (high contrast, no filler description) */}
+                    <div className="p-3.5 space-y-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-foreground leading-snug line-clamp-1">
+                          {venue.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                          {venue.district}, {venue.city}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border text-[11px] text-muted-foreground">
+                        <span className="font-semibold text-foreground tabular-nums">
+                          {venue.totalCapacity}
+                        </span>
+                        <span aria-hidden="true">•</span>
+                        <span>{venue.layouts.length} sơ đồ chỗ ngồi</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {filteredVenues.length === 0 && (
+              <div className="p-8 text-center border border-dashed border-border rounded-lg text-xs text-muted-foreground">
+                Không tìm thấy địa điểm nào phù hợp với từ khóa &quot;{venueSearch}&quot;.
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Sticky Panel with Derived Info & Form (5 columns) */}
+          <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-4">
+            <div className="rounded-lg border border-border bg-background p-5 space-y-5 shadow-2xs">
+              <div>
+                <h2 className="text-base font-bold text-foreground">
+                  Thông tin sự kiện
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Điền các thông tin cơ bản trước khi chọn sơ đồ chỗ ngồi.
+                </p>
+              </div>
+
+              {/* Read-Only Derived Venue Information */}
+              <div className="rounded-md border border-border bg-muted/30 p-3.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground">
+                    Địa điểm đã chọn
+                  </span>
+                  {selectedVenue && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedVenueId(null);
+                        venuePickerRef.current?.scrollIntoView({
+                          behavior: "smooth",
+                        });
+                      }}
+                      className="text-xs text-primary hover:underline font-semibold cursor-pointer"
+                    >
+                      Đổi địa điểm
+                    </button>
+                  )}
+                </div>
+
+                {selectedVenue ? (
+                  <div className="space-y-1 pt-1">
+                    <p className="font-bold text-foreground text-xs">
+                      {selectedVenue.name}
+                    </p>
+                    <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                      {selectedVenue.address}
+                    </p>
+                    <p className="text-muted-foreground text-[11.5px]">
+                      Thành phố:{" "}
+                      <strong className="text-foreground font-semibold">
+                        {selectedVenue.city}
+                      </strong>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground py-2 text-center text-xs">
+                    Chưa chọn địa điểm. Hãy nhấp vào một địa điểm ở cột bên trái.
+                  </div>
+                )}
+                {touched.venue && errors.venue && (
+                  <p className="text-xs text-destructive mt-1 font-medium">
+                    {errors.venue}
+                  </p>
+                )}
+              </div>
+
+              {/* Form Fields */}
+              <div className="space-y-4">
+                {/* Tên sự kiện */}
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="event-title"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Tên sự kiện <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    id="event-title"
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    onBlur={() => setTouched((p) => ({ ...p, title: true }))}
+                    placeholder="Ví dụ: Liveshow Âm Nhạc Mùa Thu 2026"
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  {touched.title && errors.title && (
+                    <p className="text-xs text-destructive font-medium">
+                      {errors.title}
+                    </p>
+                  )}
+                </div>
+
+                {/* Thể loại */}
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="event-category"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Thể loại <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    id="event-category"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    onBlur={() => setTouched((p) => ({ ...p, category: true }))}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                  >
+                    <option value="">-- Chọn thể loại --</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  {touched.category && errors.category && (
+                    <p className="text-xs text-destructive font-medium">
+                      {errors.category}
+                    </p>
+                  )}
+                </div>
+
+                {/* Thời gian bắt đầu (dd/mm/yyyy 24h) */}
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="event-start-date"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Thời gian bắt đầu <span className="text-destructive">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      id="event-start-date"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      onBlur={() =>
+                        setTouched((p) => ({ ...p, startDate: true }))
+                      }
+                      className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <input
+                      id="event-start-time"
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      onBlur={() =>
+                        setTouched((p) => ({ ...p, startTime: true }))
+                      }
+                      className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  </div>
+                  {startDate && startTime && (
+                    <p className="text-[11px] text-muted-foreground tabular-nums">
+                      Bắt đầu: {formatDateTimeVi(`${startDate}T${startTime}`)}
+                    </p>
+                  )}
+                  {touched.startDate && (errors.startDate || errors.startTime) && (
+                    <p className="text-xs text-destructive font-medium">
+                      {errors.startDate || errors.startTime}
+                    </p>
+                  )}
+                </div>
+
+                {/* Thời gian kết thúc (Tùy chọn) */}
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="event-end-date"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Thời gian kết thúc (tùy chọn)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      id="event-end-date"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      onBlur={() => setTouched((p) => ({ ...p, endDate: true }))}
+                      className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <input
+                      id="event-end-time"
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      onBlur={() => setTouched((p) => ({ ...p, endTime: true }))}
+                      className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  </div>
+                  {endDate && endTime && (
+                    <p className="text-[11px] text-muted-foreground tabular-nums">
+                      Kết thúc: {formatDateTimeVi(`${endDate}T${endTime}`)}
+                    </p>
+                  )}
+                  {errors.endDate && (
+                    <p className="text-xs text-destructive font-medium">
+                      {errors.endDate}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons & Missing Info Helper Text */}
+              <div className="pt-2 space-y-2 border-t border-border">
+                <button
+                  type="button"
+                  disabled={!isValidStep1}
+                  onClick={handleProceedToStep2}
+                  className="w-full h-10 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors disabled:opacity-40 disabled:pointer-events-none shadow-2xs flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <span>Tiếp tục: Chọn sơ đồ chỗ ngồi</span>
+                  <ArrowRight className="size-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const res = saveEventDraft({
+                      title,
+                      category,
+                      startTime:
+                        startDate && startTime ? `${startDate}T${startTime}:00Z` : "",
+                      endTime:
+                        endDate && endTime ? `${endDate}T${endTime}:00Z` : undefined,
+                      venueId: selectedVenue?.id,
+                      venueName: selectedVenue?.name,
+                      venueAddress: selectedVenue?.address,
+                      city: selectedVenue?.city,
+                    });
+                    setSavedAtTime(formatTimeVi(res.savedAt));
+                  }}
+                  className="w-full h-9 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Save className="size-3.5" />
+                  <span>Lưu nháp</span>
+                </button>
+
+                {/* Helper text explaining what's missing when disabled */}
+                {!isValidStep1 && (
+                  <p className="text-xs text-muted-foreground text-center pt-1 leading-relaxed">
+                    {step1HelperMessage}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* STEP 2: Venue Layout Selector with Interactive SVG Preview */}
-      {step === 2 && (
+      {/* ========================================================
+          STEP 2: Chọn Sơ Đồ Chỗ Ngồi
+          ======================================================== */}
+      {step === 2 && selectedVenue && (
         <div className="space-y-6">
-          <div className="bg-white rounded-[12px] border border-[#dfe3e5] p-5 sm:p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-1">
-                <h2 className="text-[17px] font-extrabold text-[#141d23]">
-                  Bước 2: Chọn mẫu sơ đồ khán đài kiến trúc
-                </h2>
-                <p className="text-[13px] text-[#606970]">
-                  {currentVenue
-                    ? `Địa điểm đã chọn: ${currentVenue.name} (${currentVenue.city}). Dưới đây là các cấu hình sân khấu tương thích:`
-                    : "Chọn mô hình không gian biểu diễn phù hợp với sự kiện của bạn:"}
-                </p>
-              </div>
-
-              {currentVenue && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllLayouts((prev) => !prev)}
-                  className="px-3.5 py-1.5 rounded-full bg-[#eff1f2] hover:bg-[#dfe3e5] text-[12px] font-bold text-[#141d23] flex items-center gap-1.5 self-start sm:self-auto transition-colors"
-                >
-                  <Compass className="size-3.5 text-primary" />
-                  <span>
-                    {showAllLayouts
-                      ? "Chỉ xem sơ đồ tương thích"
-                      : "Xem tất cả 5 mẫu sơ đồ chuẩn"}
-                  </span>
-                </button>
-              )}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">
+                Chọn mẫu sơ đồ chỗ ngồi
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Địa điểm:{" "}
+                <strong className="text-foreground">{selectedVenue.name}</strong> •{" "}
+                {selectedVenue.city}
+              </p>
             </div>
-
-            {/* Layout Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
-              {Object.entries(CURATED_LAYOUT_TEMPLATES)
-                .filter(([key]) => {
-                  if (showAllLayouts || !currentVenue) return true;
-                  return currentVenue.layouts.some((l) => l.mapKey === key);
-                })
-                .map(([key, tmpl]) => {
-                  const isSelected = tmpl.mapKey === selectedLayoutKey;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleSelectLayout(tmpl.mapKey)}
-                      className={`p-4 rounded-[12px] border text-left transition-all relative ${
-                        isSelected
-                          ? "border-primary bg-emerald-50/40 ring-2 ring-primary"
-                          : "border-[#dfe3e5] bg-white hover:border-[#141d23]/40"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
-                          {tmpl.categoryName}
-                        </span>
-                        {isSelected && (
-                          <CheckCircle2 className="size-4 text-primary shrink-0" />
-                        )}
-                      </div>
-                      <h3 className="font-extrabold text-[#141d23] text-[14px]">
-                        {tmpl.name}
-                      </h3>
-                      <p className="text-[12px] text-[#606970] mt-1 line-clamp-2">
-                        {tmpl.description}
-                      </p>
-                      <div className="mt-3 pt-2.5 border-t border-[#dfe3e5] text-[11.5px] text-[#606970] space-y-1">
-                        <div>
-                          <span className="font-semibold text-[#141d23]">
-                            Sức chứa ước tính:
-                          </span>{" "}
-                          {tmpl.capacityEstimate}
-                        </div>
-                        <div>
-                          <span className="font-semibold text-[#141d23]">
-                            Số phân khu mặc định:
-                          </span>{" "}
-                          {tmpl.defaultZones.length} khu vực
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-            </div>
-          </div>
-
-          {/* Interactive SVG Seatmap Live Preview */}
-          <div className="bg-white rounded-[12px] border border-[#dfe3e5] overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#dfe3e5] flex flex-wrap items-center justify-between gap-3 bg-[#f5f7f8]">
-              <div>
-                <h3 className="text-[14.5px] font-extrabold text-[#141d23] flex items-center gap-2">
-                  <Layers className="size-4 text-primary" />
-                  Xem trước trực tiếp: {currentLayoutTemplate.name}
-                </h3>
-                <p className="text-[12px] text-[#606970]">
-                  Rê chuột vào từng khu vực để xem nhãn giá căn giữa phía trên con trỏ, hoặc dùng nút phóng to / thu nhỏ.
-                </p>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[#065f46] text-[11.5px] font-bold">
-                {zones.length} khu vực khán đài
-              </span>
-            </div>
-
-            <div className="h-[460px] sm:h-[520px] bg-[#f5f7f8] relative">
-              <SeatMap
-                mapKey={selectedLayoutKey}
-                activeZoneId={activeZoneId}
-                hoveredZoneId={hoveredZoneId}
-                zoneInfoMap={zoneInfoMap}
-                onSelectZone={(id) => setActiveZoneId(id)}
-                onHoverZone={(id) => setHoveredZoneId(id)}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-1">
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="inline-flex items-center gap-2 px-5 h-10 rounded-full border border-[#dfe3e5] bg-white hover:bg-[#eff1f2] text-[#141d23] text-[13px] font-bold transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-semibold cursor-pointer"
             >
-              <ArrowLeft className="size-4" />
-              <span>Quay lại Bước 1</span>
+              <ArrowLeft className="size-3.5" />
+              <span>Quay lại thông tin sự kiện</span>
             </button>
+          </div>
+
+          {/* Layout Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {availableLayouts.map((layout) => {
+              const isSelected = selectedLayoutKey === layout.mapKey;
+
+              return (
+                <div
+                  key={layout.id}
+                  role="radio"
+                  aria-checked={isSelected}
+                  tabIndex={0}
+                  onClick={() => handleSelectLayout(layout.mapKey)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSelectLayout(layout.mapKey);
+                    }
+                  }}
+                  className={`p-4 rounded-lg border bg-background transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring relative ${
+                    isSelected
+                      ? "border-primary ring-2 ring-primary/20 bg-accent/20"
+                      : "border-border hover:border-foreground/40"
+                  }`}
+                >
+                  {isSelected && (
+                    <div className="absolute top-3 right-3 size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                      <Check className="size-3" />
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-[11px] font-semibold text-primary">
+                        {layout.categoryName}
+                      </span>
+                      <h3 className="text-base font-bold text-foreground mt-0.5">
+                        {layout.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        {layout.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        Sức chứa ước tính:{" "}
+                        <strong className="text-foreground font-semibold">
+                          {layout.capacityEstimate}
+                        </strong>
+                      </span>
+                      <span>{layout.defaultZones.length} phân khu giá</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Navigation buttons */}
+          <div className="flex items-center justify-between pt-4 border-t border-border">
             <button
               type="button"
-              onClick={() => setStep(3)}
-              className="inline-flex items-center gap-2 px-6 h-10 rounded-full bg-primary hover:bg-emerald-700 text-white text-[13px] font-bold transition-colors shadow-2xs"
+              onClick={() => setStep(1)}
+              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-sm font-medium transition-colors cursor-pointer"
             >
-              <span>Tiếp tục: Cấu hình giá &amp; số lượng vé</span>
+              <ArrowLeft className="size-4" />
+              <span>Quay lại</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleProceedToStep3}
+              className="inline-flex items-center gap-1.5 h-10 px-5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors shadow-2xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span>Tiếp tục: Cấu hình hạng vé</span>
               <ArrowRight className="size-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 3: Split-View Interactive SeatMap + Zone Pricing & Capacity */}
+      {/* ========================================================
+          STEP 3: Hạng vé & Giá bán (Split-View SeatMap + Table)
+          ======================================================== */}
       {step === 3 && (
         <div className="space-y-6">
-          {/* Split-View Header */}
-          <div className="bg-white rounded-[12px] border border-[#dfe3e5] p-5 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-[17px] font-extrabold text-[#141d23]">
-                Bước 3: Cấu hình giá vé &amp; sức chứa trực tiếp trên Sơ đồ SVG
+              <h2 className="text-lg font-bold text-foreground">
+                Cấu hình phân khu &amp; đơn giá
               </h2>
-              <p className="text-[13px] text-[#606970]">
-                Nhấp hoặc rê chuột vào từng phân khu bên bảng giá hoặc trên sơ đồ <strong>{currentLayoutTemplate.name}</strong> để đối chiếu vị trí và điều chỉnh giá vé.
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Thiết lập mức giá và số lượng vé cho từng khán đài. Rê chuột lên sơ đồ hoặc bảng để đối soát.
               </p>
             </div>
-            <div className="flex items-center gap-5 shrink-0">
-              <div className="text-right">
-                <span className="block text-[11px] uppercase tracking-wider text-[#606970] font-bold">
-                  Tổng vé phát hành
-                </span>
-                <span className="text-[17px] font-extrabold text-[#141d23]">
-                  {totalCapacity.toLocaleString("vi-VN")} vé
-                </span>
-              </div>
-              <div className="h-8 w-px bg-[#dfe3e5]" />
-              <div className="text-right">
-                <span className="block text-[11px] uppercase tracking-wider text-[#606970] font-bold">
-                  Doanh thu dự kiến
-                </span>
-                <span className="text-[19px] font-extrabold text-primary">
-                  {formatVnd(projectedRevenue)}
-                </span>
-              </div>
+            <div className="text-xs text-muted-foreground">
+              Sơ đồ: <strong className="text-foreground">{currentLayoutTemplate.name}</strong>
             </div>
           </div>
 
-          {/* 2-Column Split-View matching /events/[id] */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* Left Column (5 cols): Interactive SVG SeatMap */}
-            <div className="lg:col-span-5 bg-white rounded-[12px] border border-[#dfe3e5] overflow-hidden lg:sticky lg:top-22">
-              <div className="px-4 py-3 border-b border-[#dfe3e5] bg-[#f5f7f8] flex items-center justify-between">
-                <span className="text-[12.5px] font-bold text-[#141d23] flex items-center gap-1.5">
-                  <Layers className="size-3.5 text-primary" />
-                  Sơ đồ tương tác: {currentVenue?.shortName ?? venueName}
+          {/* Split-View Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left: Interactive SeatMap */}
+            <div className="lg:col-span-6 rounded-lg border border-border bg-background p-4 space-y-3 lg:sticky lg:top-20">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">
+                  Sơ đồ chỗ ngồi tương tác
                 </span>
-                {activeZoneId && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveZoneId(null)}
-                    className="text-[11.5px] font-bold text-primary hover:underline"
-                  >
-                    Bỏ chọn khu vực
-                  </button>
-                )}
+                <span>Di chuột để xem vị trí</span>
               </div>
-              <div className="h-[420px] bg-[#f5f7f8] relative">
+
+              <div className="relative aspect-[4/3] w-full rounded-md border border-border/60 bg-muted/20 overflow-hidden flex items-center justify-center">
                 <SeatMap
                   mapKey={selectedLayoutKey}
-                  activeZoneId={activeZoneId}
                   hoveredZoneId={hoveredZoneId}
-                  zoneInfoMap={zoneInfoMap}
-                  onSelectZone={(id) => setActiveZoneId(id)}
-                  onHoverZone={(id) => setHoveredZoneId(id)}
+                  onSelectZone={() => {}}
+                  onHoverZone={(zoneId: string | null) => setHoveredZoneId(zoneId)}
+                  zoneInfoMap={zones.reduce<
+                    Record<string, { name: string; minPrice: number; count: number }>
+                  >((acc, z) => {
+                    acc[z.zoneId] = {
+                      name: z.name,
+                      minPrice: z.price,
+                      count: z.capacity,
+                    };
+                    return acc;
+                  }, {})}
                 />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                <span>Trạng thái: Khán đài đã tối ưu tỷ lệ</span>
+                <span className="font-mono">
+                  {zones.length} khu vực hoạt động
+                </span>
               </div>
             </div>
 
-            {/* Right Column (7 cols): Zone Pricing Table */}
-            <div className="lg:col-span-7 bg-white rounded-[12px] border border-[#dfe3e5] overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-[12.5px]">
+            {/* Right: Zone Config Table */}
+            <div className="lg:col-span-6 space-y-3">
+              <div className="rounded-lg border border-border bg-background overflow-hidden">
+                <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-[#f5f7f8] border-b border-[#dfe3e5] text-[#606970] font-bold uppercase text-[11px] tracking-wider">
-                      <th className="py-3 px-4">Khu vực khán đài</th>
-                      <th className="py-3 px-3">Loại hình</th>
-                      <th className="py-3 px-3">Đơn giá (VND)</th>
-                      <th className="py-3 px-3">Sức chứa</th>
-                      <th className="py-3 px-4 text-right">Thành tiền</th>
+                    <tr className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
+                      <th className="py-2.5 px-3">Phân khu</th>
+                      <th className="py-2.5 px-3 w-36">Đơn giá (VNĐ)</th>
+                      <th className="py-2.5 px-3 w-28 text-right">Số lượng</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#dfe3e5]">
+                  <tbody className="divide-y divide-border">
                     {zones.map((zone) => {
-                      const rowRevenue = zone.price * zone.capacity;
-                      const isHighlighted =
-                        activeZoneId === zone.zoneId || hoveredZoneId === zone.zoneId;
+                      const isHovered = hoveredZoneId === zone.zoneId;
+
                       return (
                         <tr
                           key={zone.zoneId}
                           onMouseEnter={() => setHoveredZoneId(zone.zoneId)}
                           onMouseLeave={() => setHoveredZoneId(null)}
-                          onClick={() =>
-                            setActiveZoneId(
-                              activeZoneId === zone.zoneId ? null : zone.zoneId
-                            )
-                          }
-                          className={`cursor-pointer transition-colors ${
-                            isHighlighted ? "bg-emerald-50/70" : "hover:bg-[#f5f7f8]"
+                          className={`transition-colors ${
+                            isHovered
+                              ? "bg-accent/40 font-semibold"
+                              : "hover:bg-secondary/40"
                           }`}
                         >
-                          <td className="py-3 px-4 font-bold text-[#141d23]">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`size-2 rounded-full shrink-0 ${
-                                  isHighlighted ? "bg-primary" : "bg-[#dfe3e5]"
-                                }`}
-                              />
-                              <span>{zone.name}</span>
+                          <td className="py-3 px-3">
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-foreground">
+                                {zone.name}
+                              </span>
+                              <p className="text-[11px] text-muted-foreground">
+                                Mã phân khu: {zone.zoneId} •{" "}
+                                {zone.isSeated ? "Ghế ngồi có số" : "Khu đứng"}
+                              </p>
                             </div>
                           </td>
+
                           <td className="py-3 px-3">
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                                zone.isSeated
-                                  ? "bg-[#eff1f2] text-[#141d23]"
-                                  : "bg-emerald-50 text-[#065f46]"
-                              }`}
-                            >
-                              {zone.isSeated ? "Ghế ngồi" : "Khu đứng"}
-                            </span>
-                          </td>
-                          <td
-                            className="py-3 px-3"
-                            onClick={(e) => e.stopPropagation()}
-                          >
                             <input
                               type="number"
-                              step="50000"
-                              min="50000"
+                              min={0}
+                              step={50000}
                               value={zone.price}
                               onChange={(e) =>
-                                handleUpdateZone(
+                                handleZonePriceChange(
                                   zone.zoneId,
-                                  "price",
-                                  Math.max(0, parseInt(e.target.value, 10) || 0)
+                                  parseInt(e.target.value, 10) || 0
                                 )
                               }
-                              className="w-32 h-8.5 px-2.5 rounded-[6px] border border-[#dfe3e5] bg-white text-[#141d23] font-bold focus:outline-none focus:border-primary"
+                              className="w-full h-8 px-2.5 rounded-md border border-input bg-background font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring tabular-nums"
                             />
+                            <span className="text-[10.5px] text-muted-foreground tabular-nums block mt-0.5">
+                              {formatVnd(zone.price)}
+                            </span>
                           </td>
-                          <td
-                            className="py-3 px-3"
-                            onClick={(e) => e.stopPropagation()}
-                          >
+
+                          <td className="py-3 px-3 text-right">
                             <input
                               type="number"
-                              step="50"
-                              min="10"
+                              min={10}
+                              step={50}
                               value={zone.capacity}
                               onChange={(e) =>
-                                handleUpdateZone(
+                                handleZoneCapacityChange(
                                   zone.zoneId,
-                                  "capacity",
-                                  Math.max(1, parseInt(e.target.value, 10) || 1)
+                                  parseInt(e.target.value, 10) || 10
                                 )
                               }
-                              className="w-24 h-8.5 px-2.5 rounded-[6px] border border-[#dfe3e5] bg-white text-[#141d23] font-bold focus:outline-none focus:border-primary"
+                              className="w-24 h-8 px-2.5 rounded-md border border-input bg-background font-mono text-xs text-right text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring tabular-nums inline-block"
                             />
-                          </td>
-                          <td className="py-3 px-4 text-right font-extrabold text-[#141d23]">
-                            {formatVnd(rowRevenue)}
+                            <span className="text-[10.5px] text-muted-foreground tabular-nums block mt-0.5">
+                              vé
+                            </span>
                           </td>
                         </tr>
                       );
@@ -798,190 +1129,207 @@ function NewEventContent() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
 
-          <div className="flex items-center justify-between pt-1">
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="inline-flex items-center gap-2 px-5 h-10 rounded-full border border-[#dfe3e5] bg-white hover:bg-[#eff1f2] text-[#141d23] text-[13px] font-bold transition-colors"
-            >
-              <ArrowLeft className="size-4" />
-              <span>Quay lại sơ đồ</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(4)}
-              className="inline-flex items-center gap-2 px-6 h-10 rounded-full bg-primary hover:bg-emerald-700 text-white text-[13px] font-bold transition-colors shadow-2xs"
-            >
-              <span>Tiếp tục: Xem lại &amp; Xuất bản</span>
-              <ArrowRight className="size-4" />
-            </button>
+              {/* Financial Summary */}
+              <div className="p-3.5 rounded-lg border border-border bg-background flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-muted-foreground">Tổng số vé phát hành:</span>{" "}
+                  <strong className="text-foreground font-mono tabular-nums">
+                    {formatNumberVi(totalEventCapacity)}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Doanh thu dự kiến:</span>{" "}
+                  <strong className="text-foreground font-mono font-bold tabular-nums">
+                    {formatVnd(totalProjectedRevenue)}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Navigation buttons */}
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-sm font-medium transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="size-4" />
+                  <span>Quay lại</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleProceedToStep4}
+                  className="inline-flex items-center gap-1.5 h-10 px-5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors shadow-2xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span>Tiếp tục: Xem trước sự kiện</span>
+                  <ArrowRight className="size-4" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* STEP 4: Review and Publish */}
-      {step === 4 && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-[12px] border border-[#dfe3e5] p-6 sm:p-8 space-y-6">
-            <div className="space-y-1">
-              <h2 className="text-[18px] font-extrabold text-[#141d23]">
-                Bước 4: Kiểm tra thông tin &amp; Xuất bản sự kiện
-              </h2>
-              <p className="text-[13px] text-[#606970]">
-                Hệ thống sẽ tạo tự động toàn bộ vị trí chỗ ngồi, liên kết với sơ đồ khán đài SVG và cấp mã vé điện tử bảo mật.
+      {/* ========================================================
+          STEP 4: Xem Trước & Xuất Bản
+          ======================================================== */}
+      {step === 4 && selectedVenue && (
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="text-center space-y-1">
+            <h2 className="text-xl font-bold text-foreground">
+              Xem trước và xuất bản sự kiện
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Vui lòng rà soát lại thông tin trước khi phát hành sự kiện lên TicketHub.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-background p-6 space-y-5 shadow-2xs">
+            {/* Header info */}
+            <div className="space-y-1 pb-4 border-b border-border">
+              <span className="text-xs font-semibold text-primary">{category}</span>
+              <h3 className="text-lg font-bold text-foreground">{title}</h3>
+              <p className="text-xs text-muted-foreground tabular-nums">
+                Thời gian: {formatDateTimeVi(`${startDate}T${startTime}`)}
+                {endDate && endTime && ` - ${formatDateTimeVi(`${endDate}T${endTime}`)}`}
               </p>
             </div>
 
-            {isSubmitted ? (
-              <div className="py-10 text-center space-y-4">
-                <div className="size-16 rounded-full bg-emerald-50 text-primary mx-auto flex items-center justify-center border border-emerald-200">
-                  <CheckCircle2 className="size-9" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-[20px] font-extrabold text-[#141d23]">
-                    Sự kiện đã được tạo thành công!
-                  </h3>
-                  <p className="text-[14px] text-[#606970] max-w-md mx-auto">
-                    Địa điểm <strong>{venueName}</strong> với mẫu sơ đồ{" "}
-                    <strong>{currentLayoutTemplate.name}</strong> cùng{" "}
-                    {totalCapacity.toLocaleString("vi-VN")} vé đã được khởi tạo trong hệ thống.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-                  <Link
-                    href="/events/evt-anh-trai-vuot-ngan-chong-gai"
-                    className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-primary hover:bg-emerald-700 text-white text-[13px] font-bold transition-colors"
-                  >
-                    <Sparkles className="size-4" />
-                    <span>Xem trang bán vé &amp; Sơ đồ trực tiếp</span>
-                  </Link>
-                  <Link
-                    href="/organizer/events"
-                    className="inline-flex items-center gap-2 px-5 h-10 rounded-full border border-[#dfe3e5] bg-white hover:bg-[#eff1f2] text-[#141d23] text-[13px] font-bold transition-colors"
-                  >
-                    <span>Về danh sách sự kiện</span>
-                  </Link>
-                </div>
+            {/* Venue & Layout */}
+            <div className="grid grid-cols-2 gap-4 text-xs pb-4 border-b border-border">
+              <div>
+                <span className="text-muted-foreground block text-[11px]">Địa điểm</span>
+                <strong className="text-foreground text-xs">{selectedVenue.name}</strong>
+                <p className="text-muted-foreground text-[11.5px] mt-0.5">
+                  {selectedVenue.address}
+                </p>
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-[#f5f7f8] rounded-[12px] border border-[#dfe3e5] text-[13px]">
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-[#606970] block text-[11px] font-bold uppercase">
-                        Tên chương trình:
-                      </span>
-                      <span className="font-extrabold text-[#141d23] text-[15px]">
-                        {title}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[#606970] block text-[11px] font-bold uppercase">
-                        Thể loại &amp; Địa điểm:
-                      </span>
-                      <span className="font-semibold text-[#141d23]">
-                        {category} • {venueName}, {city}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[#606970] block text-[11px] font-bold uppercase">
-                        Địa chỉ chi tiết:
-                      </span>
-                      <span className="font-medium text-[#2b343a]">
-                        {venueAddress}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[#606970] block text-[11px] font-bold uppercase">
-                        Thời gian biểu diễn:
-                      </span>
-                      <span className="font-medium text-[#2b343a]">
-                        {new Date(eventDate).toLocaleString("vi-VN")}
-                      </span>
-                    </div>
-                  </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px]">Sơ đồ chỗ ngồi</span>
+                <strong className="text-foreground text-xs">{currentLayoutTemplate.name}</strong>
+                <p className="text-muted-foreground text-[11.5px] mt-0.5">
+                  {currentLayoutTemplate.categoryName}
+                </p>
+              </div>
+            </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-[#606970] block text-[11px] font-bold uppercase">
-                        Mẫu sơ đồ khán đài SVG:
-                      </span>
-                      <span className="font-extrabold text-primary text-[15px]">
-                        {currentLayoutTemplate.name}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[#606970] block text-[11px] font-bold uppercase">
-                        Quy mô phát hành:
-                      </span>
-                      <span className="font-semibold text-[#141d23]">
-                        {totalCapacity.toLocaleString("vi-VN")} vé trên {zones.length} khu vực
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[#606970] block text-[11px] font-bold uppercase">
-                        Doanh thu ước tính tối đa:
-                      </span>
-                      <span className="font-extrabold text-[#065f46] text-[16px]">
-                        {formatVnd(projectedRevenue)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+            {/* Ticket Breakdown */}
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-foreground">
+                Cấu hình các phân khu vé
+              </span>
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
+                      <th className="py-2 px-3">Hạng vé</th>
+                      <th className="py-2 px-3 text-right">Đơn giá</th>
+                      <th className="py-2 px-3 text-right">Số lượng</th>
+                      <th className="py-2 px-3 text-right">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {zones.map((z) => (
+                      <tr key={z.zoneId} className="hover:bg-secondary/40">
+                        <td className="py-2 px-3 font-medium text-foreground">
+                          {z.name}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono tabular-nums">
+                          {formatVnd(z.price)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono tabular-nums">
+                          {formatNumberVi(z.capacity)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono font-semibold tabular-nums text-foreground">
+                          {formatVnd(z.capacity * z.price)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-border bg-muted/30 font-bold text-foreground">
+                      <td className="py-2.5 px-3">Tổng cộng</td>
+                      <td className="py-2.5 px-3" />
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                        {formatNumberVi(totalEventCapacity)} vé
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-primary font-bold">
+                        {formatVnd(totalProjectedRevenue)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
 
-                <div className="p-4 rounded-[10px] bg-emerald-50/70 border border-emerald-200 text-[#065f46] text-[12.5px] flex items-start gap-3">
-                  <Info className="size-4 text-primary shrink-0 mt-0.5" />
-                  <p>
-                    Sau khi nhấn <strong>Xác nhận &amp; Xuất bản sự kiện</strong>, hệ thống TicketHub sẽ tự động phân bổ số lượng vé cho từng khu vực khán đài trên sơ đồ SVG và kích hoạt hệ thống điều phối lưu lượng chống nghẽn khi mở bán.
-                  </p>
-                </div>
+            {/* Actions */}
+            <div className="pt-4 border-t border-border flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md border border-border bg-background hover:bg-secondary text-foreground text-sm font-medium transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="size-4" />
+                <span>Quay lại cấu hình</span>
+              </button>
 
-                <div className="flex items-center justify-between pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep(3)}
-                    className="inline-flex items-center gap-2 px-5 h-10 rounded-full border border-[#dfe3e5] bg-white hover:bg-[#eff1f2] text-[#141d23] text-[13px] font-bold transition-colors"
-                  >
-                    <ArrowLeft className="size-4" />
-                    <span>Quay lại chỉnh giá</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handleSubmitEvent}
-                    className="inline-flex items-center gap-2 px-7 h-10 rounded-full bg-primary hover:bg-emerald-700 disabled:opacity-50 text-white text-[13px] font-bold transition-colors shadow-2xs"
-                  >
-                    <span>
-                      {isSubmitting
-                        ? "Đang xuất bản..."
-                        : "Xác nhận & Xuất bản sự kiện"}
-                    </span>
+              <button
+                type="button"
+                onClick={handleFinalPublish}
+                disabled={isPublished}
+                className="inline-flex items-center gap-2 h-10 px-6 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold transition-colors shadow-2xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
+              >
+                {isPublished ? (
+                  <>
+                    <Check className="size-4" />
+                    <span>Đang phát hành...</span>
+                  </>
+                ) : (
+                  <>
                     <CheckCircle2 className="size-4" />
-                  </button>
-                </div>
-              </>
-            )}
+                    <span>Xuất bản sự kiện</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Mobile Sticky Bottom Action Bar for Step 1 */}
+      {step === 1 && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 p-3.5 border-t border-border bg-background/95 backdrop-blur-xs shadow-lg space-y-1.5">
+          <button
+            type="button"
+            disabled={!isValidStep1}
+            onClick={handleProceedToStep2}
+            className="w-full h-11 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors disabled:opacity-40 disabled:pointer-events-none shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>Tiếp tục: Chọn sơ đồ chỗ ngồi</span>
+            <ArrowRight className="size-4" />
+          </button>
+          {!isValidStep1 && (
+            <p className="text-[11px] text-muted-foreground text-center truncate">
+              {step1HelperMessage}
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-export default function NewEventOrganizerPage() {
+export default function CreateEventWizardPage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-[1200px] mx-auto p-8 text-[#606970] text-[13px]">
-          Đang tải biểu mẫu...
+        <div className="max-w-[1200px] mx-auto px-4 py-8 text-xs text-muted-foreground">
+          Đang tải trang tạo sự kiện...
         </div>
       }
     >
-      <NewEventContent />
+      <CreateEventWizardContent />
     </Suspense>
   );
 }
