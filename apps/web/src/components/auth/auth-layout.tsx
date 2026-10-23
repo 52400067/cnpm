@@ -28,11 +28,11 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
             ======================================================== */}
         <div className="w-full lg:w-[48%] xl:w-[45%] 2xl:w-[42%] flex flex-col justify-between px-6 sm:px-8 lg:px-12 shrink-0 min-h-[100dvh]">
           {/* Header row: shares exact width and alignment with the form container */}
-          <header className="h-16 flex items-center justify-between w-full max-w-[440px] mx-auto shrink-0">
+          <header className="h-10 flex items-center justify-between w-full max-w-[440px] mx-auto shrink-0">
             <Logo />
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 text-xs sm:text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md px-1.5 py-1 -me-1.5"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md px-1.5 py-1"
             >
               <ArrowLeft className="size-4" />
               <span>Quay lại khám phá</span>
@@ -40,12 +40,17 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
           </header>
 
           {/* Form Content: identical top offset below header on both Login and Register */}
-          <main className="flex-1 flex flex-col items-center w-full pt-6 sm:pt-8 lg:pt-10 pb-4">
-            <div className="w-full max-w-[440px] mx-auto">{children}</div>
+          <main className="flex-1 flex flex-col items-center w-full pt-8 sm:pt-10 lg:pt-10 pb-0">
+            <div
+              data-slot="form-wrapper"
+              className="w-full max-w-[440px] mx-auto border-0 shadow-none bg-transparent p-0"
+            >
+              {children}
+            </div>
           </main>
 
           {/* Footer: fixed to the bottom of the left column on both pages */}
-          <footer className="h-12 flex items-center justify-center text-xs text-muted-foreground w-full max-w-[440px] mx-auto shrink-0">
+          <footer className="h-8 flex items-center justify-center text-xs text-muted-foreground w-full max-w-[440px] mx-auto shrink-0">
             © 2026 TicketHub Vietnam
           </footer>
         </div>
