@@ -16,6 +16,8 @@ import {
   User,
   Users,
   Search,
+  Sparkles,
+  Lock,
 } from "lucide-react";
 import {
   EVENTS,
@@ -228,7 +230,12 @@ function EventSplitView({ event }: { event: EventItem }) {
             <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-white px-3 py-1.5 rounded-[8px] border border-[#dfe3e5] shadow-xs text-[12px]">
               <span className="text-[#606970]">Đang lọc:</span>
               <strong className="text-primary font-bold">
-                {zoneInfoMap[activeZoneId]?.name || activeZoneId}
+                {zoneInfoMap[activeZoneId]?.name ||
+                  (activeZoneId === "11448"
+                    ? "Khu Đứng Ưu Tiên (Vé BTC)"
+                    : activeZoneId === "885"
+                    ? "Khu Kỹ Thuật (Không mở bán)"
+                    : activeZoneId)}
               </strong>
               <button
                 type="button"
@@ -257,7 +264,25 @@ function EventSplitView({ event }: { event: EventItem }) {
         {/* RIGHT PANE: Filter Bar + Scrollable Ticket Listings */}
         <div className="w-full lg:w-[42%] xl:w-[38%] h-[58vh] lg:h-full flex flex-col bg-white overflow-hidden">
           {/* Top Filter Bar inside right pane */}
-          <div className="p-3.5 border-b border-[#dfe3e5] bg-white flex items-center justify-between gap-3 shrink-0">
+          <div className="px-4 py-3 border-b border-[#dfe3e5] bg-white flex items-center justify-between gap-3 shrink-0">
+            <div className="text-[12.5px] text-[#606970] font-medium">
+              {activeZoneId ? (
+                <span>
+                  Đang xem:{" "}
+                  <strong className="text-[#141d23]">
+                    {zoneInfoMap[activeZoneId]?.name ||
+                      (activeZoneId === "11448"
+                        ? "Khu Đứng Ưu Tiên (BTC)"
+                        : activeZoneId === "885"
+                        ? "Khu Kỹ Thuật"
+                        : activeZoneId)}
+                  </strong>
+                </span>
+              ) : (
+                <span>Tất cả các khu vực</span>
+              )}
+            </div>
+
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -278,28 +303,29 @@ function EventSplitView({ event }: { event: EventItem }) {
                 <ChevronDown className="size-3.5 text-[#606970]" />
               </button>
             </div>
-
-            <div className="text-[12px] text-[#606970] font-medium">
-              Tìm thấy <strong className="text-[#141d23]">{filteredListings.length}</strong> lựa chọn vé
-            </div>
-          </div>
-
-          {/* Reassurance Substrip */}
-          <div className="px-4 py-2 bg-[#f8fafc] border-b border-[#dfe3e5] flex items-center justify-between text-[11.5px] text-[#606970]">
-            <span className="flex items-center gap-1.5 font-medium">
-              <CheckCircle2 className="size-3.5 text-emerald-600" />
-              Các vé đặt cùng lúc sẽ ngồi cạnh nhau
-            </span>
-            <span className="font-semibold text-emerald-700">Giá đã gồm phí</span>
           </div>
 
           {/* Scrollable Ticket Listings */}
           <div className="flex-1 overflow-y-auto divide-y divide-[#dfe3e5]">
             {filteredListings.length === 0 ? (
               <div className="p-8 text-center space-y-3">
-                <p className="text-[14px] font-semibold text-[#141d23]">
-                  Không tìm thấy vé phù hợp cho khu vực đã chọn
-                </p>
+                {activeZoneId === "11448" || activeZoneId === "885" ? (
+                  <>
+                    <div className="size-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                      <Lock className="size-5" />
+                    </div>
+                    <h3 className="text-[15px] font-bold text-[#141d23]">
+                      Khu vực Ban tổ chức &amp; Khách mời
+                    </h3>
+                    <p className="text-[13px] text-[#606970] max-w-xs mx-auto">
+                      Khu vực ưu tiên này do Ban tổ chức giữ chỗ (khách mời ngoại giao, nhà tài trợ hoặc kỹ thuật sân khấu), không mở bán vé trực tuyến.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[14px] font-semibold text-[#141d23]">
+                    Không tìm thấy vé phù hợp cho khu vực đã chọn
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => setActiveZoneId(null)}
@@ -319,7 +345,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                     onMouseEnter={() => setHoveredZoneId(listing.zoneId)}
                     onMouseLeave={() => setHoveredZoneId(null)}
                     onClick={() => handleStartHold(listing)}
-                    className={`p-4 transition-colors cursor-pointer flex gap-3.5 sm:gap-4 items-start ${
+                    className={`p-3.5 sm:p-4 transition-colors cursor-pointer flex gap-3.5 sm:gap-4 items-start ${
                       isSelected
                         ? "bg-emerald-50/70 border-l-4 border-l-primary"
                         : isHovered
@@ -327,76 +353,77 @@ function EventSplitView({ event }: { event: EventItem }) {
                         : "hover:bg-[#f8fafc]"
                     }`}
                   >
-                    {/* Left: 3D View-From-Seat Stage Photo */}
-                    <div className="w-[124px] sm:w-[140px] aspect-[16/10] rounded-[8px] overflow-hidden bg-[#141d23] shrink-0 relative border border-[#dfe3e5]">
+                    {/* Left: Clean Thumbnail Stage Photo */}
+                    <div className="w-[110px] sm:w-[124px] aspect-[16/10] rounded-[8px] overflow-hidden bg-[#eff1f2] shrink-0 border border-[#dfe3e5]">
                       <img
                         src={listing.viewFromSeatUrl}
-                        alt={`Góc nhìn từ ${listing.section}`}
+                        alt={listing.section}
                         className="w-full h-full object-cover"
                       />
-                      <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-[4px] bg-black/70 text-white text-[10px] flex items-center gap-1 font-semibold">
-                        <Eye className="size-2.5" /> Góc nhìn
-                      </span>
                     </div>
 
-                    {/* Middle: Details & Features */}
+                    {/* Middle: Clean details with small metadata icons */}
                     <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h2 className="text-[14px] font-bold text-[#141d23] leading-snug">
-                          {listing.section}
-                        </h2>
-                        {listing.isLastTickets && (
-                          <span className="px-1.5 py-0.5 rounded-[4px] bg-[#fce8ec] text-[#b42336] text-[10px] font-bold whitespace-nowrap">
-                            Sắp hết vé
-                          </span>
-                        )}
-                      </div>
+                      <h2 className="text-[14px] sm:text-[15px] font-bold text-[#141d23] leading-snug">
+                        {listing.section}
+                      </h2>
 
                       {listing.row && (
-                        <p className="text-[12px] font-mono text-[#606970]">
+                        <div className="text-[12px] text-[#606970]">
                           {listing.row}
-                        </p>
+                        </div>
                       )}
 
-                      {/* Prominent Seated Together reassurance badge */}
-                      <div className="pt-0.5">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-[5px] border border-emerald-200/60">
-                          <Users className="size-3 text-emerald-600" />
-                          Ghế ngồi cạnh nhau
-                        </span>
-                      </div>
+                      <div className="space-y-0.5 pt-0.5 text-[11.5px] text-[#606970]">
+                        <div className="flex items-center gap-1.5">
+                          <Users className="size-3.5 text-[#606970] shrink-0" />
+                          <span>
+                            {listing.isStanding
+                              ? `${ticketQuantity} vé đứng tự do`
+                              : `${ticketQuantity} vé ngồi cạnh nhau`}
+                          </span>
+                        </div>
 
-                      <div className="space-y-0.5 pt-0.5">
-                        {listing.features.map((feat, idx) => (
-                          <p
-                            key={idx}
-                            className="text-[11.5px] text-[#606970] truncate flex items-center gap-1"
-                          >
-                            <span>•</span>
-                            <span>{feat}</span>
-                          </p>
-                        ))}
+                        {listing.section.toLowerCase().includes("vip") && (
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="size-3.5 text-amber-600 shrink-0" />
+                            <span>Gói quyền lợi VIP &amp; Lối vào ưu tiên</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-1.5">
+                          <Eye className="size-3.5 text-[#606970] shrink-0" />
+                          <span>Tầm nhìn trực diện sân khấu</span>
+                        </div>
+
+                        {listing.isLastTickets && (
+                          <div className="pt-0.5">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-[#fef2f2] text-[#dc2626] border border-[#fecaca] text-[10.5px] font-bold">
+                              <Flame className="size-3 text-[#dc2626]" />
+                              Sắp hết vé
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Right: Price & Deal Score Badge */}
                     <div className="text-right shrink-0 flex flex-col items-end">
-                      <div className="text-[16px] font-extrabold text-[#141d23] leading-tight">
+                      <div className="text-[16px] sm:text-[17px] font-extrabold text-[#141d23] leading-tight">
                         {formatVnd(listing.price)}
                       </div>
-                      {listing.originalPrice && (
+                      {listing.originalPrice && listing.originalPrice > listing.price && (
                         <div className="text-[11px] text-[#606970] line-through">
                           {formatVnd(listing.originalPrice)}
                         </div>
                       )}
-                      <div className="text-[11px] text-[#606970] mt-0.5">mỗi vé</div>
 
-                      {/* Deal Score Badge */}
-                      <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] bg-emerald-50 text-primary border border-emerald-200">
-                        <span className="size-4.5 rounded-[4px] bg-primary text-white text-[10.5px] font-bold flex items-center justify-center">
+                      {/* Clean Deal Score: solid green square + green text, unboxed */}
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span className="size-5 rounded-[4px] bg-[#059669] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                           {listing.dealScore}
                         </span>
-                        <span className="text-[11px] font-bold text-primary">
+                        <span className="text-[12px] font-bold text-[#059669]">
                           {listing.dealLabel}
                         </span>
                       </div>
@@ -523,7 +550,11 @@ function EventSplitView({ event }: { event: EventItem }) {
             {/* Seated Together Reassurance Note */}
             <div className="flex items-center gap-2 p-2.5 rounded-[8px] bg-emerald-50 border border-emerald-200 text-emerald-800 text-[12px] font-semibold">
               <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
-              <span>Các ghế ngồi sẽ được xếp cạnh nhau</span>
+              <span>
+                {selectedListing.isStanding
+                  ? "Vé đứng tự do khu vực fanzone / sân khấu"
+                  : "Các ghế ngồi sẽ được xếp cạnh nhau"}
+              </span>
             </div>
 
             {/* Ticket details summary */}

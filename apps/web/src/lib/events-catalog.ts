@@ -612,22 +612,6 @@ export function getEventListings(event: EventItem): TicketListing[] {
   if (mapKey === "stadium-concert") {
     return [
       {
-        id: `${event.id}-priority-standing`,
-        eventId: event.id,
-        zoneId: "11448",
-        zoneName: "Khu Đứng Ưu Tiên",
-        section: "Khu Đứng Ưu Tiên",
-        seatInfo: "Khu vực ưu tiên sát sân khấu",
-        price: roundVnd(base * 2.2),
-        availableTickets: 4,
-        dealScore: 10,
-        dealLabel: "Tuyệt vời",
-        features: ["Vào cửa sớm trước 30 phút", "Khu đứng sát vách sân khấu chính", "Quà lưu niệm"],
-        viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
-        isLastTickets: true,
-        isStanding: true,
-      },
-      {
         id: `${event.id}-standing-pen`,
         eventId: event.id,
         zoneId: "682",
@@ -638,7 +622,7 @@ export function getEventListings(event: EventItem): TicketListing[] {
         availableTickets: 6,
         dealScore: 9,
         dealLabel: "Rất tốt",
-        features: ["Không khí cuồng nhiệt", "Tự do chọn vị trí đứng"],
+        features: ["Khu vực đứng tự do", "Tầm nhìn bao quát sân khấu"],
         viewFromSeatUrl: "/images/venues/view-stadium-wide.jpg",
         isStanding: true,
       },

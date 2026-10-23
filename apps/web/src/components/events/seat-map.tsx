@@ -5,6 +5,11 @@ import { Plus, Minus, Maximize2 } from "lucide-react";
 import { VENUE_SVG, type VenueMapKey } from "@/lib/venue-svg.generated";
 import { formatVnd } from "@/lib/events-catalog";
 
+const RESERVED_ZONES: Record<string, string> = {
+  "11448": "Khu Đứng Ưu Tiên (Vé Ban Tổ Chức)",
+  "885": "Khu Vực Kỹ Thuật (Không mở bán)",
+};
+
 interface SeatMapProps {
   mapKey: VenueMapKey;
   activeZoneId?: string | null;
@@ -38,6 +43,7 @@ function SeatMapView({
     zoneId: string;
     name: string;
     price: number;
+    isReserved?: boolean;
     x: number;
     y: number;
   } | null>(null);
@@ -76,14 +82,26 @@ function SeatMapView({
         if (zid) {
           onHoverZone(zid);
           const rect = containerRef.current?.getBoundingClientRect();
-          if (rect && zoneInfoMap[zid]) {
-            setTooltip({
-              zoneId: zid,
-              name: zoneInfoMap[zid].name,
-              price: zoneInfoMap[zid].minPrice,
-              x: e.clientX - rect.left,
-              y: e.clientY - rect.top,
-            });
+          if (rect) {
+            if (zoneInfoMap[zid]) {
+              setTooltip({
+                zoneId: zid,
+                name: zoneInfoMap[zid].name,
+                price: zoneInfoMap[zid].minPrice,
+                isReserved: false,
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+              });
+            } else if (RESERVED_ZONES[zid]) {
+              setTooltip({
+                zoneId: zid,
+                name: RESERVED_ZONES[zid],
+                price: 0,
+                isReserved: true,
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+              });
+            }
           }
           return;
         }
@@ -178,7 +196,11 @@ function SeatMapView({
           className="absolute z-30 transform -translate-y-full bg-[#141d23] text-white text-[12px] px-3 py-1.5 rounded-[8px] shadow-lg whitespace-nowrap flex items-center gap-2"
         >
           <span className="font-semibold">{tooltip.name}</span>
-          <span className="text-[#a7f3d0] font-bold">{formatVnd(tooltip.price)}</span>
+          {tooltip.isReserved ? (
+            <span className="text-amber-400 font-medium">Vé Ban Tổ Chức (Không mở bán)</span>
+          ) : (
+            <span className="text-[#a7f3d0] font-bold">{formatVnd(tooltip.price)}</span>
+          )}
         </div>
       )}
 
@@ -207,6 +229,19 @@ function SeatMapView({
           stroke-width: 3px;
           transition: all 0.2s ease;
           cursor: pointer;
+        }
+
+        /* Reserved & Host-only sections (Priority / Technical / Not for sale) */
+        g[data-zone="11448"] .sec,
+        g[data-zone="885"] .sec {
+          fill: #f1f5f9 !important;
+          stroke: #cbd5e1 !important;
+          stroke-dasharray: 6 4 !important;
+          cursor: pointer !important;
+        }
+        g[data-zone="11448"] text,
+        g[data-zone="885"] text {
+          fill: #94a3b8 !important;
         }
 
         /* Concert & General sections */
