@@ -255,6 +255,69 @@ Cập nhật trạng thái ghế theo thời gian thực.
 }
 ```
 
+### Địa điểm chuẩn và Sơ đồ SVG (`/venues`)
+
+#### `GET /api/v1/venues`
+
+Lấy danh mục các địa điểm tổ chức chuẩn (Curated Venues) đã được quản trị viên kiểm duyệt, hỗ trợ lọc theo 3 thành phố lớn, thể loại và tìm kiếm từ khóa.
+
+- Quyền: Công khai / Ban tổ chức
+- Tham số truy vấn:
+  - `city`: string (`TP. Hồ Chí Minh`, `Hà Nội`, `Đà Nẵng`)
+  - `category`: string (`stadium`, `arena`, `theater`, `sports`)
+  - `search`: string (tìm theo tên sân, quận huyện, địa chỉ)
+- Response 200:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "vn-hn-my-dinh",
+      "name": "Sân Vận Động Quốc Gia Mỹ Đình",
+      "shortName": "SVĐ Mỹ Đình",
+      "city": "Hà Nội",
+      "district": "Quận Nam Từ Liêm",
+      "address": "Đường Lê Đức Thọ, Phường Mỹ Đình 1, Quận Nam Từ Liêm, Hà Nội",
+      "category": "stadium",
+      "categoryLabel": "Sân vận động quốc gia",
+      "totalCapacity": "40.000 chỗ",
+      "thumbnailUrl": "/images/events/vn/vleague-cahn.jpg",
+      "description": "Công trình thể thao và biểu diễn quy mô lớn nhất Việt Nam với 4 khán đài đồ sộ.",
+      "featuredEvents": "Đội tuyển Quốc gia Việt Nam, Born Pink World Tour",
+      "layouts": [
+        {
+          "id": "layout-stadium-concert",
+          "name": "Mega Concert Sân Vận Động",
+          "categoryName": "Đại nhạc hội / Festival ngoài trời",
+          "mapKey": "stadium-concert",
+          "capacityEstimate": "30.000 - 50.000 chỗ"
+        },
+        {
+          "id": "layout-stadium-football",
+          "name": "Sân Bóng Đá (Chuẩn Thi Đấu FIFA)",
+          "categoryName": "Bóng đá / Giải V-League & Quốc tế",
+          "mapKey": "stadium-football",
+          "capacityEstimate": "20.000 - 45.000 chỗ"
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### `GET /api/v1/venues/:id`
+
+Lấy chi tiết một địa điểm chuẩn kèm tất cả cấu hình sơ đồ khán đài SVG và phân khu mặc định.
+
+- Response 200: Chi tiết địa điểm và danh sách các layout có sẵn (`layouts` kèm `defaultZones`).
+
+#### `GET /api/v1/venues/:id/layouts`
+
+Lấy danh sách các mẫu sơ đồ khán đài của địa điểm kèm danh sách `defaultZones` tương thích với `data-zone` trong tệp SVG.
+
+- Response 200: Danh sách sơ đồ khán đài kiến trúc kèm ước lượng sức chứa và cấu hình phân khu.
+
 ### Hàng chờ ảo (`/waiting-room`)
 
 #### `POST /api/v1/waiting-room/:eventId/join`
@@ -525,3 +588,77 @@ Lấy danh sách đối soát giao dịch với dữ liệu VNPay.
 Xác nhận phê duyệt lệnh chi trả tiền bán vé cho ban tổ chức.
 
 - Response 200: Lệnh chi trả chuyển trạng thái `PAID_OUT`.
+
+#### `POST /api/v1/admin/venues`
+
+Quản trị viên tạo mới hoặc nhập một địa điểm tổ chức chuẩn vào hệ thống.
+
+- Header: `Authorization: Bearer <adminToken>`
+- Request body:
+
+```json
+{
+  "name": "Cung Thể Thao Tiên Sơn (Đĩa Bay)",
+  "shortName": "Cung Tiên Sơn",
+  "city": "Đà Nẵng",
+  "district": "Quận Hải Châu",
+  "address": "Đường Phan Đăng Lưu, Phường Hòa Cường Bắc, Quận Hải Châu, Đà Nẵng",
+  "category": "arena",
+  "totalCapacity": "7.500 chỗ",
+  "thumbnailUrl": "/images/events/vn/anh-trai.jpg",
+  "description": "Kiến trúc độc đáo hình đĩa bay nổi tiếng bên bờ sông Hàn."
+}
+```
+
+- Response 201:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "vn-danang-tien-son",
+    "isCreated": true,
+    "message": "Địa điểm chuẩn đã được tạo và kích hoạt."
+  }
+}
+```
+
+#### `POST /api/v1/admin/venues/:id/layouts`
+
+Quản trị viên liên kết mẫu sơ đồ SVG đã chuẩn hóa (hoặc tải lên SVG mới) cho địa điểm tổ chức.
+
+- Header: `Authorization: Bearer <adminToken>`
+- Request body:
+
+```json
+{
+  "name": "Sân Khấu Chữ T (Live Concert)",
+  "categoryName": "Âm nhạc / Live Concert",
+  "mapKey": "arena-t-stage",
+  "capacityEstimate": "8.000 - 15.000 chỗ",
+  "defaultZones": [
+    { "zoneId": "495", "name": "VIP Đặc Biệt", "price": 2500000, "capacity": 1200, "isSeated": true },
+    { "zoneId": "496", "name": "VIP Vàng", "price": 1900000, "capacity": 2500, "isSeated": true }
+  ]
+}
+```
+
+- Response 201:
+
+```json
+{
+  "success": true,
+  "data": {
+    "layoutId": "layout-arena-t-stage",
+    "status": "ACTIVE"
+  }
+}
+```
+
+#### `PUT /api/v1/admin/venues/:id`
+
+Quản trị viên cập nhật thông tin địa điểm hoặc tạm ngưng khả dụng.
+
+- Header: `Authorization: Bearer <adminToken>`
+- Request body: `{ "isActive": false }`
+- Response 200: `{ "success": true, "data": { "message": "Cập nhật địa điểm thành công" } }`
