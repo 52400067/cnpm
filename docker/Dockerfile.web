@@ -30,7 +30,7 @@ COPY . .
 
 # Build shared library dependency first, then web frontend
 RUN pnpm --filter @tickethub/shared build
-RUN pnpm --filter @ticket-hub/web build
+RUN pnpm --filter @tickethub/web build
 
 # 4. Production runner stage
 FROM base AS runner
@@ -49,4 +49,4 @@ COPY --from=builder /app/apps/web ./apps/web
 
 EXPOSE 3000
 
-CMD ["pnpm", "--filter", "@ticket-hub/web", "start"]
+CMD ["pnpm", "--filter", "@tickethub/web", "start"]

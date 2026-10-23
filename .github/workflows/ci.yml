@@ -122,7 +122,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ steps.repo.outputs.owner }}/ticket-hub-api:unstable
-            ghcr.io/${{ steps.repo.outputs.owner }}/ticket-hub-api:sha-${{ github.sha }}
+            ghcr.io/${{ steps.repo.outputs.owner }}/tickethub-api:unstable
+            ghcr.io/${{ steps.repo.outputs.owner }}/tickethub-api:sha-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
