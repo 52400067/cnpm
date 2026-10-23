@@ -3,6 +3,7 @@
 import { useState, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import {
   Layers,
   ArrowRight,
@@ -10,99 +11,37 @@ import {
   CheckCircle2,
   Sparkles,
   Info,
+  MapPin,
+  Search,
+  Building2,
+  Check,
+  Compass,
 } from "lucide-react";
 import { SeatMap } from "@/components/events/seat-map";
 import { type VenueMapKey } from "@/lib/venue-svg.generated";
 import { formatVnd } from "@/lib/events-catalog";
+import {
+  CURATED_VENUES,
+  CURATED_LAYOUT_TEMPLATES,
+  type VietnamCity,
+  type VenueCategory,
+  type CuratedVenue,
+  type CuratedZoneConfig,
+} from "@/lib/curated-venues";
 
-interface VenueTemplateOption {
-  key: VenueMapKey;
-  title: string;
-  category: string;
-  capacityEstimate: string;
-  description: string;
-  realVenuesExample: string;
-  defaultZones: Array<{
-    zoneId: string;
-    name: string;
-    price: number;
-    capacity: number;
-    isSeated: boolean;
-  }>;
-}
+const CITY_FILTERS: Array<{ id: VietnamCity | "ALL"; label: string }> = [
+  { id: "ALL", label: "Tất cả thành phố" },
+  { id: "TP. Hồ Chí Minh", label: "TP. Hồ Chí Minh (4)" },
+  { id: "Hà Nội", label: "Hà Nội (4)" },
+  { id: "Đà Nẵng", label: "Đà Nẵng (3)" },
+];
 
-const VENUE_TEMPLATES: VenueTemplateOption[] = [
-  {
-    key: "arena-t-stage",
-    title: "Sân Khấu Chữ T (Nhà thi đấu)",
-    category: "Âm nhạc / Live Concert",
-    capacityEstimate: "8.000 - 15.000 chỗ",
-    description: "Thiết kế sân khấu chữ T vươn dài ra giữa sàn đấu, khán đài ôm trọn 3 phía.",
-    realVenuesExample: "Nhà thi đấu Quân Khu 7, Phú Thọ, SECC, Điền Kinh Hà Nội",
-    defaultZones: [
-      { zoneId: "495", name: "HẠNG A (Mặt sàn T-Stage)", price: 2500000, capacity: 1200, isSeated: true },
-      { zoneId: "496", name: "HẠNG B (Tầng 1 đối diện)", price: 1800000, capacity: 2500, isSeated: true },
-      { zoneId: "497", name: "HẠNG C (Khán đài tầng trung)", price: 1200000, capacity: 3500, isSeated: true },
-      { zoneId: "504", name: "HẠNG D (Khán đài tầng cao)", price: 800000, capacity: 4000, isSeated: true },
-    ],
-  },
-  {
-    key: "stadium-concert",
-    title: "SVĐ Mega Concert (Sân khấu ngoài trời)",
-    category: "Đại nhạc hội / Festival",
-    capacityEstimate: "30.000 - 60.000 chỗ",
-    description: "Sơ đồ sân vận động với sân khấu siêu lớn ở đầu cầu môn, kết hợp fanzone sân cỏ và 3 tầng khán đài.",
-    realVenuesExample: "SVĐ Quốc Gia Mỹ Đình, SVĐ Thống Nhất, SVĐ Cần Thơ",
-    defaultZones: [
-      { zoneId: "508", name: "VIP ĐỨNG (Fanzone sát sân khấu)", price: 3200000, capacity: 4000, isSeated: false },
-      { zoneId: "509", name: "SÂN CỎ ĐỨNG (Khu Đứng Tự Do)", price: 1900000, capacity: 12000, isSeated: false },
-      { zoneId: "510", name: "KHÁN ĐÀI TẦNG 100 (Cận cảnh)", price: 2400000, capacity: 10000, isSeated: true },
-      { zoneId: "511", name: "KHÁN ĐÀI TẦNG 400 (Tầm nhìn rộng)", price: 1400000, capacity: 15000, isSeated: true },
-      { zoneId: "512", name: "KHÁN ĐÀI TẦNG 600 (Toàn cảnh)", price: 750000, capacity: 12000, isSeated: true },
-    ],
-  },
-  {
-    key: "stadium-football",
-    title: "Sân Vận Động (Sân bóng đá thể thao)",
-    category: "Bóng đá / Giải vô địch",
-    capacityEstimate: "20.000 - 45.000 chỗ",
-    description: "Khán đài 4 phía bao quanh mặt sân cỏ chuẩn FIFA (Khán đài A VIP, Khán đài B, C, D).",
-    realVenuesExample: "SVĐ Mỹ Đình, SVĐ Hàng Đẫy, SVĐ Lạch Tray, Thiên Trường",
-    defaultZones: [
-      { zoneId: "508", name: "KHÁN ĐÀI A - VIP (Trung tâm)", price: 800000, capacity: 3000, isSeated: true },
-      { zoneId: "509", name: "KHÁN ĐÀI B (Khán đài chính)", price: 500000, capacity: 12000, isSeated: true },
-      { zoneId: "510", name: "KHÁN ĐÀI C / D (Sau khung thành)", price: 300000, capacity: 15000, isSeated: true },
-      { zoneId: "511", name: "KHÁN ĐÀI TRÊN (Tầng 2)", price: 200000, capacity: 10000, isSeated: true },
-    ],
-  },
-  {
-    key: "arena-basketball",
-    title: "Sàn Thi Đấu Thể Thao (Bóng rổ / Võ thuật)",
-    category: "Thể thao trong nhà / VBA",
-    capacityEstimate: "3.000 - 8.000 chỗ",
-    description: "Sân đấu gỗ chuẩn quốc tế với hàng ghế Sát Sân và khán đài vòng cung.",
-    realVenuesExample: "Nhà thi đấu Hồ Xuân Hương, Cầu Giấy, Tây Hồ, Tân Bình",
-    defaultZones: [
-      { zoneId: "518", name: "VIP SÁT SÂN (Sát sàn đấu)", price: 1500000, capacity: 300, isSeated: true },
-      { zoneId: "519", name: "KHÁN ĐÀI VIP (Trung tâm)", price: 750000, capacity: 1200, isSeated: true },
-      { zoneId: "520", name: "KHÁN ĐÀI TẦNG DƯỚI", price: 450000, capacity: 2500, isSeated: true },
-      { zoneId: "521", name: "KHÁN ĐÀI TẦNG TRÊN", price: 250000, capacity: 3000, isSeated: true },
-    ],
-  },
-  {
-    key: "theater",
-    title: "Nhà Hát & Khán Phòng Thính Phòng",
-    category: "Kịch / Stand-up Comedy / Acoustic",
-    capacityEstimate: "1.000 - 3.000 chỗ",
-    description: "Khán phòng thính phòng với hàng ghế phân tầng dốc cao, âm học chuẩn cho sân khấu nghệ thuật.",
-    realVenuesExample: "Nhà hát Hòa Bình, Nhà hát Lớn Hà Nội, Cung Văn Hóa Việt Xô",
-    defaultZones: [
-      { zoneId: "518", name: "VIP CHÍNH DIỆN (Trung tâm khán phòng)", price: 1200000, capacity: 250, isSeated: true },
-      { zoneId: "519", name: "KHÁN PHÒNG CHÍNH (Tầng trệt)", price: 800000, capacity: 800, isSeated: true },
-      { zoneId: "520", name: "TẦNG LỬNG (Khán phòng giữa)", price: 500000, capacity: 600, isSeated: true },
-      { zoneId: "521", name: "BAN CÔNG (Tầng cao)", price: 300000, capacity: 500, isSeated: true },
-    ],
-  },
+const CATEGORY_FILTERS: Array<{ id: VenueCategory | "ALL"; label: string }> = [
+  { id: "ALL", label: "Tất cả danh mục" },
+  { id: "stadium", label: "Sân vận động" },
+  { id: "arena", label: "Nhà thi đấu" },
+  { id: "theater", label: "Nhà hát" },
+  { id: "sports", label: "Thể thao" },
 ];
 
 function NewEventContent() {
@@ -110,30 +49,77 @@ function NewEventContent() {
   const initialStep = Math.min(4, Math.max(1, parseInt(searchParams.get("step") ?? "1", 10) || 1)) as 1 | 2 | 3 | 4;
   const [step, setStep] = useState<1 | 2 | 3 | 4>(initialStep);
 
-  // Step 1: Event Info
+  // Curated Venue Filtering State
+  const [selectedCity, setSelectedCity] = useState<VietnamCity | "ALL">("ALL");
+  const [selectedCategory, setSelectedCategory] = useState<VenueCategory | "ALL">("ALL");
+  const [venueSearchQuery, setVenueSearchQuery] = useState("");
+  const [selectedVenueId, setSelectedVenueId] = useState<string>("vn-hn-dien-kinh");
+
+  // Step 1: Event Basic Info
   const [title, setTitle] = useState("Live Concert Mùa Thu Hà Nội");
   const [category, setCategory] = useState("Âm nhạc");
-  const [venueName, setVenueName] = useState("Cung Điền Kinh Trong Nhà Hà Nội");
-  const [venueAddress, setVenueAddress] = useState("Đường Trần Hữu Dực, Cầu Diễn, Nam Từ Liêm");
+  const [venueName, setVenueName] = useState("Cung Thể Thao Điền Kinh Trong Nhà Hà Nội");
+  const [venueAddress, setVenueAddress] = useState("Đường Trần Hữu Dực, Phường Cầu Diễn, Quận Nam Từ Liêm, Hà Nội");
   const [city, setCity] = useState("Hà Nội");
   const [eventDate, setEventDate] = useState("2027-11-20T19:30");
 
-  // Step 2: Venue Template
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState<VenueMapKey>("arena-t-stage");
-  const selectedTemplate = useMemo(
-    () => VENUE_TEMPLATES.find((t) => t.key === selectedTemplateKey) ?? VENUE_TEMPLATES[0],
-    [selectedTemplateKey]
+  // Step 2: Venue Layout Template
+  const [selectedLayoutKey, setSelectedLayoutKey] = useState<VenueMapKey>("arena-t-stage");
+  const [showAllLayouts, setShowAllLayouts] = useState(false);
+
+  // Currently selected venue object
+  const currentVenue = useMemo<CuratedVenue | undefined>(
+    () => CURATED_VENUES.find((v) => v.id === selectedVenueId),
+    [selectedVenueId]
   );
 
+  // Filtered venues based on City, Category, Search Query
+  const filteredVenues = useMemo(() => {
+    return CURATED_VENUES.filter((venue) => {
+      const matchCity = selectedCity === "ALL" || venue.city === selectedCity;
+      const matchCategory = selectedCategory === "ALL" || venue.category === selectedCategory;
+      const matchSearch =
+        venueSearchQuery.trim() === "" ||
+        venue.name.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
+        venue.shortName.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
+        venue.district.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
+        venue.address.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
+        venue.featuredEvents.toLowerCase().includes(venueSearchQuery.toLowerCase());
+
+      return matchCity && matchCategory && matchSearch;
+    });
+  }, [selectedCity, selectedCategory, venueSearchQuery]);
+
+  // Current layout template
+  const currentLayoutTemplate = useMemo(() => {
+    return CURATED_LAYOUT_TEMPLATES[selectedLayoutKey] ?? CURATED_LAYOUT_TEMPLATES["arena-t-stage"];
+  }, [selectedLayoutKey]);
+
   // Step 3: Zone Pricing & Capacity
-  const [zones, setZones] = useState(selectedTemplate.defaultZones);
+  const [zones, setZones] = useState<CuratedZoneConfig[]>(
+    CURATED_LAYOUT_TEMPLATES["arena-t-stage"].defaultZones
+  );
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
   const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
 
-  // When switching template, reset zones
-  const handleSelectTemplate = (key: VenueMapKey) => {
-    setSelectedTemplateKey(key);
-    const tmpl = VENUE_TEMPLATES.find((t) => t.key === key) ?? VENUE_TEMPLATES[0];
+  // Handle selecting a curated venue card
+  const handleSelectCuratedVenue = (venue: CuratedVenue) => {
+    setSelectedVenueId(venue.id);
+    setVenueName(venue.name);
+    setVenueAddress(venue.address);
+    setCity(venue.city);
+
+    // Pick first layout of this curated venue
+    const firstLayout = venue.layouts[0] ?? CURATED_LAYOUT_TEMPLATES["arena-t-stage"];
+    setSelectedLayoutKey(firstLayout.mapKey);
+    setZones(firstLayout.defaultZones);
+    setActiveZoneId(null);
+  };
+
+  // Handle switching layout template
+  const handleSelectLayout = (mapKey: VenueMapKey) => {
+    setSelectedLayoutKey(mapKey);
+    const tmpl = CURATED_LAYOUT_TEMPLATES[mapKey] ?? CURATED_LAYOUT_TEMPLATES["arena-t-stage"];
     setZones(tmpl.defaultZones);
     setActiveZoneId(null);
   };
@@ -169,7 +155,6 @@ function NewEventContent() {
 
   const handleSubmitEvent = () => {
     setIsSubmitting(true);
-    // Simulate saving event and generating seat allocations
     setTimeout(() => {
       setIsSubmitting(false);
       setIsSubmitted(true);
@@ -187,19 +172,27 @@ function NewEventContent() {
           <span>/</span>
           <span className="text-slate-900 font-semibold">Tạo sự kiện mới</span>
         </div>
-        <h1 className="text-[26px] font-extrabold tracking-[-0.02em] text-slate-900">
-          Tạo sự kiện &amp; Chọn mẫu sơ đồ địa điểm
-        </h1>
-        <p className="text-[14px] text-slate-500">
-          Chọn mô hình khán đài kiến trúc chuẩn, thiết lập giá vé từng phân khu và sẵn sàng mở bán.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-[26px] font-extrabold tracking-[-0.02em] text-slate-900">
+              Tạo sự kiện &amp; Chọn Địa điểm Chuẩn (Curated Venues)
+            </h1>
+            <p className="text-[14px] text-slate-500">
+              Chọn địa điểm thực tế tại TP. Hồ Chí Minh, Hà Nội, Đà Nẵng với sơ đồ khán đài SVG đã được kiểm duyệt.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[12px] font-bold self-start">
+            <CheckCircle2 className="size-4 text-emerald-600" />
+            3 Thành phố hỗ trợ
+          </span>
+        </div>
       </div>
 
       {/* Stepper Progress Indicator */}
       <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-4">
         {[
-          { num: 1, title: "1. Thông tin sự kiện" },
-          { num: 2, title: "2. Chọn mẫu sơ đồ" },
+          { num: 1, title: "1. Địa điểm & Thông tin" },
+          { num: 2, title: "2. Chọn mẫu sơ đồ SVG" },
           { num: 3, title: "3. Cấu hình giá & vé" },
           { num: 4, title: "4. Hoàn tất & Mở bán" },
         ].map((s) => (
@@ -220,160 +213,332 @@ function NewEventContent() {
         ))}
       </div>
 
-      {/* STEP 1: Basic Information */}
+      {/* STEP 1: Curated Venue Picker & Event Details */}
       {step === 1 && (
-        <div className="bg-white rounded-[16px] border border-slate-200 p-6 sm:p-7 shadow-2xs space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-[18px] font-extrabold text-slate-900">
-              Bước 1: Thông tin sự kiện cơ bản
-            </h2>
-            <p className="text-[13px] text-slate-500">
-              Nhập tên chương trình, thể loại và thông tin địa điểm tổ chức tại Việt Nam.
-            </p>
+        <div className="space-y-6">
+          {/* Curated Venues Section */}
+          <div className="bg-white rounded-[16px] border border-slate-200 p-6 sm:p-7 shadow-2xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-[18px] font-extrabold text-slate-900 flex items-center gap-2">
+                  <Building2 className="size-5 text-primary" />
+                  Chọn địa điểm tiêu chuẩn đã kiểm duyệt (Curated Venues)
+                </h2>
+                <p className="text-[13px] text-slate-500">
+                  Hệ thống TicketHub hỗ trợ sẵn 11 địa điểm tổ chức biểu diễn và thi đấu lớn nhất tại 3 thành phố trọng điểm.
+                </p>
+              </div>
+              {currentVenue && (
+                <div className="px-3.5 py-1.5 rounded-[8px] bg-emerald-50 border border-emerald-200 text-emerald-800 text-[12px] font-semibold flex items-center gap-1.5">
+                  <Check className="size-4 text-emerald-600" />
+                  <span>Đang chọn: <strong>{currentVenue.shortName}</strong></span>
+                </div>
+              )}
+            </div>
+
+            {/* City Tabs Filter */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {CITY_FILTERS.map((tab) => {
+                const isSelected = selectedCity === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSelectedCity(tab.id)}
+                    className={`px-4 py-2 rounded-[10px] text-[13px] font-bold whitespace-nowrap transition-all ${
+                      isSelected
+                        ? "bg-primary text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search and Category Filter Bar */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-2 relative">
+                <Search className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={venueSearchQuery}
+                  onChange={(e) => setVenueSearchQuery(e.target.value)}
+                  placeholder="Tìm theo tên sân, quận huyện, địa chỉ (VD: Mỹ Đình, Quân Khu 7, Hòa Xuân)..."
+                  className="w-full h-10.5 pl-10 pr-4 rounded-[10px] border border-slate-200 text-slate-900 text-[13px] font-medium placeholder:text-slate-400 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value as VenueCategory | "ALL")}
+                  className="w-full h-10.5 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 text-[13px] font-medium bg-white focus:outline-none focus:border-primary"
+                >
+                  {CATEGORY_FILTERS.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Curated Venues Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+              {filteredVenues.length === 0 ? (
+                <div className="col-span-full py-10 text-center text-slate-500 text-[13px]">
+                  Không tìm thấy địa điểm phù hợp trong bộ lọc hiện tại. Vui lòng thử tìm kiếm khác hoặc chuyển thành phố.
+                </div>
+              ) : (
+                filteredVenues.map((v) => {
+                  const isSelected = v.id === selectedVenueId;
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => handleSelectCuratedVenue(v)}
+                      className={`cursor-pointer rounded-[14px] border overflow-hidden transition-all text-left flex flex-col ${
+                        isSelected
+                          ? "border-primary bg-emerald-50/40 ring-2 ring-primary shadow-xs"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-2xs"
+                      }`}
+                    >
+                      {/* Image header with category pill */}
+                      <div className="relative h-28 bg-slate-100 overflow-hidden shrink-0">
+                        <Image
+                          src={v.thumbnailUrl}
+                          alt={v.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-[6px] bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold">
+                            {v.categoryLabel}
+                          </span>
+                        </div>
+                        <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-white text-[11px] font-semibold">
+                          <span className="flex items-center gap-1">
+                            <MapPin className="size-3 text-emerald-400" />
+                            {v.city}
+                          </span>
+                          <span className="text-white/90">
+                            {v.totalCapacity}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+                        <div>
+                          <div className="flex items-start justify-between gap-1.5">
+                            <h3 className="font-extrabold text-slate-900 text-[14px] leading-tight line-clamp-1">
+                              {v.name}
+                            </h3>
+                            {isSelected && (
+                              <span className="p-0.5 rounded-full bg-primary text-white shrink-0 mt-0.5">
+                                <Check className="size-3" />
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                            {v.district} • {v.address}
+                          </p>
+                          <p className="text-[11px] text-slate-600 mt-1.5 line-clamp-2">
+                            {v.description}
+                          </p>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">
+                            {v.layouts.length} sơ đồ khán đài SVG
+                          </span>
+                          <span className={`font-bold ${isSelected ? "text-primary" : "text-slate-700"}`}>
+                            {isSelected ? "Đang chọn" : "Nhấn để chọn"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-[13px]">
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="font-bold text-slate-700">Tên sự kiện / Chương trình *</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="VD: Live Concert Vũ - Bảo Tàng Của Nuối Tiếc"
-                className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
-              />
+          {/* Event Details Form */}
+          <div className="bg-white rounded-[16px] border border-slate-200 p-6 sm:p-7 shadow-2xs space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-[18px] font-extrabold text-slate-900">
+                Thông tin chương trình &amp; Địa chỉ tổ chức
+              </h2>
+              <p className="text-[13px] text-slate-500">
+                Thông tin bên dưới đã được tự động điền theo địa điểm đã chọn ở trên. Bạn có thể chỉnh sửa nếu có yêu cầu riêng.
+              </p>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="font-bold text-slate-700">Thể loại sự kiện *</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-[13px]">
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="font-bold text-slate-700">Tên sự kiện / Chương trình *</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="VD: Live Concert Vũ - Bảo Tàng Của Nuối Tiếc"
+                  className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Thể loại sự kiện *</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
+                >
+                  <option value="Âm nhạc">Âm nhạc / Live Concert</option>
+                  <option value="Thể thao">Thể thao / Bóng đá / Bóng rổ</option>
+                  <option value="Sân khấu">Sân khấu / Hài kịch / Nghệ thuật</option>
+                  <option value="Festival">Lễ hội âm nhạc / EDM Festival</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Thời gian bắt đầu *</label>
+                <input
+                  type="datetime-local"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Tên địa điểm tổ chức *</label>
+                <input
+                  type="text"
+                  value={venueName}
+                  onChange={(e) => setVenueName(e.target.value)}
+                  placeholder="VD: Cung Điền Kinh Hà Nội, SVĐ Mỹ Đình..."
+                  className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Thành phố *</label>
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
+                >
+                  <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                  <option value="Hà Nội">Hà Nội</option>
+                  <option value="Đà Nẵng">Đà Nẵng</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="font-bold text-slate-700">Địa chỉ chi tiết *</label>
+                <input
+                  type="text"
+                  value={venueAddress}
+                  onChange={(e) => setVenueAddress(e.target.value)}
+                  placeholder="Số đường, phường/xã, quận/huyện..."
+                  className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="inline-flex items-center gap-2 px-6 h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[13px] font-bold transition-colors shadow-xs"
               >
-                <option value="Âm nhạc">Âm nhạc / Live Concert</option>
-                <option value="Thể thao">Thể thao / Bóng đá / Bóng rổ</option>
-                <option value="Sân khấu">Sân khấu / Hài kịch / Nghệ thuật</option>
-                <option value="Festival">Lễ hội âm nhạc / EDM Festival</option>
-              </select>
+                Tiếp tục: Chọn mẫu sơ đồ SVG
+                <ArrowRight className="size-4" />
+              </button>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-slate-700">Thời gian bắt đầu *</label>
-              <input
-                type="datetime-local"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-slate-700">Tên địa điểm tổ chức *</label>
-              <input
-                type="text"
-                value={venueName}
-                onChange={(e) => setVenueName(e.target.value)}
-                placeholder="VD: Cung Điền Kinh Hà Nội, SVĐ Mỹ Đình..."
-                className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-slate-700">Thành phố *</label>
-              <select
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
-              >
-                <option value="Hà Nội">Hà Nội</option>
-                <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                <option value="Đà Nẵng">Đà Nẵng</option>
-                <option value="Hải Phòng">Hải Phòng</option>
-                <option value="Cần Thơ">Cần Thơ</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="font-bold text-slate-700">Địa chỉ chi tiết *</label>
-              <input
-                type="text"
-                value={venueAddress}
-                onChange={(e) => setVenueAddress(e.target.value)}
-                placeholder="Số đường, phường/xã, quận/huyện..."
-                className="w-full h-11 px-3.5 rounded-[10px] border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-primary"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="inline-flex items-center gap-2 px-6 h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[13px] font-bold transition-colors"
-            >
-              Tiếp tục: Chọn mẫu sơ đồ địa điểm
-              <ArrowRight className="size-4" />
-            </button>
           </div>
         </div>
       )}
 
-      {/* STEP 2: Venue Template Selector with Interactive SVG Preview */}
+      {/* STEP 2: Venue Layout Selector with Interactive SVG Preview */}
       {step === 2 && (
         <div className="space-y-6">
           <div className="bg-white rounded-[16px] border border-slate-200 p-6 sm:p-7 shadow-2xs space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-[18px] font-extrabold text-slate-900">
-                Bước 2: Chọn mẫu sơ đồ khán đài kiến trúc
-              </h2>
-              <p className="text-[13px] text-slate-500">
-                Hệ thống TicketHub cung cấp 5 mô hình không gian biểu diễn tiêu chuẩn tại Việt Nam. Chọn mẫu phù hợp với sân vận động hoặc nhà thi đấu của bạn:
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <h2 className="text-[18px] font-extrabold text-slate-900">
+                  Bước 2: Chọn mẫu sơ đồ khán đài kiến trúc
+                </h2>
+                <p className="text-[13px] text-slate-500">
+                  {currentVenue
+                    ? `Địa điểm đã chọn: ${currentVenue.name} (${currentVenue.city}). Dưới đây là các cấu hình sân khấu tương thích:`
+                    : "Chọn mô hình không gian biểu diễn phù hợp với sự kiện của bạn:"}
+                </p>
+              </div>
+
+              {currentVenue && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllLayouts((prev) => !prev)}
+                  className="text-[12px] font-bold text-primary hover:underline flex items-center gap-1 self-start sm:self-auto"
+                >
+                  <Compass className="size-3.5" />
+                  {showAllLayouts ? "Chỉ xem sơ đồ tương thích" : "Xem tất cả 5 mẫu sơ đồ chuẩn"}
+                </button>
+              )}
             </div>
 
-            {/* Template Selector Cards */}
+            {/* Layout Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
-              {VENUE_TEMPLATES.map((tmpl) => {
-                const isSelected = tmpl.key === selectedTemplateKey;
-                return (
-                  <button
-                    key={tmpl.key}
-                    type="button"
-                    onClick={() => handleSelectTemplate(tmpl.key)}
-                    className={`p-4 rounded-[12px] border text-left transition-all relative ${
-                      isSelected
-                        ? "border-primary bg-emerald-50/50 shadow-xs ring-1 ring-primary"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
-                        {tmpl.category}
-                      </span>
-                      {isSelected && (
-                        <CheckCircle2 className="size-4 text-primary shrink-0" />
-                      )}
-                    </div>
-                    <h3 className="font-extrabold text-slate-900 text-[14px]">
-                      {tmpl.title}
-                    </h3>
-                    <p className="text-[12px] text-slate-600 mt-1 line-clamp-2">
-                      {tmpl.description}
-                    </p>
-                    <div className="mt-3 pt-2.5 border-t border-slate-200/60 text-[11px] text-slate-500 space-y-1">
-                      <div>
-                        <span className="font-semibold text-slate-700">Sức chứa:</span>{" "}
-                        {tmpl.capacityEstimate}
+              {Object.entries(CURATED_LAYOUT_TEMPLATES)
+                .filter(([key]) => {
+                  if (showAllLayouts || !currentVenue) return true;
+                  return currentVenue.layouts.some((l) => l.mapKey === key);
+                })
+                .map(([key, tmpl]) => {
+                  const isSelected = tmpl.mapKey === selectedLayoutKey;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleSelectLayout(tmpl.mapKey)}
+                      className={`p-4 rounded-[12px] border text-left transition-all relative ${
+                        isSelected
+                          ? "border-primary bg-emerald-50/50 shadow-xs ring-1 ring-primary"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                          {tmpl.categoryName}
+                        </span>
+                        {isSelected && (
+                          <CheckCircle2 className="size-4 text-primary shrink-0" />
+                        )}
                       </div>
-                      <div className="line-clamp-1">
-                        <span className="font-semibold text-slate-700">Ví dụ:</span>{" "}
-                        {tmpl.realVenuesExample}
+                      <h3 className="font-extrabold text-slate-900 text-[14px]">
+                        {tmpl.name}
+                      </h3>
+                      <p className="text-[12px] text-slate-600 mt-1 line-clamp-2">
+                        {tmpl.description}
+                      </p>
+                      <div className="mt-3 pt-2.5 border-t border-slate-200/60 text-[11px] text-slate-500 space-y-1">
+                        <div>
+                          <span className="font-semibold text-slate-700">Sức chứa ước tính:</span>{" "}
+                          {tmpl.capacityEstimate}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-slate-700">Số phân khu mặc định:</span>{" "}
+                          {tmpl.defaultZones.length} khu vực
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
             </div>
           </div>
 
@@ -383,7 +548,7 @@ function NewEventContent() {
               <div>
                 <h3 className="text-[15px] font-extrabold text-slate-900 flex items-center gap-2">
                   <Layers className="size-4 text-primary" />
-                  Xem trước trực tiếp: {selectedTemplate.title}
+                  Xem trước trực tiếp: {currentLayoutTemplate.name}
                 </h3>
                 <p className="text-[12px] text-slate-500">
                   Bạn có thể dùng chuột kéo rê để xoay góc nhìn, lăn chuột hoặc bấm nút để phóng to / thu nhỏ.
@@ -396,7 +561,7 @@ function NewEventContent() {
 
             <div className="h-[460px] sm:h-[520px] bg-[#f8fafc] relative">
               <SeatMap
-                mapKey={selectedTemplateKey}
+                mapKey={selectedLayoutKey}
                 activeZoneId={activeZoneId}
                 hoveredZoneId={hoveredZoneId}
                 zoneInfoMap={zoneInfoMap}
@@ -413,7 +578,7 @@ function NewEventContent() {
               className="inline-flex items-center gap-2 px-5 h-11 rounded-[10px] border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[13px] font-bold transition-colors"
             >
               <ArrowLeft className="size-4" />
-              Quay lại
+              Quay lại Bước 1
             </button>
             <button
               type="button"
@@ -438,7 +603,7 @@ function NewEventContent() {
                 </h2>
                 <p className="text-[13px] text-slate-500">
                   Điều chỉnh đơn giá (VND) và số lượng vé phân bổ cho từng khu khán đài của mẫu{" "}
-                  <strong>{selectedTemplate.title}</strong>.
+                  <strong>{currentLayoutTemplate.name}</strong>.
                 </p>
               </div>
               <div className="text-right">
@@ -583,7 +748,7 @@ function NewEventContent() {
                 Bước 4: Kiểm tra thông tin &amp; Xuất bản sự kiện
               </h2>
               <p className="text-[13px] text-slate-500">
-                Hệ thống sẽ tạo tự động toàn bộ vị trí chỗ ngồi, liên kết với sơ đồ khán đài và cấp mã vé điện tử bảo mật.
+                Hệ thống sẽ tạo tự động toàn bộ vị trí chỗ ngồi, liên kết với sơ đồ khán đài SVG và cấp mã vé điện tử bảo mật.
               </p>
             </div>
 
@@ -597,7 +762,7 @@ function NewEventContent() {
                     Sự kiện đã được tạo thành công!
                   </h3>
                   <p className="text-[14px] text-slate-600 max-w-md mx-auto">
-                    Mẫu sơ đồ <strong>{selectedTemplate.title}</strong> cùng {totalCapacity.toLocaleString("vi-VN")} vé đã được khởi tạo trong hệ thống.
+                    Địa điểm <strong>{venueName}</strong> với mẫu sơ đồ <strong>{currentLayoutTemplate.name}</strong> cùng {totalCapacity.toLocaleString("vi-VN")} vé đã được khởi tạo trong hệ thống.
                   </p>
                 </div>
 
@@ -637,6 +802,14 @@ function NewEventContent() {
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[11px] font-bold uppercase">
+                        Địa chỉ chi tiết:
+                      </span>
+                      <span className="font-medium text-slate-800">
+                        {venueAddress}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px] font-bold uppercase">
                         Thời gian biểu diễn:
                       </span>
                       <span className="font-medium text-slate-800">
@@ -648,10 +821,10 @@ function NewEventContent() {
                   <div className="space-y-3">
                     <div>
                       <span className="text-slate-400 block text-[11px] font-bold uppercase">
-                        Mẫu sơ đồ khán đài:
+                        Mẫu sơ đồ khán đài SVG:
                       </span>
                       <span className="font-extrabold text-primary text-[15px]">
-                        {selectedTemplate.title}
+                        {currentLayoutTemplate.name}
                       </span>
                     </div>
                     <div>
@@ -676,7 +849,7 @@ function NewEventContent() {
                 <div className="p-4 rounded-[12px] bg-blue-50 border border-blue-200 text-blue-900 text-[12px] flex items-start gap-3">
                   <Info className="size-4.5 text-blue-600 shrink-0 mt-0.5" />
                   <p>
-                    Sau khi nhấn <strong>Xuất bản sự kiện</strong>, hệ thống TicketHub sẽ tự động phân bổ số lượng vé cho từng khu vực khán đài và kích hoạt hệ thống điều phối lưu lượng chống nghẽn khi mở bán.
+                    Sau khi nhấn <strong>Xác nhận &amp; Xuất bản sự kiện</strong>, hệ thống TicketHub sẽ tự động phân bổ số lượng vé cho từng khu vực khán đài trên sơ đồ SVG và kích hoạt hệ thống điều phối lưu lượng chống nghẽn khi mở bán.
                   </p>
                 </div>
 

@@ -195,6 +195,56 @@ sequenceDiagram
     end
 ```
 
+## Hệ thống Địa điểm Chuẩn & Quản lý Sơ đồ SVG (Curated Venues)
+
+Hệ thống TicketHub chuẩn hóa quy trình tạo sự kiện thông qua mô hình Địa điểm Chuẩn (Curated Venues) và Sơ đồ SVG vector tương tác:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Quản trị viên (Admin)
+    actor Host as Ban tổ chức (Host)
+    participant Web as Web Dashboard
+    participant API as API Server
+    participant DB as PostgreSQL
+    actor Buyer as Người mua vé
+
+    Admin->>Web: Nhập địa điểm mới & tải lên sơ đồ SVG đã chuẩn hóa
+    Web->>API: POST /admin/venues (kèm sơ đồ mapKey & metadata phân khu)
+    API->>DB: Lưu venues và venue_layouts (default_zones, map_key)
+
+    Host->>Web: Vào màn hình Tạo sự kiện mới
+    Web->>API: GET /venues?city=Hà Nội
+    API->>DB: Truy vấn danh sách địa điểm khả dụng theo thành phố
+    API-->>Web: Trả danh mục 11 địa điểm chuẩn (TP.HCM, Hà Nội, Đà Nẵng)
+
+    Host->>Web: Nhấp chọn 1-click Địa điểm chuẩn (VD: Cung Điền Kinh Hà Nội)
+    Web-->>Host: Tự động điền địa chỉ, quận huyện, chọn sơ đồ T-Stage & nạp bảng giá khu vực
+    Host->>Web: Điều chỉnh đơn giá từng khu vực & nhấn Xuất bản sự kiện
+    Web->>API: POST /events (kèm venue_id, venue_layout_id, ticket_types)
+    API->>DB: Tạo sự kiện và khởi tạo các phân khu vé
+
+    Buyer->>Web: Xem trang chi tiết sự kiện
+    Web-->>Buyer: Hiển thị SeatMap SVG tương tác với giá vé động theo từng phân khu
+```
+
+### 1. Phân quyền và kiểm duyệt sơ đồ (Admin Curation)
+
+- Quản trị viên biên tập và duy trì danh mục các địa điểm tổ chức biểu diễn và thi đấu lớn tại 3 thành phố hạt nhân: **TP. Hồ Chí Minh** (SVĐ Thống Nhất, NTĐ Quân Khu 7, Nhà Hát Hòa Bình, NTĐ Hồ Xuân Hương), **Hà Nội** (SVĐ Quốc Gia Mỹ Đình, Cung Điền Kinh Hà Nội, SVĐ Hàng Đẫy, Nhà Hát Lớn Hà Nội), và **Đà Nẵng** (Cung Thể Thao Tiên Sơn, SVĐ Hòa Xuân, Nhà Hát Trưng Vương).
+- Mỗi địa điểm được liên kết với một hoặc nhiều mẫu sơ đồ kiến trúc chuẩn dạng SVG (sân khấu chữ T concert, mega concert sân vận động ngoài trời, sân bóng đá tiêu chuẩn FIFA, sàn đấu bóng rổ VBA, khán phòng nhà hát thính phòng).
+- Các tệp SVG được chuẩn hóa thuộc tính `data-zone` trên từng phần tử khán đài nhằm đồng bộ tự động với bảng mã phân khu vé của hệ thống.
+
+### 2. Quy trình lựa chọn 1-click cho Ban tổ chức (Host)
+
+- Ban tổ chức có thể lọc địa điểm trực quan theo thành phố (Tất cả, TP. Hồ Chí Minh, Hà Nội, Đà Nẵng), lọc theo danh mục không gian hoặc tìm kiếm nhanh theo từ khóa.
+- Khi chọn địa điểm, hệ thống tự động điền toàn bộ thông tin địa danh, địa chỉ, đồng thời thiết lập sẵn mẫu sơ đồ kiến trúc tối ưu nhất kèm theo ma trận phân bổ vé và mức giá đề xuất thực tế.
+- Ban tổ chức có thể xem trước trực quan sơ đồ SVG tương tác (xoay, thu phóng, rê chuột xem giá) trước khi hoàn tất phát hành vé.
+
+### 3. Trải nghiệm chọn chỗ trực quan cho Người mua vé
+
+- Sơ đồ SVG vector được hiển thị sắc nét trên mọi thiết bị và độ phân giải, hỗ trợ thao tác cảm ứng trên thiết bị di động và chuột trên máy tính bàn.
+- Trạng thái từng phân khu (còn vé, sắp hết vé, hết vé) được cập nhật đồng bộ với hệ thống hàng chờ và giữ chỗ thông qua Server-Sent Events (SSE).
+
 ## Các biện pháp an toàn và giới hạn
 
 ### Giới hạn gian lận vé
