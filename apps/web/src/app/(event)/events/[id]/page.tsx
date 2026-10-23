@@ -56,7 +56,9 @@ function EventSplitView({ event }: { event: EventItem }) {
   const [showQtyModal, setShowQtyModal] = useState<boolean>(
     searchParams.get("modal") !== "false"
   );
-  const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
+  const [activeZoneId, setActiveZoneId] = useState<string | null>(
+    searchParams.get("zone") || null
+  );
   const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<TicketListing | null>(null);
   const [isSaved, setIsSaved] = useState<boolean>(false);
@@ -235,7 +237,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                     ? "Khu Đứng Ưu Tiên (Vé BTC)"
                     : activeZoneId === "885"
                     ? "Khu Kỹ Thuật (Không mở bán)"
-                    : activeZoneId)}
+                    : `Khu ${activeZoneId}`)}
               </strong>
               <button
                 type="button"
@@ -275,7 +277,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                         ? "Khu Đứng Ưu Tiên (BTC)"
                         : activeZoneId === "885"
                         ? "Khu Kỹ Thuật"
-                        : activeZoneId)}
+                        : `Khu ${activeZoneId}`)}
                   </strong>
                 </span>
               ) : (
@@ -322,9 +324,14 @@ function EventSplitView({ event }: { event: EventItem }) {
                     </p>
                   </>
                 ) : (
-                  <p className="text-[14px] font-semibold text-[#141d23]">
-                    Không tìm thấy vé phù hợp cho khu vực đã chọn
-                  </p>
+                  <>
+                    <h3 className="text-[15px] font-bold text-[#141d23]">
+                      Khu vực đã chọn hiện chưa có vé phù hợp
+                    </h3>
+                    <p className="text-[13px] text-[#606970] max-w-xs mx-auto">
+                      Khu vực này hiện đã bán hết hoặc không đủ số lượng vé bạn chọn. Quý khách vui lòng chọn các khu vực khác.
+                    </p>
+                  </>
                 )}
                 <button
                   type="button"
@@ -393,7 +400,7 @@ function EventSplitView({ event }: { event: EventItem }) {
 
                         <div className="flex items-center gap-1.5">
                           <Eye className="size-3.5 text-[#606970] shrink-0" />
-                          <span>Tầm nhìn trực diện sân khấu</span>
+                          <span>Tầm nhìn trực diện</span>
                         </div>
 
                         {listing.isLastTickets && (
