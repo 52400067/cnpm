@@ -10,288 +10,11 @@ import {
   Navigation,
   X,
 } from "lucide-react";
-
-type CategoryCode = "ALL" | "CONCERT" | "SPORT" | "THEATER" | "FESTIVAL";
-
-interface EventItem {
-  id: string;
-  title: string;
-  category: Exclude<CategoryCode, "ALL">;
-  dateRange: string;
-  dateWindow: "WEEKEND" | "NOV" | "DEC";
-  venue: string;
-  city: string;
-  cityCode: "HCM" | "HN" | "DN";
-  fromPrice: string;
-  image: string;
-  portraitImage?: string;
-  featuredOrder?: number;
-  trendingOrder?: number;
-}
-
-const EVENTS: EventItem[] = [
-  // 4 Popular Portrait Marquee Events (286x352 aspect ratio)
-  {
-    id: "evt-anh-trai-vuot-ngan-chong-gai",
-    title: "Anh Trai Vượt Ngàn Chông Gai",
-    category: "CONCERT",
-    dateRange: "15 Th11 - 16 Th11",
-    dateWindow: "WEEKEND",
-    venue: "Vạn Phúc City",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "800.000 ₫+",
-    image: "/images/events/vn/anh-trai.jpg",
-    portraitImage: "/images/events/vn/anh-trai.jpg",
-    featuredOrder: 1,
-  },
-  {
-    id: "evt-ha-anh-tuan-sketch-a-rose",
-    title: "Hà Anh Tuấn: Sketch A Rose",
-    category: "CONCERT",
-    dateRange: "16 Th11 - 23 Th11",
-    dateWindow: "WEEKEND",
-    venue: "Nhà hát Hòa Bình",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "1.200.000 ₫+",
-    image: "/images/events/vn/ha-anh-tuan.jpg",
-    portraitImage: "/images/events/vn/ha-anh-tuan.jpg",
-    featuredOrder: 2,
-  },
-  {
-    id: "evt-nhung-thanh-pho-mo-mang",
-    title: "Những Thành Phố Mơ Màng",
-    category: "FESTIVAL",
-    dateRange: "22 Th11 - 06 Th12",
-    dateWindow: "NOV",
-    venue: "Công viên Yên Sở",
-    city: "Hà Nội",
-    cityCode: "HN",
-    fromPrice: "650.000 ₫+",
-    image: "/images/events/vn/ntpmm.jpg",
-    portraitImage: "/images/events/vn/ntpmm.jpg",
-    featuredOrder: 3,
-  },
-  {
-    id: "evt-rock-viet-buc-tuong",
-    title: "Rock Việt: Bức Tường Live",
-    category: "CONCERT",
-    dateRange: "29 Th11 - 13 Th12",
-    dateWindow: "NOV",
-    venue: "SVĐ Quân Khu 7",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "500.000 ₫+",
-    image: "/images/events/vn/buc-tuong.jpg",
-    portraitImage: "/images/events/vn/buc-tuong.jpg",
-    featuredOrder: 4,
-  },
-
-  // Trending Events Near You
-  {
-    id: "evt-den-vau-show-cua-den",
-    title: "Đen Vâu: Show Của Đen",
-    category: "CONCERT",
-    dateRange: "T7, 29 Th11 • 19:30",
-    dateWindow: "NOV",
-    venue: "Cung Điền kinh Mỹ Đình",
-    city: "Hà Nội",
-    cityCode: "HN",
-    fromPrice: "700.000 ₫+",
-    image: "/images/events/vn/den-vau.jpg",
-    trendingOrder: 1,
-  },
-  {
-    id: "evt-soobin-live-showcase",
-    title: "SOOBIN Live Showcase",
-    category: "CONCERT",
-    dateRange: "T6, 21 Th11 • 20:00",
-    dateWindow: "NOV",
-    venue: "Nhà thi đấu Nguyễn Du",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "750.000 ₫+",
-    image: "/images/events/vn/soobin.jpg",
-    trendingOrder: 2,
-  },
-  {
-    id: "evt-vu-bao-tang-cua-nuoi-tiec",
-    title: "Vũ. Bảo Tàng Của Nuối Tiếc",
-    category: "CONCERT",
-    dateRange: "CN, 30 Th11 • 20:00",
-    dateWindow: "NOV",
-    venue: "Nhà thi đấu Phú Thọ",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "650.000 ₫+",
-    image: "/images/events/vn/vu.jpg",
-    trendingOrder: 3,
-  },
-  {
-    id: "evt-chi-dep-dap-gio-re-song",
-    title: "Chị Đẹp Đạp Gió Rẽ Sóng",
-    category: "FESTIVAL",
-    dateRange: "CN, 14 Th12 • 19:00",
-    dateWindow: "DEC",
-    venue: "SECC Quận 7",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "700.000 ₫+",
-    image: "/images/events/vn/hozo.jpg",
-    trendingOrder: 4,
-  },
-
-  // Concerts Row
-  {
-    id: "evt-my-tam-tri-am",
-    title: "Mỹ Tâm: Tri Âm Acoustic",
-    category: "CONCERT",
-    dateRange: "06 Th12 - 07 Th12",
-    dateWindow: "DEC",
-    venue: "Cung Tiên Sơn",
-    city: "Đà Nẵng",
-    cityCode: "DN",
-    fromPrice: "900.000 ₫+",
-    image: "/images/events/vn/my-tam.jpg",
-  },
-  {
-    id: "evt-chillies-ca-hoi-hoang",
-    title: "Chillies & Cá Hồi Hoang",
-    category: "CONCERT",
-    dateRange: "05 Th12 - 12 Th12",
-    dateWindow: "DEC",
-    venue: "Capital Theatre",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "550.000 ₫+",
-    image: "/images/events/vn/chillies.jpg",
-  },
-  {
-    id: "evt-anh-trai-say-hi-live",
-    title: "Anh Trai Say Hi: Concert Live",
-    category: "CONCERT",
-    dateRange: "22 Th11 - 28 Th11",
-    dateWindow: "NOV",
-    venue: "Vạn Phúc City",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "850.000 ₫+",
-    image: "/images/events/vn/tlinh.jpg",
-  },
-  {
-    id: "evt-wren-evans-loi-choi",
-    title: "Wren Evans: LOI CHOI Live",
-    category: "CONCERT",
-    dateRange: "13 Th12 - 20 Th12",
-    dateWindow: "DEC",
-    venue: "Nhà thi đấu Nguyễn Du",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "600.000 ₫+",
-    image: "/images/events/vn/indie-saigon.jpg",
-  },
-
-  // Sports Row
-  {
-    id: "evt-vleague-cahn-namdinh",
-    title: "Công An Hà Nội vs. Nam Định FC",
-    category: "SPORT",
-    dateRange: "CN, 23 Th11 • 19:15",
-    dateWindow: "WEEKEND",
-    venue: "SVĐ Hàng Đẫy",
-    city: "Hà Nội",
-    cityCode: "HN",
-    fromPrice: "150.000 ₫+",
-    image: "/images/events/vn/vleague-cahn.jpg",
-  },
-  {
-    id: "evt-vba-finals-saigon-heat",
-    title: "Saigon Heat vs. Hanoi Buffaloes",
-    category: "SPORT",
-    dateRange: "CN, 16 Th11 • 19:30",
-    dateWindow: "WEEKEND",
-    venue: "Nhà thi đấu CIS Quận 7",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "250.000 ₫+",
-    image: "/images/events/vn/saigon-heat.jpg",
-  },
-  {
-    id: "evt-giao-huu-vietnam-allstars",
-    title: "Đội Tuyển Việt Nam vs. All-Stars",
-    category: "SPORT",
-    dateRange: "T7, 13 Th12 • 19:00",
-    dateWindow: "DEC",
-    venue: "SVĐ Quốc gia Mỹ Đình",
-    city: "Hà Nội",
-    cityCode: "HN",
-    fromPrice: "300.000 ₫+",
-    image: "/images/events/vn/vietnam-football.jpg",
-  },
-  {
-    id: "evt-vleague-thecong-hanoi",
-    title: "Thể Công Viettel vs. Hà Nội FC",
-    category: "SPORT",
-    dateRange: "T7, 29 Th11 • 19:15",
-    dateWindow: "NOV",
-    venue: "SVĐ Quốc gia Mỹ Đình",
-    city: "Hà Nội",
-    cityCode: "HN",
-    fromPrice: "180.000 ₫+",
-    image: "/images/events/vn/thecong-hanoi.jpg",
-  },
-
-  // Theater & Comedy Row
-  {
-    id: "evt-ky-uc-hoi-an-show",
-    title: "Show Thực Cảnh Ký Ức Hội An",
-    category: "THEATER",
-    dateRange: "16 Th11 - 30 Th11",
-    dateWindow: "WEEKEND",
-    venue: "Đảo Ký Ức Hội An",
-    city: "Đà Nẵng",
-    cityCode: "DN",
-    fromPrice: "400.000 ₫+",
-    image: "/images/events/vn/kich-idecaf.jpg",
-  },
-  {
-    id: "evt-giao-huong-ghibli-hanoi",
-    title: "Dàn Nhạc Giao Hưởng Hà Nội",
-    category: "THEATER",
-    dateRange: "22 Th11 - 23 Th11",
-    dateWindow: "NOV",
-    venue: "Nhà hát Hồ Gươm",
-    city: "Hà Nội",
-    cityCode: "HN",
-    fromPrice: "600.000 ₫+",
-    image: "/images/events/vn/dan-nhac-giao-huong.jpg",
-  },
-  {
-    id: "evt-saigon-teu-standup",
-    title: "Sài Gòn Tếu Stand-up Comedy",
-    category: "THEATER",
-    dateRange: "28 Th11 - 05 Th12",
-    dateWindow: "NOV",
-    venue: "Sân khấu C30 Hòa Bình",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "220.000 ₫+",
-    image: "/images/events/vn/saigon-teu.jpg",
-  },
-  {
-    id: "evt-a-o-show-opera",
-    title: "Vở Múa Đương Đại À Ố Show",
-    category: "THEATER",
-    dateRange: "06 Th12 - 20 Th12",
-    dateWindow: "DEC",
-    venue: "Nhà hát Thành phố",
-    city: "TP. Hồ Chí Minh",
-    cityCode: "HCM",
-    fromPrice: "700.000 ₫+",
-    image: "/images/events/vn/a-o-show.jpg",
-  },
-];
+import {
+  EVENTS,
+  type CategoryCode,
+  type EventItem,
+} from "@/lib/events-catalog";
 
 const POPULAR_CATEGORIES = [
   {
@@ -362,10 +85,7 @@ function EventGridCard({
   return (
     <div className="group relative flex flex-col">
       <div className="relative aspect-[5/4] w-full overflow-hidden rounded-[16px] bg-[#eff1f2]">
-        <Link
-          href={`/my-tickets?event=${event.id}`}
-          className="block h-full w-full"
-        >
+        <Link href={`/events/${event.id}`} className="block h-full w-full">
           <img
             src={event.image}
             alt={event.title}
@@ -384,10 +104,7 @@ function EventGridCard({
         </button>
       </div>
 
-      <Link
-        href={`/my-tickets?event=${event.id}`}
-        className="pt-2 flex flex-col"
-      >
+      <Link href={`/events/${event.id}`} className="pt-2 flex flex-col">
         <h3 className="text-[14px] font-bold leading-[1.35] text-[#141d23] truncate group-hover:text-primary transition-colors">
           {event.title}
         </h3>
@@ -562,7 +279,7 @@ export default function HomePage() {
                   className="group relative aspect-[286/352] w-full overflow-hidden rounded-[16px] bg-[#141d23]"
                 >
                   <Link
-                    href={`/my-tickets?event=${ev.id}`}
+                    href={`/events/${ev.id}`}
                     className="block h-full w-full"
                   >
                     <img
@@ -583,7 +300,7 @@ export default function HomePage() {
                   </button>
 
                   <Link
-                    href={`/my-tickets?event=${ev.id}`}
+                    href={`/events/${ev.id}`}
                     className="absolute inset-x-0 bottom-0 p-4 text-white"
                   >
                     <h3 className="text-[17px] font-bold leading-snug text-white line-clamp-2">
