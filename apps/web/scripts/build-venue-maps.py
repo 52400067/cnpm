@@ -88,7 +88,36 @@ def process(src_name, rules_key, variant):
                         break
             parent.remove(g)
             continue
-        ng = ET.Element(q("g"), {"data-zone": eid, "data-sec": g.get("sprite-identifier")})
+
+        sec_text = ""
+        for tnode in g.iter():
+            if tnode.tag in (q("text"), q("tspan")) and tnode.text and tnode.text.strip():
+                sec_text = tnode.text.strip().replace(" ", "")
+                break
+
+        # Divide individual sections rather than grouping an entire stadium into a single class
+        if rules_key == "stadium":
+            if sec_text in ("ĐỨNG", "KHUĐỨNG", "STANDING", "STANDINGPEN"):
+                zone_key = "682"
+            elif sec_text in ("ĐỨNGƯUTIÊN", "PRIORITY", "PRIORITYSTANDING"):
+                zone_key = "11448"
+            elif sec_text:
+                zone_key = sec_text
+            else:
+                zone_key = eid
+        elif rules_key == "arena-basketball":
+            if sec_text:
+                zone_key = sec_text
+            else:
+                zone_key = eid
+        else:
+            zone_key = eid
+
+        ng = ET.Element(q("g"), {
+            "data-zone": zone_key,
+            "data-tier": eid,
+            "data-sec": g.get("sprite-identifier"),
+        })
         for c in g:
             if c.tag == q("path"):
                 if c.get("obs"):

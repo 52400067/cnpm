@@ -44,6 +44,7 @@ function SeatMapView({
     name: string;
     price: number;
     isReserved?: boolean;
+    isSoldOut?: boolean;
     x: number;
     y: number;
   } | null>(null);
@@ -89,6 +90,7 @@ function SeatMapView({
                 name: zoneInfoMap[zid].name,
                 price: zoneInfoMap[zid].minPrice,
                 isReserved: false,
+                isSoldOut: false,
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top,
               });
@@ -98,6 +100,17 @@ function SeatMapView({
                 name: RESERVED_ZONES[zid],
                 price: 0,
                 isReserved: true,
+                isSoldOut: false,
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+              });
+            } else {
+              setTooltip({
+                zoneId: zid,
+                name: `Khu ${zid}`,
+                price: 0,
+                isReserved: false,
+                isSoldOut: true,
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top,
               });
@@ -198,6 +211,8 @@ function SeatMapView({
           <span className="font-semibold">{tooltip.name}</span>
           {tooltip.isReserved ? (
             <span className="text-amber-400 font-medium">Vé Ban Tổ Chức (Không mở bán)</span>
+          ) : tooltip.isSoldOut ? (
+            <span className="text-red-400 font-medium">Hết vé</span>
           ) : (
             <span className="text-[#a7f3d0] font-bold">{formatVnd(tooltip.price)}</span>
           )}
@@ -221,7 +236,9 @@ function SeatMapView({
       </div>
 
       {/* Dynamic CSS injecting live highlight styles based on activeZoneId and hoveredZoneId */}
-      <style jsx global>{`
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         /* Base section styles */
         .sec {
           fill: #eff6ff;
@@ -244,61 +261,82 @@ function SeatMapView({
           fill: #94a3b8 !important;
         }
 
-        /* Concert & General sections */
-        g[data-zone] {
-          cursor: pointer;
-        }
+        /* Default for sections without active tickets */
         g[data-zone] .sec {
-          fill: #ecfdf5;
-          stroke: #6ee7b7;
-          stroke-width: 3.5px;
+          fill: #f8fafc;
+          stroke: #cbd5e1;
+          stroke-width: 2.5px;
+          transition: all 0.15s ease;
         }
         g[data-zone] text {
-          fill: #141d23;
+          fill: #64748b;
           font-family: var(--font-sans), system-ui, sans-serif;
           font-weight: 700;
           pointer-events: none;
           user-select: none;
+          transition: all 0.15s ease;
         }
 
+        /* Available zones with active tickets */
+        ${Object.keys(zoneInfoMap)
+          .map(
+            (zid) => `
+        g[data-zone="${zid}"] .sec {
+          fill: #ecfdf5;
+          stroke: #10b981;
+          stroke-width: 3px;
+          cursor: pointer;
+        }
+        g[data-zone="${zid}"] text {
+          fill: #064e3b;
+          font-weight: 800;
+        }
+        `
+          )
+          .join("\n")}
+
         /* Hovered zone highlight */
-        ${hoveredZoneId
-          ? `
+        ${
+          hoveredZoneId
+            ? `
           g[data-zone="${hoveredZoneId}"] .sec {
-            fill: #6ee7b7 !important;
-            stroke: #059669 !important;
+            fill: #10b981 !important;
+            stroke: #047857 !important;
             stroke-width: 6px !important;
-            filter: drop-shadow(0 2px 8px rgba(5, 150, 105, 0.4));
+            filter: drop-shadow(0 2px 8px rgba(16, 185, 129, 0.45));
           }
           g[data-zone="${hoveredZoneId}"] text {
-            fill: #065f46 !important;
+            fill: #ffffff !important;
             font-weight: 800 !important;
           }
         `
-          : ""}
+            : ""
+        }
 
         /* Active / Selected zone highlight */
-        ${activeZoneId
-          ? `
+        ${
+          activeZoneId
+            ? `
           g[data-zone]:not([data-zone="${activeZoneId}"]) {
-            opacity: 0.38;
+            opacity: 0.35;
           }
           g[data-zone="${activeZoneId}"] .sec {
             fill: #059669 !important;
-            stroke: #047857 !important;
+            stroke: #064e3b !important;
             stroke-width: 7px !important;
-            filter: drop-shadow(0 4px 12px rgba(5, 150, 105, 0.5));
+            filter: drop-shadow(0 4px 12px rgba(5, 150, 105, 0.55));
           }
           g[data-zone="${activeZoneId}"] text {
             fill: #ffffff !important;
             font-weight: 800 !important;
           }
         `
-          : ""}
+            : ""
+        }
 
         /* Stage styling */
         .stage {
-          fill: #1e293b !important;
+          fill: #334155 !important;
         }
         .stage-label {
           fill: #ffffff !important;
@@ -325,7 +363,9 @@ function SeatMapView({
           stroke: #ffffff !important;
           fill: none !important;
         }
-      `}</style>
+      `,
+        }}
+      />
     </div>
   );
 }
