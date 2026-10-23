@@ -499,7 +499,7 @@ function EventSplitView({ event }: { event: EventItem }) {
             {/* Action Buttons */}
             <div className="space-y-2 pt-1">
               <Link
-                href={`/my-tickets?event=${event.id}&order=${holdOrderCode || "ORD-88412"}`}
+                href={`/my-tickets?event=${event.id}&order=${holdOrderCode || "ORD-88412"}&zone=${encodeURIComponent(selectedListing.zoneName)}&row=${encodeURIComponent(selectedListing.row || "")}&qty=${ticketQuantity}&price=${selectedListing.price}`}
                 className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors"
               >
                 <CheckCircle2 className="size-4.5" />
