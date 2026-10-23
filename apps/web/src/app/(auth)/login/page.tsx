@@ -60,8 +60,8 @@ export default function LoginPage() {
   };
 
   return (
-    <Card className="border border-border rounded-xl bg-card text-card-foreground shadow-xs">
-      <CardHeader className="space-y-1.5 text-center pb-2">
+    <Card className="border border-border rounded-xl bg-card text-card-foreground shadow-xs ring-0 p-5 sm:p-6 lg:border-0 lg:ring-0 lg:shadow-none lg:bg-transparent lg:rounded-none lg:p-0">
+      <CardHeader className="space-y-1.5 text-left p-0 pb-4 lg:p-0 lg:pb-4">
         <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
           Đăng nhập
         </CardTitle>
@@ -71,7 +71,7 @@ export default function LoginPage() {
       </CardHeader>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <CardContent className="space-y-4 pt-2">
+        <CardContent className="space-y-3.5 p-0 lg:p-0">
           {/* Top-of-form server error alert */}
           {serverError && (
             <div
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 placeholder="Ví dụ: nguyenan@example.com"
-                className="h-11 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-10 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-invalid={!!errors.email}
                 aria-describedby={errors.email ? "email-error" : undefined}
                 {...register("email")}
@@ -121,7 +121,7 @@ export default function LoginPage() {
               </Label>
               <Link
                 href="/forgot-password"
-                className="text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xs"
+                className="text-xs sm:text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xs"
               >
                 Quên mật khẩu?
               </Link>
@@ -133,7 +133,7 @@ export default function LoginPage() {
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 placeholder="Nhập mật khẩu"
-                className="h-11 pl-9 pr-10 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-10 pl-9 pr-10 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-invalid={!!errors.password}
                 aria-describedby={errors.password ? "password-error" : undefined}
                 {...register("password")}
@@ -163,25 +163,27 @@ export default function LoginPage() {
             )}
           </div>
 
-          {/* Remember me checkbox */}
-          <div className="flex items-center gap-2 pt-0.5">
-            <input
-              id="rememberMe"
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="size-4 rounded-xs border-border text-primary focus-visible:ring-2 focus-visible:ring-ring cursor-pointer accent-primary"
-            />
+          {/* Remember me checkbox (whole row 44px click target, box >= 20px) */}
+          <div className="pt-0.5">
             <label
               htmlFor="rememberMe"
-              className="text-xs text-foreground cursor-pointer select-none font-medium"
+              className="min-h-[44px] flex items-center gap-3 cursor-pointer select-none rounded-lg hover:bg-muted/40 px-2 -mx-2 transition-colors"
             >
-              Ghi nhớ đăng nhập
+              <input
+                id="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="size-5 rounded-xs border-border text-primary focus-visible:ring-2 focus-visible:ring-ring cursor-pointer accent-primary shrink-0"
+              />
+              <span className="text-sm text-foreground font-medium">
+                Ghi nhớ đăng nhập
+              </span>
             </label>
           </div>
         </CardContent>
 
-        <CardFooter className="flex flex-col gap-3.5 bg-transparent border-t-0 pt-2 pb-6">
+        <CardFooter className="flex flex-col gap-3.5 bg-transparent border-t-0 pt-3 pb-2 px-0 lg:px-0">
           <Button
             type="submit"
             disabled={isSubmitting}

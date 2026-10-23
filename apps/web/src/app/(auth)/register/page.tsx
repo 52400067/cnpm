@@ -111,8 +111,8 @@ function RegisterFormContent() {
   };
 
   return (
-    <Card className="border border-border rounded-xl bg-card text-card-foreground shadow-xs">
-      <CardHeader className="space-y-1.5 text-center pb-2">
+    <Card className="border border-border rounded-xl bg-card text-card-foreground shadow-xs ring-0 p-5 sm:p-6 lg:border-0 lg:ring-0 lg:shadow-none lg:bg-transparent lg:rounded-none lg:p-0">
+      <CardHeader className="space-y-1 text-left p-0 pb-2.5 lg:p-0 lg:pb-2.5">
         <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
           Tạo tài khoản
         </CardTitle>
@@ -122,9 +122,9 @@ function RegisterFormContent() {
       </CardHeader>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <CardContent className="space-y-4 pt-2">
+        <CardContent className="space-y-2.5 p-0 lg:p-0">
           {/* Role selector segmented control */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <span
               id="role-selector-label"
               className="block text-xs font-semibold text-foreground"
@@ -140,11 +140,18 @@ function RegisterFormContent() {
                 type="button"
                 role="radio"
                 aria-checked={role === UserRole.BUYER}
+                tabIndex={role === UserRole.BUYER ? 0 : -1}
                 onClick={() => handleRoleChange(UserRole.BUYER)}
-                className={`h-9 rounded-md text-xs sm:text-sm font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center gap-1.5 ${
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                    e.preventDefault();
+                    handleRoleChange(UserRole.ORGANIZER);
+                  }
+                }}
+                className={`h-8.5 rounded-md text-xs sm:text-sm font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 flex items-center justify-center gap-1.5 ${
                   role === UserRole.BUYER
                     ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-foreground/80 hover:text-foreground hover:bg-background/60"
                 }`}
               >
                 <User className="size-3.5" />
@@ -154,11 +161,18 @@ function RegisterFormContent() {
                 type="button"
                 role="radio"
                 aria-checked={role === UserRole.ORGANIZER}
+                tabIndex={role === UserRole.ORGANIZER ? 0 : -1}
                 onClick={() => handleRoleChange(UserRole.ORGANIZER)}
-                className={`h-9 rounded-md text-xs sm:text-sm font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center gap-1.5 ${
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    handleRoleChange(UserRole.BUYER);
+                  }
+                }}
+                className={`h-8.5 rounded-md text-xs sm:text-sm font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 flex items-center justify-center gap-1.5 ${
                   role === UserRole.ORGANIZER
                     ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-foreground/80 hover:text-foreground hover:bg-background/60"
                 }`}
               >
                 <Building2 className="size-3.5" />
@@ -171,7 +185,7 @@ function RegisterFormContent() {
           {serverError && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs font-medium text-destructive"
+              className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-xs font-medium text-destructive"
             >
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
               <span>{serverError}</span>
@@ -179,18 +193,18 @@ function RegisterFormContent() {
           )}
 
           {/* Full name field */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <Label htmlFor="fullName" className="text-xs font-semibold text-foreground">
-              Họ và tên <span className="text-destructive">*</span>
+              Họ và tên<span className="text-destructive ms-0.5" aria-hidden="true">*</span>
             </Label>
             <div className="relative">
-              <User className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <User className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 id="fullName"
                 type="text"
                 autoComplete="name"
                 placeholder="Ví dụ: Nguyễn Văn An"
-                className="h-11 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-9 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-invalid={!!errors.fullName}
                 aria-describedby={errors.fullName ? "fullName-error" : undefined}
                 {...register("fullName")}
@@ -208,22 +222,22 @@ function RegisterFormContent() {
             )}
           </div>
 
-          {/* Organizer-only organization name (optional on backend) */}
+          {/* Organizer-only organization name */}
           {role === UserRole.ORGANIZER && (
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <Label
                 htmlFor="organizationName"
                 className="text-xs font-semibold text-foreground"
               >
-                Tên Tổ chức / Doanh nghiệp <span className="text-destructive">*</span>
+                Tên Tổ chức / Doanh nghiệp<span className="text-destructive ms-0.5" aria-hidden="true">*</span>
               </Label>
               <div className="relative">
-                <Building2 className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Building2 className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
                   id="organizationName"
                   type="text"
                   placeholder="Ví dụ: Công ty Giải trí & Sự kiện ABC"
-                  className="h-11 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-9 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-invalid={!!errors.organizationName}
                   aria-describedby={
                     errors.organizationName ? "organizationName-error" : undefined
@@ -245,18 +259,18 @@ function RegisterFormContent() {
           )}
 
           {/* Email field */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <Label htmlFor="email" className="text-xs font-semibold text-foreground">
-              Địa chỉ Email <span className="text-destructive">*</span>
+              Địa chỉ Email<span className="text-destructive ms-0.5" aria-hidden="true">*</span>
             </Label>
             <div className="relative">
-              <Mail className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Mail className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
                 placeholder="Ví dụ: nguyenan@example.com"
-                className="h-11 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-9 pl-9 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-invalid={!!errors.email}
                 aria-describedby={errors.email ? "email-error" : undefined}
                 {...register("email")}
@@ -274,25 +288,25 @@ function RegisterFormContent() {
             )}
           </div>
 
-          {/* Phone number field (font-sans, not monospace) */}
-          <div className="space-y-1.5">
+          {/* Phone number field (font-sans, plain label + muted "Tùy chọn", NO asterisk) */}
+          <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label htmlFor="phone" className="text-xs font-semibold text-foreground">
                 Số điện thoại
               </Label>
               <span className="text-xs text-muted-foreground font-normal">
-                (Không bắt buộc)
+                Tùy chọn
               </span>
             </div>
             <div className="relative">
-              <Phone className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Phone className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 id="phone"
                 type="tel"
                 autoComplete="tel"
                 inputMode="tel"
                 placeholder="Ví dụ: 0912345678"
-                className="h-11 pl-9 rounded-lg text-sm bg-background border-input text-foreground font-sans placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-9 pl-9 rounded-lg text-sm bg-background border-input text-foreground font-sans placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-invalid={!!errors.phone}
                 aria-describedby={errors.phone ? "phone-error" : undefined}
                 {...register("phone")}
@@ -311,20 +325,20 @@ function RegisterFormContent() {
           </div>
 
           {/* Passwords stacked in a single column */}
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {/* Password field */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <Label htmlFor="password" className="text-xs font-semibold text-foreground">
-                Mật khẩu <span className="text-destructive">*</span>
+                Mật khẩu<span className="text-destructive ms-0.5" aria-hidden="true">*</span>
               </Label>
               <div className="relative">
-                <Lock className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Lock className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   placeholder="Nhập mật khẩu"
-                  className="h-11 pl-9 pr-10 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-9 pl-9 pr-10 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-invalid={!!errors.password}
                   aria-describedby={
                     errors.password ? "password-error" : "password-hint"
@@ -345,9 +359,9 @@ function RegisterFormContent() {
                 </button>
               </div>
 
-              {/* Persistent helper text & strength check */}
+              {/* Helper text without trailing period & strength indicator */}
               <div className="flex items-center justify-between text-xs text-muted-foreground pt-0.5">
-                <span id="password-hint">Tối thiểu 8 ký tự.</span>
+                <span id="password-hint">Tối thiểu 8 ký tự</span>
                 {watchedPassword && watchedPassword.length >= 8 && (
                   <span className="inline-flex items-center gap-1 text-emerald-700 font-medium text-[11px]">
                     <Check className="size-3 text-emerald-600" />
@@ -369,21 +383,21 @@ function RegisterFormContent() {
             </div>
 
             {/* Confirm Password field */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <Label
                 htmlFor="confirmPassword"
                 className="text-xs font-semibold text-foreground"
               >
-                Xác nhận mật khẩu <span className="text-destructive">*</span>
+                Xác nhận mật khẩu<span className="text-destructive ms-0.5" aria-hidden="true">*</span>
               </Label>
               <div className="relative">
-                <Lock className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Lock className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
                   autoComplete="new-password"
                   placeholder="Nhập lại mật khẩu"
-                  className="h-11 pl-9 pr-10 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-9 pl-9 pr-10 rounded-lg text-sm bg-background border-input text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-invalid={!!errors.confirmPassword}
                   aria-describedby={
                     errors.confirmPassword ? "confirmPassword-error" : undefined
@@ -420,58 +434,75 @@ function RegisterFormContent() {
             </div>
           </div>
 
-          {/* Required Consent Checkbox */}
-          <div className="flex items-start gap-2.5 pt-1">
-            <input
-              id="consent"
-              type="checkbox"
-              checked={isAgreed}
-              onChange={(e) => setIsAgreed(e.target.checked)}
-              className="mt-0.5 size-4 rounded-xs border-border text-primary focus-visible:ring-2 focus-visible:ring-ring cursor-pointer accent-primary shrink-0"
-              aria-required="true"
-            />
-            <label
-              htmlFor="consent"
-              className="text-xs text-foreground leading-relaxed cursor-pointer select-none"
-            >
-              Tôi đồng ý với{" "}
-              <Link
-                href="/terms"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary font-semibold hover:underline"
+          {/* Required Consent Checkbox (44px target, checkbox box >= 20px) */}
+          <div className="pt-0.5">
+            <div className="min-h-[44px] flex items-center gap-3 select-none rounded-lg hover:bg-muted/40 px-2 -mx-2 transition-colors">
+              <input
+                id="consent"
+                type="checkbox"
+                checked={isAgreed}
+                onChange={(e) => setIsAgreed(e.target.checked)}
+                className="size-5 rounded-xs border-border text-primary focus-visible:ring-2 focus-visible:ring-ring cursor-pointer accent-primary shrink-0"
+                aria-required="true"
+              />
+              <label
+                htmlFor="consent"
+                className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer py-1 flex-1"
               >
-                Điều khoản sử dụng
-              </Link>{" "}
-              và{" "}
-              <Link
-                href="/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary font-semibold hover:underline"
-              >
-                Chính sách bảo mật
-              </Link>
-              .
-            </label>
+                Tôi đồng ý với{" "}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary font-semibold hover:underline"
+                >
+                  Điều khoản sử dụng
+                </Link>{" "}
+                và{" "}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary font-semibold hover:underline"
+                >
+                  Chính sách bảo mật
+                </Link>
+                .
+              </label>
+            </div>
           </div>
         </CardContent>
 
-        <CardFooter className="flex flex-col gap-3.5 bg-transparent border-t-0 pt-2 pb-6">
-          <Button
-            type="submit"
-            disabled={!isAgreed || isSubmitting}
-            className="w-full h-11 rounded-lg font-semibold text-sm shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:opacity-40 disabled:pointer-events-none"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin" />
-                <span>Đang tạo tài khoản...</span>
-              </span>
-            ) : (
-              "Đăng ký ngay"
+        <CardFooter className="flex flex-col gap-2.5 bg-transparent border-t-0 pt-2.5 pb-1 px-0 lg:px-0">
+          <div className="w-full space-y-1">
+            <Button
+              type="submit"
+              aria-disabled={!isAgreed || isSubmitting}
+              className={`w-full h-10 rounded-lg font-semibold text-sm shadow-xs transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+                !isAgreed
+                  ? "opacity-60 cursor-not-allowed"
+                  : "cursor-pointer"
+              }`}
+              aria-describedby={!isAgreed ? "consent-submit-hint" : undefined}
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  <span>Đang tạo tài khoản...</span>
+                </span>
+              ) : (
+                "Đăng ký ngay"
+              )}
+            </Button>
+            {!isAgreed && (
+              <p
+                id="consent-submit-hint"
+                className="text-xs text-muted-foreground text-center"
+              >
+                Vui lòng đồng ý với điều khoản sử dụng để đăng ký
+              </p>
             )}
-          </Button>
+          </div>
 
           <div className="text-center text-sm text-muted-foreground">
             Đã có tài khoản?{" "}
