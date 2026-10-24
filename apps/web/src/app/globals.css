@@ -53,6 +53,13 @@
   --input: #dfe3e5;
   --ring: #10b981;
   --radius: 12px;
+  --auth-stage-offset: 0px;
+}
+
+@media (min-width: 1024px) and (min-height: 850px) {
+  :root {
+    --auth-stage-offset: -3vh;
+  }
 }
 
 @layer base {

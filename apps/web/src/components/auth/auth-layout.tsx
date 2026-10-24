@@ -39,14 +39,9 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
             </Link>
           </header>
 
-          {/* Form Content: identical top offset below header on all steps */}
-          <main className="flex-1 flex flex-col items-center w-full pt-8 sm:pt-10 lg:pt-10 pb-0">
-            <div
-              data-slot="form-wrapper"
-              className="w-full max-w-[440px] mx-auto border-0 shadow-none bg-transparent p-0"
-            >
-              {children}
-            </div>
+          {/* Main Zone: flex: 1, flex column, justify-content: center, padding-block >= 24px */}
+          <main className="flex-1 flex flex-col justify-center items-center w-full py-6 min-h-0">
+            {children}
           </main>
 
           {/* Footer: fixed to the bottom of the left column with clearance */}
