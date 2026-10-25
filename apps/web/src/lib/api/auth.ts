@@ -109,7 +109,7 @@ export const authApi = {
     };
   },
 
- login: async (body: LoginRequest): Promise<LoginResponseData> => {
+  login: async (body: LoginRequest): Promise<LoginResponseData> => {
     const result = await apiClient<LoginResponseData>("/auth/login", {
       method: "POST",
       body: JSON.stringify(body),
@@ -117,10 +117,16 @@ export const authApi = {
     if (result?.accessToken) {
       setAccessToken(result.accessToken);
     }
-    if (result?.user && typeof document !== "undefined") {
-      // Lưu cookie an toàn (SameSite=Lax) để Next.js Middleware kiểm tra RBAC
-      document.cookie = `th_role=${result.user.role}; path=/; max-age=604800; SameSite=Lax`;
-      localStorage.setItem("tickethub_user", JSON.stringify(result.user));
+    if (typeof document !== "undefined") {
+      const isSecure =
+        typeof window !== "undefined" && window.location.protocol === "https:";
+      const secureFlag = isSecure ? "; Secure" : "";
+      const maxAge = result.expiresIn || 900;
+      document.cookie = `accessToken=${result.accessToken}; path=/; max-age=${maxAge}; SameSite=Lax${secureFlag}`;
+      document.cookie = `th_role=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
+      if (result?.user) {
+        localStorage.setItem("tickethub_user", JSON.stringify(result.user));
+      }
     }
     return result;
   },
@@ -129,11 +135,16 @@ export const authApi = {
     try {
       await apiClient("/auth/logout", { method: "POST" });
     } catch {
-      // Bỏ qua nếu backend chưa bật
+      // Bo qua neu backend chua bat
     } finally {
       setAccessToken(null);
       if (typeof document !== "undefined") {
-        document.cookie = "th_role=; path=/; max-age=0; SameSite=Lax";
+        const isSecure =
+          typeof window !== "undefined" &&
+          window.location.protocol === "https:";
+        const secureFlag = isSecure ? "; Secure" : "";
+        document.cookie = `accessToken=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
+        document.cookie = `th_role=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
         localStorage.removeItem("tickethub_user");
       }
     }

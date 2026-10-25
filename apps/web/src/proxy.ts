@@ -1,46 +1,23 @@
-// apps/web/src/proxy.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifyJwt } from "./lib/auth-crypto";
 
-/**
- * Giải mã nhanh JWT payload (nếu BE1 lưu token trong cookie) để lấy role
- */
-function extractRoleFromJwt(token?: string): string | null {
-  if (!token) return null;
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(
-      Buffer.from(parts[1], "base64url").toString("utf-8"),
-    );
-    return payload?.role || null;
-  } catch {
-    return null;
-  }
-}
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
-export function proxy(request: NextRequest) {
-  const { pathname, searchParams } = request.nextUrl;
-
-  // Cho phép bypass nhanh khi thêm ?demo=1 trên URL để test UI lúc tắt Backend
-  if (searchParams.get("demo") === "1") {
-    return NextResponse.next();
-  }
-
-  // Đọc Role từ Cookie (hỗ trợ cả cookie th_role lẫn JWT cookie từ BE1)
-  const roleCookie = request.cookies.get("th_role")?.value;
   const accessCookie =
     request.cookies.get("accessToken")?.value ||
     request.cookies.get("access_token")?.value;
 
-  const userRole = roleCookie || extractRoleFromJwt(accessCookie);
+  const jwtPayload = await verifyJwt(accessCookie);
+  const userRole = jwtPayload?.role || null;
 
-  // 1. Bảo vệ cụm Route ADMIN (/admin/*) -> Chỉ cho phép ADMIN
+  // 1. Bao ve cum Route ADMIN (/admin/*) -> Chi cho phep ADMIN
   if (pathname.startsWith("/admin")) {
-    if (!userRole) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
+    if (!jwtPayload) {
+      const authUrl = new URL("/auth", request.url);
+      authUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(authUrl);
     }
     if (userRole !== "ADMIN") {
       const homeUrl = new URL("/", request.url);
@@ -49,12 +26,12 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // 2. Bảo vệ cụm Route ORGANIZER (/organizer/*) -> Chỉ cho phép ORGANIZER hoặc ADMIN
+  // 2. Bao ve cum Route ORGANIZER (/organizer/*) -> Chi cho phep ORGANIZER hoac ADMIN
   if (pathname.startsWith("/organizer")) {
-    if (!userRole) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
+    if (!jwtPayload) {
+      const authUrl = new URL("/auth", request.url);
+      authUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(authUrl);
     }
     if (userRole !== "ORGANIZER" && userRole !== "ADMIN") {
       const homeUrl = new URL("/", request.url);
@@ -63,12 +40,12 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // 3. Bảo vệ trang Vé của tôi (/my-tickets/*) -> Yêu cầu đã đăng nhập
+  // 3. Bao ve trang Ve cua toi (/my-tickets/*) -> Yeu cau da dang nhap
   if (pathname.startsWith("/my-tickets")) {
-    if (!userRole) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
+    if (!jwtPayload) {
+      const authUrl = new URL("/auth", request.url);
+      authUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(authUrl);
     }
   }
 

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Calendar,
   Plus,
@@ -14,9 +14,11 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
+import { authApi } from "@/lib/api/auth";
 
 export function OrganizerHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +55,10 @@ export function OrganizerHeader() {
         {/* Left: Logo + Organizer Portal Nav */}
         <div className="flex items-center gap-4 sm:gap-6">
           <Logo />
-          <span className="h-4 w-px bg-border hidden sm:block" aria-hidden="true" />
+          <span
+            className="h-4 w-px bg-border hidden sm:block"
+            aria-hidden="true"
+          />
 
           <nav
             aria-label="Điều hướng chính Ban tổ chức"
@@ -105,7 +110,7 @@ export function OrganizerHeader() {
                 aria-labelledby="organizer-account-button"
                 className="absolute right-0 mt-1.5 w-60 rounded-md border border-border bg-popover text-popover-foreground shadow-md py-1.5 z-40 focus:outline-none"
               >
-                <Link 
+                <Link
                   href="/organizer/profile"
                   onClick={() => setIsMenuOpen(false)}
                   className="block px-3.5 py-2 border-b border-border hover:bg-secondary transition-colors"
@@ -154,9 +159,10 @@ export function OrganizerHeader() {
                   <button
                     type="button"
                     role="menuitem"
-                    onClick={() => {
+                    onClick={async () => {
                       setIsMenuOpen(false);
-                      // TODO(contract): Call auth logout
+                      await authApi.logout();
+                      router.push("/auth");
                     }}
                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors text-left cursor-pointer"
                   >

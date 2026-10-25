@@ -27,7 +27,7 @@ export interface OrganizerEventItem {
   venueAddress: string;
   city: string;
   startTime: string; // ISO 8601
-  endTime?: string;  // ISO 8601
+  endTime?: string; // ISO 8601
   status: EventStatus;
   ticketsSold: number;
   ticketsTotal: number;
@@ -133,7 +133,10 @@ export function getDisplayStatus(event: OrganizerEventItem): DisplayStatusMeta {
         badgeClass: "bg-slate-100 text-slate-700 border-slate-300",
       };
     }
-    if (event.ticketsTotal > 0 && event.ticketsSold >= event.ticketsTotal * 0.9) {
+    if (
+      event.ticketsTotal > 0 &&
+      event.ticketsSold >= event.ticketsTotal * 0.9
+    ) {
       return {
         key: "ALMOST_SOLD_OUT",
         label: "Sắp hết vé",
@@ -424,7 +427,8 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
     ticketsTotal: 15000,
     revenue: 60000000,
     version: 4,
-    rejectionReason: "Điều kiện thời tiết bão nhiệt đới không đảm bảo an toàn khán đài ngoài trời.",
+    rejectionReason:
+      "Điều kiện thời tiết bão nhiệt đới không đảm bảo an toàn khán đài ngoài trời.",
   },
   {
     id: "evt-13",
@@ -476,7 +480,7 @@ export const MOCK_ORGANIZER_EVENTS: OrganizerEventItem[] = [
  * { success: true, data: { items: OrganizerEventItem[], nextCursor, hasMore, totalCount } }
  */
 export async function getOrganizerEvents(
-  query: OrganizerEventsQuery = {}
+  query: OrganizerEventsQuery = {},
 ): Promise<OrganizerEventsResponse> {
   const {
     keyword = "",
@@ -498,7 +502,7 @@ export async function getOrganizerEvents(
       (item) =>
         item.title.toLowerCase().includes(q) ||
         item.venueName.toLowerCase().includes(q) ||
-        item.city.toLowerCase().includes(q)
+        item.city.toLowerCase().includes(q),
     );
   }
 
@@ -508,7 +512,7 @@ export async function getOrganizerEvents(
       (item) =>
         item.status === EventStatus.DRAFT ||
         item.status === EventStatus.PENDING_APPROVAL ||
-        item.status === EventStatus.SUSPENDED
+        item.status === EventStatus.SUSPENDED,
     );
   } else if (status !== "ALL") {
     filtered = filtered.filter((item) => item.status === status);
@@ -524,7 +528,7 @@ export async function getOrganizerEvents(
     const fromTime = new Date(fromDate).getTime();
     if (!isNaN(fromTime)) {
       filtered = filtered.filter(
-        (item) => new Date(item.startTime).getTime() >= fromTime
+        (item) => new Date(item.startTime).getTime() >= fromTime,
       );
     }
   }
@@ -532,7 +536,7 @@ export async function getOrganizerEvents(
     const toTime = new Date(toDate).getTime();
     if (!isNaN(toTime)) {
       filtered = filtered.filter(
-        (item) => new Date(item.startTime).getTime() <= toTime
+        (item) => new Date(item.startTime).getTime() <= toTime,
       );
     }
   }
@@ -554,10 +558,14 @@ export async function getOrganizerEvents(
         if (aIsEndedOrPast !== bIsEndedOrPast) {
           return aIsEndedOrPast ? 1 : -1;
         }
-        return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+        return (
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
       }
       case "date_desc":
-        return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+        return (
+          new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+        );
       case "title_asc":
         return a.title.localeCompare(b.title, "vi");
       case "revenue_desc":
@@ -565,14 +573,16 @@ export async function getOrganizerEvents(
       case "sold_desc":
         return b.ticketsSold - a.ticketsSold;
       default:
-        return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+        return (
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
     }
   });
 
   const totalCount = filtered.length;
   const items = filtered.slice(0, limit);
   const nextCursor =
-    filtered.length > limit ? filtered[limit - 1]?.id ?? null : null;
+    filtered.length > limit ? (filtered[limit - 1]?.id ?? null) : null;
   const hasMore = filtered.length > limit;
 
   return {
@@ -597,13 +607,13 @@ export async function getOrganizerMetrics(): Promise<OrganizerMetrics> {
   const upcomingEventsCount = all.filter(
     (e) =>
       e.status === EventStatus.PUBLISHED &&
-      new Date(e.startTime).getTime() >= now
+      new Date(e.startTime).getTime() >= now,
   ).length;
   const actionRequiredCount = all.filter(
     (e) =>
       e.status === EventStatus.DRAFT ||
       e.status === EventStatus.PENDING_APPROVAL ||
-      e.status === EventStatus.SUSPENDED
+      e.status === EventStatus.SUSPENDED,
   ).length;
 
   return {
@@ -626,9 +636,9 @@ const DRAFT_STORAGE_KEY = "tickethub_organizer_event_draft";
  * // TODO(contract): POST /api/v1/events/draft is missing in API_CONTRACT.md.
  * Client-side persistence adapter is used until a backend draft endpoint is specified.
  */
-export function saveEventDraft(
-  draft: Omit<EventDraftData, "savedAt">
-): { savedAt: string } {
+export function saveEventDraft(draft: Omit<EventDraftData, "savedAt">): {
+  savedAt: string;
+} {
   const savedAt = new Date().toISOString();
   const payload: EventDraftData = {
     ...draft,
@@ -740,9 +750,10 @@ export async function cloneOrganizerEvent(id: string): Promise<string> {
 // Kết hợp API thật (BE1) & Fallback Mock (BE2)
 // ==========================================
 
-import { apiClient } from "./api/client"; // Nếu file này nằm trong thư mục lib/api thì đổi thành "./client"
+import { apiClient, ApiError } from "./api/client";
 
-export type OrganizerVerificationStatus = "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";
+export type OrganizerVerificationStatus =
+  "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";
 
 export interface OrganizerProfile {
   id: string;
@@ -761,7 +772,8 @@ export interface OrganizerProfile {
 
 export interface AuditLogEntry {
   id: string;
-  action: "APPROVE_ORGANIZER" | "REJECT_ORGANIZER" | "APPROVE_EVENT" | "REJECT_EVENT";
+  action:
+    "APPROVE_ORGANIZER" | "REJECT_ORGANIZER" | "APPROVE_EVENT" | "REJECT_EVENT";
   targetName: string;
   actorEmail: string;
   reason?: string;
@@ -817,36 +829,39 @@ export const MOCK_AUDIT_LOGS: AuditLogEntry[] = [
 ];
 
 /**
- * Lấy thông tin hồ sơ BTC của tài khoản đang đăng nhập
+ * Lay thong tin ho so BTC cua tai khoan dang dang nhap
  */
 export async function getMyOrganizerProfile(): Promise<OrganizerProfile> {
   try {
-    return await apiClient<OrganizerProfile>("/organizer/profile", { method: "GET" });
-  } catch {
-    // Fallback khi BE2 chưa có endpoint
-    await new Promise((r) => setTimeout(r, 250));
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("tickethub_my_org_profile");
-      if (saved) return JSON.parse(saved);
+    return await apiClient<OrganizerProfile>("/organizer/profile", {
+      method: "GET",
+    });
+  } catch (err) {
+    if (err instanceof ApiError && err.status !== 0 && err.status !== 404) {
+      throw err;
     }
+    await new Promise((r) => setTimeout(r, 200));
     return MOCK_ORGANIZER_PROFILES[0];
   }
 }
 
 /**
- * Cập nhật và gửi duyệt lại hồ sơ BTC
+ * Cap nhat va gui duyet lai ho so BTC
  */
 export async function updateMyOrganizerProfile(
-  payload: Partial<OrganizerProfile>
+  payload: Partial<OrganizerProfile>,
 ): Promise<OrganizerProfile> {
   try {
     return await apiClient<OrganizerProfile>("/organizer/profile", {
       method: "PUT",
       body: JSON.stringify(payload),
     });
-  } catch {
-    await new Promise((r) => setTimeout(r, 350));
-    const current = await getMyOrganizerProfile();
+  } catch (err) {
+    if (err instanceof ApiError && err.status !== 0 && err.status !== 404) {
+      throw err;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+    const current = MOCK_ORGANIZER_PROFILES[0];
     const updated: OrganizerProfile = {
       ...current,
       ...payload,
@@ -855,27 +870,29 @@ export async function updateMyOrganizerProfile(
       updatedAt: new Date().toISOString(),
     };
     MOCK_ORGANIZER_PROFILES[0] = updated;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("tickethub_my_org_profile", JSON.stringify(updated));
-    }
     return updated;
   }
 }
 
 /**
- * Admin: Lấy danh sách toàn bộ hồ sơ BTC
+ * Admin: Lay danh sach toan bo ho so BTC
  */
 export async function getAdminOrganizers(): Promise<OrganizerProfile[]> {
   try {
-    return await apiClient<OrganizerProfile[]>("/admin/organizers", { method: "GET" });
-  } catch {
-    await new Promise((r) => setTimeout(r, 250));
+    return await apiClient<OrganizerProfile[]>("/admin/organizers", {
+      method: "GET",
+    });
+  } catch (err) {
+    if (err instanceof ApiError && err.status !== 0 && err.status !== 404) {
+      throw err;
+    }
+    await new Promise((r) => setTimeout(r, 200));
     return [...MOCK_ORGANIZER_PROFILES];
   }
 }
 
 /**
- * Admin: Duyệt hoặc Từ chối hồ sơ BTC (UC10)
+ * Admin: Duyet hoac Tu choi ho so BTC (UC10)
  */
 export async function reviewOrganizerProfile(params: {
   id: string;
@@ -892,18 +909,17 @@ export async function reviewOrganizerProfile(params: {
       method: "POST",
       body: JSON.stringify({ reason }),
     });
-  } catch {
-    await new Promise((r) => setTimeout(r, 300));
+  } catch (err) {
+    if (err instanceof ApiError && err.status !== 0 && err.status !== 404) {
+      throw err;
+    }
+    await new Promise((r) => setTimeout(r, 250));
     const item = MOCK_ORGANIZER_PROFILES.find((o) => o.id === id);
     if (!item) throw new Error("Không tìm thấy hồ sơ BTC");
 
     item.status = decision === "APPROVE" ? "VERIFIED" : "REJECTED";
     item.rejectionReason = decision === "REJECT" ? reason : undefined;
     item.updatedAt = new Date().toISOString();
-
-    if (id === MOCK_ORGANIZER_PROFILES[0].id && typeof window !== "undefined") {
-      localStorage.setItem("tickethub_my_org_profile", JSON.stringify(item));
-    }
 
     MOCK_AUDIT_LOGS.unshift({
       id: `log-${Date.now()}`,
@@ -919,27 +935,32 @@ export async function reviewOrganizerProfile(params: {
 }
 
 /**
- * Lấy danh sách sự kiện từ BE1 (events.controller.ts) kèm fallback sang Mock
+ * Lay danh sach su kien tu BE1 (events.controller.ts) kem fallback sang Mock
  */
 export async function getAdminPendingEvents(): Promise<OrganizerEventItem[]> {
   try {
-    const res = await apiClient<OrganizerEventItem[] | { items: OrganizerEventItem[] }>(
-      "/events?status=PENDING_APPROVAL",
-      { method: "GET" }
-    );
-    const list = Array.isArray(res) ? res : res.items;
-    if (list && list.length > 0) return list;
-  } catch {
-    // Nếu BE1 cần truyền query khác hoặc chưa chạy server thì dùng MOCK_ORGANIZER_EVENTS
+    const res = await apiClient<
+      OrganizerEventItem[] | { items: OrganizerEventItem[] }
+    >("/events?status=PENDING_APPROVAL", { method: "GET" });
+    const list = Array.isArray(res) ? res : res?.items;
+    if (list !== undefined && list !== null) {
+      return list;
+    }
+  } catch (err) {
+    if (err instanceof ApiError && err.status !== 0 && err.status !== 404) {
+      throw err;
+    }
   }
-  await new Promise((r) => setTimeout(r, 250));
+  await new Promise((r) => setTimeout(r, 200));
   return MOCK_ORGANIZER_EVENTS.filter(
-    (e) => e.status === EventStatus.PENDING_APPROVAL || e.status === EventStatus.CANCELLED
+    (e) =>
+      e.status === EventStatus.PENDING_APPROVAL ||
+      e.status === EventStatus.CANCELLED,
   );
 }
 
 /**
- * Admin: Duyệt hoặc Từ chối sự kiện (PENDING_APPROVAL -> PUBLISHED / CANCELLED)
+ * Admin: Duyet hoac Tu choi su kien (PENDING_APPROVAL -> PUBLISHED / CANCELLED)
  */
 export async function reviewAdminEvent(params: {
   id: string;
@@ -956,12 +977,16 @@ export async function reviewAdminEvent(params: {
       method: "POST",
       body: JSON.stringify({ reason }),
     });
-  } catch {
-    await new Promise((r) => setTimeout(r, 300));
+  } catch (err) {
+    if (err instanceof ApiError && err.status !== 0 && err.status !== 404) {
+      throw err;
+    }
+    await new Promise((r) => setTimeout(r, 250));
     const evt = MOCK_ORGANIZER_EVENTS.find((e) => e.id === id);
     if (!evt) throw new Error("Không tìm thấy sự kiện");
 
-    evt.status = decision === "APPROVE" ? EventStatus.PUBLISHED : EventStatus.CANCELLED;
+    evt.status =
+      decision === "APPROVE" ? EventStatus.PUBLISHED : EventStatus.CANCELLED;
     evt.rejectionReason = decision === "REJECT" ? reason : undefined;
     evt.version += 1;
 
@@ -981,5 +1006,3 @@ export async function reviewAdminEvent(params: {
 export async function getAdminAuditLogs(): Promise<AuditLogEntry[]> {
   return [...MOCK_AUDIT_LOGS];
 }
-
-
