@@ -109,7 +109,7 @@ export const authApi = {
     };
   },
 
-  login: async (body: LoginRequest): Promise<LoginResponseData> => {
+ login: async (body: LoginRequest): Promise<LoginResponseData> => {
     const result = await apiClient<LoginResponseData>("/auth/login", {
       method: "POST",
       body: JSON.stringify(body),
@@ -117,11 +117,29 @@ export const authApi = {
     if (result?.accessToken) {
       setAccessToken(result.accessToken);
     }
+    if (result?.user && typeof document !== "undefined") {
+      // Lưu cookie an toàn (SameSite=Lax) để Next.js Middleware kiểm tra RBAC
+      document.cookie = `th_role=${result.user.role}; path=/; max-age=604800; SameSite=Lax`;
+      localStorage.setItem("tickethub_user", JSON.stringify(result.user));
+    }
     return result;
   },
 
+  logout: async (): Promise<void> => {
+    try {
+      await apiClient("/auth/logout", { method: "POST" });
+    } catch {
+      // Bỏ qua nếu backend chưa bật
+    } finally {
+      setAccessToken(null);
+      if (typeof document !== "undefined") {
+        document.cookie = "th_role=; path=/; max-age=0; SameSite=Lax";
+        localStorage.removeItem("tickethub_user");
+      }
+    }
+  },
+
   register: async (body: RegisterRequest): Promise<RegisterResponseData> => {
-    // Mock edge case: Duplicate registration race
     if (body.email === "duplicate@example.com") {
       throw new ApiError(
         409,

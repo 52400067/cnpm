@@ -105,14 +105,18 @@ export function OrganizerHeader() {
                 aria-labelledby="organizer-account-button"
                 className="absolute right-0 mt-1.5 w-60 rounded-md border border-border bg-popover text-popover-foreground shadow-md py-1.5 z-40 focus:outline-none"
               >
-                <div className="px-3.5 py-2 border-b border-border">
+                <Link 
+                  href="/organizer/profile"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block px-3.5 py-2 border-b border-border hover:bg-secondary transition-colors"
+                >
                   <p className="text-xs font-bold text-foreground">
                     Hồ sơ Ban Tổ Chức
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     organizer@tickethub.vn
                   </p>
-                </div>
+                </Link>
 
                 <div className="py-1">
                   <Link

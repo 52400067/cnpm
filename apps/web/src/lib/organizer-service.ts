@@ -734,3 +734,252 @@ export async function cloneOrganizerEvent(id: string): Promise<string> {
   MOCK_ORGANIZER_EVENTS.unshift(cloned);
   return newId;
 }
+
+// ==========================================
+// 7. Organizer Profile & Admin Verification (Tuần 2 - FE1)
+// Kết hợp API thật (BE1) & Fallback Mock (BE2)
+// ==========================================
+
+import { apiClient } from "./api/client"; // Nếu file này nằm trong thư mục lib/api thì đổi thành "./client"
+
+export type OrganizerVerificationStatus = "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";
+
+export interface OrganizerProfile {
+  id: string;
+  userId?: string;
+  organizationName: string;
+  taxCode: string;
+  phone: string;
+  email: string;
+  address: string;
+  representativeName: string;
+  businessLicenseUrl?: string;
+  status: OrganizerVerificationStatus;
+  rejectionReason?: string;
+  updatedAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: "APPROVE_ORGANIZER" | "REJECT_ORGANIZER" | "APPROVE_EVENT" | "REJECT_EVENT";
+  targetName: string;
+  actorEmail: string;
+  reason?: string;
+  timestamp: string;
+}
+
+export const MOCK_ORGANIZER_PROFILES: OrganizerProfile[] = [
+  {
+    id: "org-01",
+    organizationName: "Công ty TNHH Giải Trí & Sự Kiện Sao Việt",
+    taxCode: "0312345678",
+    phone: "0901234567",
+    email: "organizer@tickethub.com",
+    address: "19 Nguyễn Hữu Thọ, Phường Tân Phong, Quận 7, TP. Hồ Chí Minh",
+    representativeName: "Nguyễn Văn An",
+    businessLicenseUrl: "https://example.com/giay-phep-kd-saoviet.pdf",
+    status: "PENDING_VERIFICATION",
+    updatedAt: "2026-10-24T10:30:00Z",
+  },
+  {
+    id: "org-02",
+    organizationName: "Saigon Live Music Production",
+    taxCode: "0398765432",
+    phone: "0918765432",
+    email: "contact@saigonlive.vn",
+    address: "202 Hoàng Văn Thụ, Phường 9, Quận Phú Nhuận, TP. Hồ Chí Minh",
+    representativeName: "Trần Minh Tuấn",
+    businessLicenseUrl: "https://example.com/giay-phep-saigonlive.pdf",
+    status: "PENDING_VERIFICATION",
+    updatedAt: "2026-10-25T08:15:00Z",
+  },
+  {
+    id: "org-03",
+    organizationName: "Hanoi Symphony Orchestra Club",
+    taxCode: "0102938475",
+    phone: "0987654321",
+    email: "info@hanoisymphony.vn",
+    address: "Số 1 Tràng Tiền, Quận Hoàn Kiếm, Hà Nội",
+    representativeName: "Lê Thu Hà",
+    status: "VERIFIED",
+    updatedAt: "2026-10-20T14:00:00Z",
+  },
+];
+
+export const MOCK_AUDIT_LOGS: AuditLogEntry[] = [
+  {
+    id: "log-01",
+    action: "APPROVE_ORGANIZER",
+    targetName: "Hanoi Symphony Orchestra Club",
+    actorEmail: "admin@tickethub.com",
+    timestamp: "2026-10-20T14:00:00Z",
+  },
+];
+
+/**
+ * Lấy thông tin hồ sơ BTC của tài khoản đang đăng nhập
+ */
+export async function getMyOrganizerProfile(): Promise<OrganizerProfile> {
+  try {
+    return await apiClient<OrganizerProfile>("/organizer/profile", { method: "GET" });
+  } catch {
+    // Fallback khi BE2 chưa có endpoint
+    await new Promise((r) => setTimeout(r, 250));
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("tickethub_my_org_profile");
+      if (saved) return JSON.parse(saved);
+    }
+    return MOCK_ORGANIZER_PROFILES[0];
+  }
+}
+
+/**
+ * Cập nhật và gửi duyệt lại hồ sơ BTC
+ */
+export async function updateMyOrganizerProfile(
+  payload: Partial<OrganizerProfile>
+): Promise<OrganizerProfile> {
+  try {
+    return await apiClient<OrganizerProfile>("/organizer/profile", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    await new Promise((r) => setTimeout(r, 350));
+    const current = await getMyOrganizerProfile();
+    const updated: OrganizerProfile = {
+      ...current,
+      ...payload,
+      status: "PENDING_VERIFICATION",
+      rejectionReason: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    MOCK_ORGANIZER_PROFILES[0] = updated;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("tickethub_my_org_profile", JSON.stringify(updated));
+    }
+    return updated;
+  }
+}
+
+/**
+ * Admin: Lấy danh sách toàn bộ hồ sơ BTC
+ */
+export async function getAdminOrganizers(): Promise<OrganizerProfile[]> {
+  try {
+    return await apiClient<OrganizerProfile[]>("/admin/organizers", { method: "GET" });
+  } catch {
+    await new Promise((r) => setTimeout(r, 250));
+    return [...MOCK_ORGANIZER_PROFILES];
+  }
+}
+
+/**
+ * Admin: Duyệt hoặc Từ chối hồ sơ BTC (UC10)
+ */
+export async function reviewOrganizerProfile(params: {
+  id: string;
+  decision: "APPROVE" | "REJECT";
+  reason?: string;
+}): Promise<OrganizerProfile> {
+  const { id, decision, reason } = params;
+  try {
+    const endpoint =
+      decision === "APPROVE"
+        ? `/admin/organizers/${id}/approve`
+        : `/admin/organizers/${id}/reject`;
+    return await apiClient<OrganizerProfile>(endpoint, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  } catch {
+    await new Promise((r) => setTimeout(r, 300));
+    const item = MOCK_ORGANIZER_PROFILES.find((o) => o.id === id);
+    if (!item) throw new Error("Không tìm thấy hồ sơ BTC");
+
+    item.status = decision === "APPROVE" ? "VERIFIED" : "REJECTED";
+    item.rejectionReason = decision === "REJECT" ? reason : undefined;
+    item.updatedAt = new Date().toISOString();
+
+    if (id === MOCK_ORGANIZER_PROFILES[0].id && typeof window !== "undefined") {
+      localStorage.setItem("tickethub_my_org_profile", JSON.stringify(item));
+    }
+
+    MOCK_AUDIT_LOGS.unshift({
+      id: `log-${Date.now()}`,
+      action: decision === "APPROVE" ? "APPROVE_ORGANIZER" : "REJECT_ORGANIZER",
+      targetName: item.organizationName,
+      actorEmail: "admin@tickethub.com",
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+
+    return { ...item };
+  }
+}
+
+/**
+ * Lấy danh sách sự kiện từ BE1 (events.controller.ts) kèm fallback sang Mock
+ */
+export async function getAdminPendingEvents(): Promise<OrganizerEventItem[]> {
+  try {
+    const res = await apiClient<OrganizerEventItem[] | { items: OrganizerEventItem[] }>(
+      "/events?status=PENDING_APPROVAL",
+      { method: "GET" }
+    );
+    const list = Array.isArray(res) ? res : res.items;
+    if (list && list.length > 0) return list;
+  } catch {
+    // Nếu BE1 cần truyền query khác hoặc chưa chạy server thì dùng MOCK_ORGANIZER_EVENTS
+  }
+  await new Promise((r) => setTimeout(r, 250));
+  return MOCK_ORGANIZER_EVENTS.filter(
+    (e) => e.status === EventStatus.PENDING_APPROVAL || e.status === EventStatus.CANCELLED
+  );
+}
+
+/**
+ * Admin: Duyệt hoặc Từ chối sự kiện (PENDING_APPROVAL -> PUBLISHED / CANCELLED)
+ */
+export async function reviewAdminEvent(params: {
+  id: string;
+  decision: "APPROVE" | "REJECT";
+  reason?: string;
+}): Promise<OrganizerEventItem> {
+  const { id, decision, reason } = params;
+  try {
+    const endpoint =
+      decision === "APPROVE"
+        ? `/admin/events/${id}/approve`
+        : `/admin/events/${id}/reject`;
+    return await apiClient<OrganizerEventItem>(endpoint, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  } catch {
+    await new Promise((r) => setTimeout(r, 300));
+    const evt = MOCK_ORGANIZER_EVENTS.find((e) => e.id === id);
+    if (!evt) throw new Error("Không tìm thấy sự kiện");
+
+    evt.status = decision === "APPROVE" ? EventStatus.PUBLISHED : EventStatus.CANCELLED;
+    evt.rejectionReason = decision === "REJECT" ? reason : undefined;
+    evt.version += 1;
+
+    MOCK_AUDIT_LOGS.unshift({
+      id: `log-${Date.now()}`,
+      action: decision === "APPROVE" ? "APPROVE_EVENT" : "REJECT_EVENT",
+      targetName: evt.title,
+      actorEmail: "admin@tickethub.com",
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+
+    return { ...evt };
+  }
+}
+
+export async function getAdminAuditLogs(): Promise<AuditLogEntry[]> {
+  return [...MOCK_AUDIT_LOGS];
+}
+
+
