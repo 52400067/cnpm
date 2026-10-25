@@ -6,7 +6,8 @@ import { EventsModule } from "./events/events.module";
 import { WaitingRoomModule } from "./waiting-room/waiting-room.module";
 import { BookingModule } from "./booking/booking.module";
 import { PaymentsModule } from "./payments/payments.module";
-
+import { AdminModule } from "./admin/admin.module";
+import { UploadsModule } from "./uploads/uploads.module";
 @Module({
   imports: [
     RedisModule,
@@ -16,6 +17,8 @@ import { PaymentsModule } from "./payments/payments.module";
     WaitingRoomModule,
     BookingModule,
     PaymentsModule,
+    AdminModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

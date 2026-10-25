@@ -1,63 +1,124 @@
-import { and, asc, eq, lte, sql } from "drizzle-orm";
-import { OutboxStatus } from "@tickethub/shared";
+import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 
+import { OutboxStatus } from "@tickethub/shared";
+import { env } from "../config/env.config";
 import { db, sqlClient } from "../database/db";
 import { outbox } from "../database/schema";
 
-import { emailQueue, enqueueRegistrationEmail } from "./email.queue";
+import {
+  emailQueue,
+  enqueueRegistrationEmail,
+  enqueueReviewEmail,
+} from "./email.queue";
 
-import { UserRegisteredPayloadSchema } from "./email.types";
+import {
+  REVIEW_EVENT_TYPES,
+  UserRegisteredPayloadSchema,
+  parseReviewPayload,
+} from "./email.types";
 
-// Chỉ cho phép gửi job với dữ liệu giả khi kiểm thử.
+import type { ReviewEventType } from "./email.types";
+
+// Các chế độ thực thi
 const enqueueTest = process.argv.includes("--enqueue-test");
 const enqueueLive = process.argv.includes("--enqueue");
 const enqueueEmailTest = process.argv.includes("--enqueue-email-test");
 
-if ([enqueueTest, enqueueLive, enqueueEmailTest].filter(Boolean).length > 1) {
-  throw new Error("Only one enqueue mode is allowed.");
+const enqueueReviewTest = process.argv.includes("--enqueue-review-test");
+
+const dryRun =
+  !enqueueTest && !enqueueLive && !enqueueEmailTest && !enqueueReviewTest;
+
+const modes = [enqueueTest, enqueueLive, enqueueEmailTest, enqueueReviewTest];
+
+if (modes.filter(Boolean).length > 1) {
+  throw new Error("Only one enqueue mode is allowed");
 }
+
+// Giới hạn một Outbox khi kiểm thử Review
+const idArgs = process.argv.filter((arg) => arg.startsWith("--outbox-id="));
+
+if (idArgs.length > 1) {
+  throw new Error("Only one outbox ID is allowed");
+}
+
+const targetOutboxId = idArgs[0]?.slice("--outbox-id=".length);
 
 async function main() {
   const testEmail = process.env.TEST_EMAIL_TO?.trim().toLowerCase();
 
-  if (enqueueEmailTest) {
-    if (process.env.ENABLE_TEST_EMAIL_DISPATCH !== "true") {
-      throw new Error("Test email dispatch is disabled.");
+  // 1. Bảo vệ chế độ kiểm thử Email Review
+  if (enqueueReviewTest) {
+    const databaseName = new URL(env.DATABASE_URL).pathname.slice(1);
+
+    const redisDatabase = new URL(env.REDIS_URL).pathname;
+
+    if (process.env.ENABLE_REVIEW_EMAIL_TEST !== "true") {
+      throw new Error("Review email test is disabled");
     }
 
-    if (!testEmail) {
-      throw new Error("TEST_EMAIL_TO is required.");
+    if (!databaseName.endsWith("_test")) {
+      throw new Error("Review test requires a dedicated _test database");
+    }
+
+    if (redisDatabase !== "/15") {
+      throw new Error("Review test requires Redis database 15");
     }
 
     if (process.env.EMAIL_WORKER_MODE !== "live-test") {
-      throw new Error("Worker must use live-test mode.");
+      throw new Error("Review test requires live-test worker mode");
+    }
+
+    if (!testEmail) {
+      throw new Error("TEST_EMAIL_TO is required");
+    }
+
+    if (
+      !targetOutboxId ||
+      !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(targetOutboxId)
+    ) {
+      throw new Error("Review test requires --outbox-id=<UUID>");
+    }
+  }
+
+  // 2. Giữ cơ chế an toàn từ tuần 1
+  if (enqueueEmailTest) {
+    if (process.env.ENABLE_TEST_EMAIL_DISPATCH !== "true") {
+      throw new Error("Test email dispatch is disabled");
+    }
+
+    if (!testEmail) {
+      throw new Error("TEST_EMAIL_TO is required");
+    }
+
+    if (process.env.EMAIL_WORKER_MODE !== "live-test") {
+      throw new Error("Worker must use live-test mode");
     }
 
     const redisUrl = process.env.REDIS_URL;
 
     if (!redisUrl || new URL(redisUrl).hostname !== "email-test-redis") {
-      throw new Error("Test dispatch must use isolated Redis.");
+      throw new Error("Test dispatch must use isolated Redis");
     }
   }
 
   if (enqueueLive && process.env.ENABLE_REAL_EMAIL_DISPATCH !== "true") {
-    throw new Error(
-      "Real email dispatch is disabled. " +
-        "ENABLE_REAL_EMAIL_DISPATCH must be true.",
-    );
+    throw new Error("Real email dispatch is disabled");
   }
 
-  const mode = enqueueEmailTest
-    ? "EMAIL LIVE TEST"
-    : enqueueTest
-      ? "TEST ENQUEUE"
-      : enqueueLive
-        ? "LIVE ENQUEUE"
-        : "DRY RUN";
+  const mode = enqueueReviewTest
+    ? "REVIEW EMAIL TEST"
+    : enqueueEmailTest
+      ? "EMAIL LIVE TEST"
+      : enqueueTest
+        ? "TEST ENQUEUE"
+        : enqueueLive
+          ? "LIVE ENQUEUE"
+          : "DRY RUN";
 
-  console.log("[Dispatcher] Starting...");
   console.log(`[Dispatcher] Mode: ${mode}`);
 
+  // 3. Lấy Outbox chưa xử lý
   const events = await db
     .select({
       id: outbox.id,
@@ -69,71 +130,99 @@ async function main() {
     .where(
       and(
         eq(outbox.status, OutboxStatus.PENDING),
-        eq(outbox.eventType, "USER_REGISTERED"),
+
+        enqueueReviewTest
+          ? inArray(outbox.eventType, [...REVIEW_EVENT_TYPES])
+          : dryRun
+            ? inArray(outbox.eventType, [
+                "USER_REGISTERED",
+                ...REVIEW_EVENT_TYPES,
+              ])
+            : eq(outbox.eventType, "USER_REGISTERED"),
+
         lte(outbox.nextRetryAt, new Date()),
+
+        enqueueReviewTest ? eq(outbox.id, targetOutboxId!) : undefined,
+
         enqueueEmailTest
           ? sql`lower(${outbox.payload} ->> 'email') = ${testEmail}`
           : undefined,
       ),
     )
     .orderBy(asc(outbox.createdAt))
-    .limit(10);
+    .limit(enqueueReviewTest ? 1 : 10);
 
   console.log(`[Dispatcher] Found ${events.length} events`);
 
   let failed = 0;
 
+  // 4. Xử lý từng Outbox
   for (const event of events) {
     try {
-      const payload = UserRegisteredPayloadSchema.parse(event.payload);
+      const isRegistration = event.eventType === "USER_REGISTERED";
 
-      if (!enqueueTest && !enqueueLive && !enqueueEmailTest) {
-        console.log(`[Dispatcher] Valid event: ${event.id}`);
+      const isReview = (REVIEW_EVENT_TYPES as readonly string[]).includes(
+        event.eventType,
+      );
+
+      if (!isRegistration && !isReview) {
+        throw new Error("Unsupported event type");
+      }
+
+      const registrationPayload = isRegistration
+        ? UserRegisteredPayloadSchema.parse(event.payload)
+        : null;
+
+      const reviewPayload = isReview
+        ? parseReviewPayload(event.eventType as ReviewEventType, event.payload)
+        : null;
+
+      // Chế độ đọc: không cập nhật dữ liệu
+      if (dryRun) {
+        console.log(`[Dispatcher] Valid: ${event.eventType} / ${event.id}`);
         continue;
       }
 
-      if (
-        enqueueEmailTest &&
-        payload.email.trim().toLowerCase() !== testEmail
-      ) {
-        console.log(`[Dispatcher] Skipped other email: ${event.id}`);
-        continue;
+      // Chỉ cho phép đúng người nhận khi kiểm thử Review
+      if (enqueueReviewTest) {
+        if (!reviewPayload || reviewPayload.email.toLowerCase() !== testEmail) {
+          console.log(`[Dispatcher] Skipped recipient: ${event.id}`);
+          continue;
+        }
+      } else {
+        // Các chế độ cũ chỉ xử lý USER_REGISTERED
+        if (!registrationPayload) {
+          console.log(`[Dispatcher] Skipped review: ${event.id}`);
+          continue;
+        }
+
+        if (
+          enqueueEmailTest &&
+          registrationPayload.email.toLowerCase() !== testEmail
+        ) {
+          continue;
+        }
+
+        if (
+          enqueueTest &&
+          (registrationPayload.email !== "outbox-smoke@example.invalid" ||
+            registrationPayload.verificationToken !== "fake-test-token")
+        ) {
+          continue;
+        }
       }
 
-      // Không xử lý email đăng ký thật trong giai đoạn mock.
-      if (
-        enqueueTest &&
-        (payload.email !== "outbox-smoke@example.invalid" ||
-          payload.verificationToken !== "fake-test-token")
-      ) {
-        console.log(`[Dispatcher] Skipped non-test event: ${event.id}`);
-        continue;
-      }
-
-      // Phát hiện job còn lưu từ bài kiểm thử trước.
-      const existingJob = await emailQueue.getJob(`outbox_${event.id}`);
+      // 5. Kiểm tra Job trùng trong Redis
+      const jobId = `outbox_${event.id}`;
+      const existingJob = await emailQueue.getJob(jobId);
 
       if (existingJob) {
-        const jobState = await existingJob.getState();
-
-        console.warn(
-          `[Dispatcher] Existing BullMQ job detected: ` +
-            `outboxId=${event.id}, ` +
-            `jobId=${existingJob.id}, ` +
-            `state=${jobState}`,
-        );
-
-        // Không tự động enqueue lại khi chưa đối soát
-        // trạng thái Redis với PostgreSQL.
-        console.warn(
-          `[Dispatcher] Skipped to prevent duplicate enqueue. ` +
-            `Manual reconciliation may be required.`,
-        );
-
+        console.warn(`[Dispatcher] Existing job ${jobId}`);
+        console.warn("[Dispatcher] Manual reconciliation required");
         continue;
       }
 
-      // Atomic Claim: chỉ 1 Dispatcher nhận được sự kiện.
+      // 6. Claim Outbox nguyên tử
       const [claimed] = await db
         .update(outbox)
         .set({
@@ -147,9 +236,7 @@ async function main() {
             lte(outbox.nextRetryAt, new Date()),
           ),
         )
-        .returning({
-          id: outbox.id,
-        });
+        .returning({ id: outbox.id });
 
       if (!claimed) {
         console.log(`[Dispatcher] Already claimed: ${event.id}`);
@@ -157,14 +244,21 @@ async function main() {
       }
 
       try {
-        const job = await enqueueRegistrationEmail(event.id, payload);
+        // 7. Đưa Job vào BullMQ
+        const job = enqueueReviewTest
+          ? await enqueueReviewEmail(
+              event.id,
+              event.eventType as ReviewEventType,
+              reviewPayload!,
+            )
+          : await enqueueRegistrationEmail(event.id, registrationPayload!);
 
         console.log(`[Dispatcher] Enqueued: ${job.id}`);
       } catch (error) {
-        // Chỉ hoàn lại claim nếu Redis enqueue thất bại.
         const message =
           error instanceof Error ? error.message : "Unknown error";
 
+        // Chỉ trả lại PENDING khi enqueue thất bại
         await db
           .update(outbox)
           .set({
@@ -187,7 +281,7 @@ async function main() {
       failed++;
 
       console.error(
-        `[Dispatcher] Failed event ${event.id}:`,
+        `[Dispatcher] Failed ${event.id}:`,
         error instanceof Error ? error.message : error,
       );
     }
