@@ -195,6 +195,20 @@ export function useSeatMap({
   const totalPrice   = useMemo(() => internalSelected.reduce((s, seat) => s + seat.price, 0), [internalSelected]);
   const zoomPercent  = useMemo(() => Math.round(Math.min(400, Math.max(25, (data.viewBoxWidth / viewBox.w) * 100))), [viewBox.w, data.viewBoxWidth]);
 
+  const focusOnSeat = useCallback(
+    (seat: Seat) => {
+      const zoomW = data.viewBoxWidth * 0.42;
+      const zoomH = data.viewBoxHeight * 0.42;
+      setViewBox({
+        x: seat.x - zoomW / 2,
+        y: seat.y - zoomH / 2,
+        w: zoomW,
+        h: zoomH,
+      });
+    },
+    [data.viewBoxWidth, data.viewBoxHeight]
+  );
+
   return {
     svgRef, containerRef,
     viewBox, zoomPercent, resetView,
@@ -203,7 +217,7 @@ export function useSeatMap({
     internalSelected, selectedSeatIds,
     hoveredSeat, handleHoverSeat,
     toastMessage, setToastMessage,
-    handleToggleSeat,
+    handleToggleSeat, focusOnSeat,
     totalPrice,
   };
 }
