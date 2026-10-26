@@ -1,7 +1,8 @@
 // apps/web/src/app/(public)/layout.tsx
 import Link from "next/link";
-import { User, ShieldCheck, Clock, RefreshCcw, Globe } from "lucide-react";
+import { ShieldCheck, Clock, RefreshCcw, Globe } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
+import { PublicHeader } from "@/components/layout/public-header";
 
 export default function PublicLayout({
   children,
@@ -19,86 +20,7 @@ export default function PublicLayout({
       </div>
 
       {/* Main navigation header */}
-      <header className="bg-white">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          {/* Left: Brand & Categories */}
-          <div className="flex items-center gap-6">
-            <Logo />
-
-            <nav
-              aria-label="Danh mục chính"
-              className="hidden md:flex items-center gap-6 text-[13.5px] font-medium text-[#141d23]"
-            >
-              <Link
-                href="/#heading-sports"
-                className="hover:text-primary transition-colors"
-              >
-                Thể thao
-              </Link>
-              <Link
-                href="/#heading-concerts"
-                className="hover:text-primary transition-colors"
-              >
-                Hòa nhạc
-              </Link>
-              <Link
-                href="/#heading-theater"
-                className="hover:text-primary transition-colors"
-              >
-                Sân khấu &amp; Hài kịch
-              </Link>
-              <Link
-                href="/#heading-popular"
-                className="hover:text-primary transition-colors"
-              >
-                Sự kiện nổi bật
-              </Link>
-            </nav>
-          </div>
-
-          {/* Right: Actions & User Profile */}
-          <div className="flex items-center gap-5 text-[13.5px] font-medium text-[#141d23]">
-            <Link
-              href="/#heading-trending"
-              className="hidden lg:inline-block hover:text-primary transition-colors"
-            >
-              Khám phá
-            </Link>
-            <Link
-              href="/register?role=ORGANIZER"
-              className="hidden sm:inline-block hover:text-primary transition-colors"
-            >
-              Bán vé
-            </Link>
-            <Link
-              href="/my-tickets"
-              className="hidden sm:inline-block hover:text-primary transition-colors"
-            >
-              Yêu thích
-            </Link>
-            <Link
-              href="/my-tickets"
-              className="hidden sm:inline-block hover:text-primary transition-colors"
-            >
-              Vé của tôi
-            </Link>
-            <Link
-              href="/login"
-              className="hover:text-primary transition-colors"
-            >
-              Đăng nhập
-            </Link>
-
-            <Link
-              href="/login"
-              aria-label="Tài khoản"
-              className="size-8 rounded-full bg-[#eff1f2] hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-[#141d23] transition-colors"
-            >
-              <User className="size-4 fill-current" />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* Main Content */}
       <main className="flex-1">{children}</main>

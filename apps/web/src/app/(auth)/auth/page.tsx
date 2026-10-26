@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthContext } from "@/components/auth/auth-context";
+import { useSession } from "@/providers/session-provider";
 import {
   authApi,
   AuthNetworkError,
@@ -73,6 +74,7 @@ function AuthFlowContent() {
   const stepParam = searchParams.get("step");
 
   const { identifier, setIdentifier, roleTab, setRoleTab } = useAuthContext();
+  const { login: sessionLogin } = useSession();
 
   // Active step calculation: If no identifier in memory, gracefully default to "identifier" step
   const activeStep: "identifier" | "password" | "register" =
@@ -223,11 +225,33 @@ function AuthFlowContent() {
   const onPasswordSubmit = async (data: PasswordInput) => {
     setLoginError(null);
     try {
-      await authApi.login({
+      const result = await authApi.login({
         email: identifier,
         password: data.password,
       });
-      router.push("/");
+
+      if (result) {
+        sessionLogin(result);
+      }
+
+      const redirectParam = searchParams.get("redirect");
+      if (
+        redirectParam &&
+        redirectParam.startsWith("/") &&
+        !redirectParam.startsWith("/auth") &&
+        !redirectParam.startsWith("/login")
+      ) {
+        router.push(redirectParam);
+        return;
+      }
+
+      if (result?.user?.role === "ADMIN") {
+        router.push("/admin");
+      } else if (result?.user?.role === "ORGANIZER") {
+        router.push("/organizer/events");
+      } else {
+        router.push("/");
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setLoginError(err.message);
@@ -621,7 +645,9 @@ function AuthFlowContent() {
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xs p-1"
-                      aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                      aria-label={
+                        showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                      }
                     >
                       {showPassword ? (
                         <EyeOff className="size-5" />

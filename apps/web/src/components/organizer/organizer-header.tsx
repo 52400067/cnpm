@@ -14,11 +14,12 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
-import { authApi } from "@/lib/api/auth";
+import { useSession } from "@/providers/session-provider";
 
 export function OrganizerHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, logout } = useSession();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -94,7 +95,7 @@ export function OrganizerHeader() {
                 <User className="size-3 sm:size-3.5" />
               </div>
               <span className="hidden md:inline text-xs font-semibold">
-                Ban Tổ Chức
+                {user?.fullName || "Ban Tổ Chức"}
               </span>
               <ChevronDown
                 className={`size-3 sm:size-3.5 text-muted-foreground transition-transform duration-200 ${
@@ -119,7 +120,7 @@ export function OrganizerHeader() {
                     Hồ sơ Ban Tổ Chức
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    organizer@tickethub.vn
+                    {user?.email || "organizer@tickethub.vn"}
                   </p>
                 </Link>
 
@@ -161,7 +162,7 @@ export function OrganizerHeader() {
                     role="menuitem"
                     onClick={async () => {
                       setIsMenuOpen(false);
-                      await authApi.logout();
+                      await logout();
                       router.push("/auth");
                     }}
                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors text-left cursor-pointer"

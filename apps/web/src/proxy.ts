@@ -40,12 +40,19 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 3. Bao ve trang Ve cua toi (/my-tickets/*) -> Yeu cau da dang nhap
+  // 3. Bao ve trang Ve cua toi (/my-tickets/*) -> Yeu cau BUYER da dang nhap
   if (pathname.startsWith("/my-tickets")) {
     if (!jwtPayload) {
       const authUrl = new URL("/auth", request.url);
       authUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(authUrl);
+    }
+    // ADMIN va ORGANIZER khong the mua ve -> Tu dong dieu huong ve portal quan ly tuong ung
+    if (userRole === "ADMIN") {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+    if (userRole === "ORGANIZER") {
+      return NextResponse.redirect(new URL("/organizer/events", request.url));
     }
   }
 

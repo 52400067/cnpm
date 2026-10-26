@@ -69,6 +69,17 @@ Kho mã nguồn sử dụng pnpm workspaces để quản lý các gói:
 - `apps/api`: Dịch vụ backend xây dựng bằng NestJS trên nền tảng Fastify. Các module nghiệp vụ được tách biệt (auth, events, seats, booking, waiting-room, payment, ticket, checkin, refund, reporting, admin, notification).
 - `packages/shared`: Thư viện dùng chung chứa định nghĩa kiểu dữ liệu TypeScript, schema xác thực Zod và hằng số hệ thống.
 
+## Ranh giới vai trò và Ma trận phân quyền
+
+Hệ thống phân tách rõ trách nhiệm giữa các tầng client và vai trò người dùng nhằm ngăn ngừa xung đột lợi ích và bảo vệ tính minh bạch của thị trường vé:
+
+| Vai trò        | Client tương tác     | Chức năng chính                                                                                                | Giới hạn nghiệp vụ (Restrictions)                                                   |
+| :------------- | :------------------- | :------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------- |
+| **BUYER**      | `BuyerBrowser`       | Mua vé, tham gia hàng chờ ảo, giữ chỗ ghế (`/booking/hold`), thanh toán qua VNPay, xem vé QR tại `/my-tickets` | Bị chặn truy cập các route `/admin/*` và `/organizer/*`                             |
+| **ORGANIZER**  | `OrganizerDashboard` | Tạo sự kiện, cấu hình hạng vé, sơ đồ ghế, nộp hồ sơ KYC, xem báo cáo doanh thu                                 | **Không thể mua vé**, không có mục "Vé của tôi", bị chặn gọi API giữ chỗ và tạo đơn |
+| **ADMIN**      | `OrganizerDashboard` | Phê duyệt sự kiện, duyệt hồ sơ ban tổ chức, đối soát tài chính, kiểm tra nhật ký kiểm toán                     | **Không thể mua vé**, không có mục "Vé của tôi", bị chặn gọi API giữ chỗ và tạo đơn |
+| **GATE_STAFF** | `GateStaffPWA`       | Quét mã QR và xác thực vé vào cổng                                                                             | Không thể mua vé, không can thiệp cấu hình sự kiện                                  |
+
 ## Các luồng xử lý chính
 
 ### Giữ chỗ và điều tiết hàng chờ

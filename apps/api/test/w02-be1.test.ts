@@ -259,6 +259,67 @@ describe("W02-BE1: Auth (UC01) & Event Management (UC07) Verification", () => {
       const allowed = rolesGuard.canActivate(mockContext);
       assert.equal(allowed, true);
     });
+
+    it("Chặn người dùng vai trò ORGANIZER và ADMIN mua vé (tài nguyên BUYER)", () => {
+      reflector.getAllAndOverride = () => [UserRole.BUYER];
+
+      const orgContext = {
+        getHandler: () => {},
+        getClass: () => {},
+        switchToHttp: () => ({
+          getRequest: () => ({
+            user: { userId: createdUserId, role: UserRole.ORGANIZER },
+          }),
+        }),
+      } as any;
+
+      assert.throws(
+        () => {
+          rolesGuard.canActivate(orgContext);
+        },
+        (err: any) => {
+          assert.equal(err.response?.error?.code, "FORBIDDEN_RESOURCE");
+          return true;
+        },
+      );
+
+      const adminContext = {
+        getHandler: () => {},
+        getClass: () => {},
+        switchToHttp: () => ({
+          getRequest: () => ({
+            user: { userId: createdUserId, role: UserRole.ADMIN },
+          }),
+        }),
+      } as any;
+
+      assert.throws(
+        () => {
+          rolesGuard.canActivate(adminContext);
+        },
+        (err: any) => {
+          assert.equal(err.response?.error?.code, "FORBIDDEN_RESOURCE");
+          return true;
+        },
+      );
+    });
+
+    it("Cho phép người dùng vai trò BUYER mua vé (tài nguyên BUYER)", () => {
+      reflector.getAllAndOverride = () => [UserRole.BUYER];
+
+      const buyerContext = {
+        getHandler: () => {},
+        getClass: () => {},
+        switchToHttp: () => ({
+          getRequest: () => ({
+            user: { userId: createdUserId, role: UserRole.BUYER },
+          }),
+        }),
+      } as any;
+
+      const allowed = rolesGuard.canActivate(buyerContext);
+      assert.equal(allowed, true);
+    });
   });
 
   describe("5. Quản lý Sự kiện & Sinh Sơ đồ Ghế (UC07)", () => {
