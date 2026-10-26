@@ -1,10 +1,17 @@
 import { Queue } from "bullmq";
 import { env } from "../config/env.config";
+
 import {
   EMAIL_QUEUE_NAME,
+  UserRegisteredPayloadSchema,
+  parseReviewPayload,
+} from "./email.types";
+
+import type {
   EmailJobData,
   UserRegisteredPayload,
-  UserRegisteredPayloadSchema,
+  ReviewEventType,
+  ReviewNotificationPayload,
 } from "./email.types";
 
 const redisUrl = new URL(env.REDIS_URL);
@@ -12,6 +19,7 @@ const redisUrl = new URL(env.REDIS_URL);
 const connection = {
   host: redisUrl.hostname,
   port: Number(redisUrl.port || 6379),
+  db: Number(redisUrl.pathname.slice(1) || 0),
   username: redisUrl.username
     ? decodeURIComponent(redisUrl.username)
     : undefined,
@@ -21,6 +29,7 @@ const connection = {
   ...(redisUrl.protocol === "rediss:" ? { tls: {} } : {}),
 };
 
+// Sử dụng lại queue có sẵn của TicketHub
 export const emailQueue = new Queue<EmailJobData>(EMAIL_QUEUE_NAME, {
   connection,
   defaultJobOptions: {
@@ -38,6 +47,7 @@ export const emailQueue = new Queue<EmailJobData>(EMAIL_QUEUE_NAME, {
   },
 });
 
+// Email đăng ký tài khoản - tuần 1
 export async function enqueueRegistrationEmail(
   outboxId: string,
   payload: UserRegisteredPayload,
@@ -49,6 +59,27 @@ export async function enqueueRegistrationEmail(
     {
       outboxId,
       eventType: "USER_REGISTERED",
+      payload: validPayload,
+    },
+    {
+      jobId: `outbox_${outboxId}`,
+    },
+  );
+}
+
+// Email thông báo Admin - tuần 2
+export async function enqueueReviewEmail(
+  outboxId: string,
+  eventType: ReviewEventType,
+  payload: ReviewNotificationPayload,
+) {
+  const validPayload = parseReviewPayload(eventType, payload);
+
+  return emailQueue.add(
+    "admin-review",
+    {
+      outboxId,
+      eventType,
       payload: validPayload,
     },
     {

@@ -1,63 +1,54 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
+import { isDeepStrictEqual } from "node:util";
 import { and, eq } from "drizzle-orm";
 import { OutboxStatus } from "@tickethub/shared";
 
 import { env } from "../config/env.config";
 import { db, sqlClient } from "../database/db";
 import { outbox } from "../database/schema";
-import { sendRegistrationEmail } from "./email.sender";
+
+import { sendRegistrationEmail, sendReviewEmail } from "./email.sender";
 
 import {
   EMAIL_QUEUE_NAME,
+  REVIEW_EVENT_TYPES,
   UserRegisteredPayloadSchema,
-  type EmailJobData,
+  parseReviewPayload,
 } from "./email.types";
 
+import type { EmailJobData, ReviewEventType } from "./email.types";
+
+// Kết nối Redis cho BullMQ
 const connection = new IORedis(env.REDIS_URL, {
   maxRetriesPerRequest: null,
 });
 
 const worker = new Worker<EmailJobData>(
   EMAIL_QUEUE_NAME,
+
   async (job) => {
-    if (
-      job.name !== "user-registered" ||
-      job.data.eventType !== "USER_REGISTERED"
-    ) {
-      throw new Error(`Unsupported job: ${job.name}`);
-    }
+    const { outboxId, eventType } = job.data;
 
-    const payload = UserRegisteredPayloadSchema.parse(job.data.payload);
+    const isRegistration = eventType === "USER_REGISTERED";
 
-    const mode = process.env.EMAIL_WORKER_MODE ?? "mock";
-
-    console.log(`[Email Worker] Processing: ${job.id}`);
-
-    // Chế độ giả lập: không gửi email và
-    // không đánh dấu Outbox đã hoàn thành.
-    if (mode === "mock") {
-      console.log("[Email Worker] Mock completed");
-      return { simulated: true };
-    }
-
-    if (mode === "live-test") {
-      // Chỉ gửi đến email kiểm thử.
-      const testEmail = process.env.TEST_EMAIL_TO?.trim().toLowerCase();
-
-      if (!testEmail || payload.email.toLowerCase() !== testEmail) {
-        throw new Error("Recipient is not TEST_EMAIL_TO");
-      }
-    } else if (mode === "live") {
-      // Chỉ cho phép gửi email thật khi bật rõ ràng.
-      if (process.env.ENABLE_REAL_EMAIL !== "true") {
-        throw new Error("Real email sending is disabled");
+    // 1. Kiểm tra loại công việc
+    if (isRegistration) {
+      if (job.name !== "user-registered") {
+        throw new Error("Invalid registration job");
       }
     } else {
-      throw new Error(`Unsupported mode: ${mode}`);
+      if (
+        job.name !== "admin-review" ||
+        !REVIEW_EVENT_TYPES.includes(eventType as ReviewEventType)
+      ) {
+        throw new Error(`Unsupported job: ${job.name}`);
+      }
     }
 
-    // Tìm bản ghi Outbox tương ứng.
+    console.log(`[Email Worker] Processing: ${outboxId}`);
+
+    // 2. Lấy Outbox từ PostgreSQL
     const [event] = await db
       .select({
         id: outbox.id,
@@ -66,29 +57,33 @@ const worker = new Worker<EmailJobData>(
         status: outbox.status,
       })
       .from(outbox)
-      .where(eq(outbox.id, job.data.outboxId))
+      .where(eq(outbox.id, outboxId))
       .limit(1);
 
-    if (!event || event.eventType !== "USER_REGISTERED") {
+    if (!event || event.eventType !== eventType) {
       throw new Error("Matching Outbox event not found");
     }
 
-    const storedPayload = UserRegisteredPayloadSchema.parse(event.payload);
+    // 3. Kiểm tra payload
+    const reviewType = eventType as ReviewEventType;
 
-    // Chống sử dụng job có dữ liệu không khớp Outbox.
+    const jobPayload = isRegistration
+      ? UserRegisteredPayloadSchema.parse(job.data.payload)
+      : parseReviewPayload(reviewType, job.data.payload);
 
-    if (
-      storedPayload.userId !== payload.userId ||
-      storedPayload.email !== payload.email ||
-      storedPayload.fullName !== payload.fullName ||
-      storedPayload.verificationToken !== payload.verificationToken
-    ) {
+    const storedPayload = isRegistration
+      ? UserRegisteredPayloadSchema.parse(event.payload)
+      : parseReviewPayload(reviewType, event.payload);
+
+    // Không sử dụng dữ liệu Redis nếu khác PostgreSQL
+    if (!isDeepStrictEqual(jobPayload, storedPayload)) {
       throw new Error("Job payload does not match Outbox");
     }
 
-    // Nếu đã hoàn thành, không gửi email lần nữa.
+    // 4. Chống xử lý lại sự kiện hoàn thành
     if (event.status === OutboxStatus.COMPLETED) {
       console.log("[Email Worker] Already completed");
+
       return { alreadyCompleted: true };
     }
 
@@ -96,10 +91,48 @@ const worker = new Worker<EmailJobData>(
       throw new Error(`Unexpected Outbox status: ${event.status}`);
     }
 
-    // Gửi email qua Resend.
-    const emailId = await sendRegistrationEmail(event.id, storedPayload);
+    // 5. Kiểm tra chế độ gửi email
+    const mode = process.env.EMAIL_WORKER_MODE ?? "mock";
 
-    // Chỉ cập nhật sau khi Resend chấp nhận yêu cầu.
+    if (mode === "mock") {
+      console.log("[Email Worker] Mock only - no email sent");
+
+      // Giữ Outbox PROCESSING, không giả mạo đã gửi.
+      // Chỉ sử dụng mock trên môi trường test cô lập.
+      return { simulated: true };
+    }
+
+    if (mode === "live-test") {
+      const testEmail = process.env.TEST_EMAIL_TO?.trim().toLowerCase();
+
+      if (!testEmail || storedPayload.email.toLowerCase() !== testEmail) {
+        throw new Error("Recipient is not TEST_EMAIL_TO");
+      }
+    } else if (mode === "live") {
+      if (process.env.ENABLE_REAL_EMAIL !== "true") {
+        throw new Error("Real email sending is disabled");
+      }
+    } else {
+      throw new Error(`Unsupported mode: ${mode}`);
+    }
+
+    // 6. Gửi email theo loại event
+    let emailId: string;
+
+    if (isRegistration) {
+      emailId = await sendRegistrationEmail(
+        event.id,
+        UserRegisteredPayloadSchema.parse(storedPayload),
+      );
+    } else {
+      emailId = await sendReviewEmail(
+        event.id,
+        reviewType,
+        parseReviewPayload(reviewType, storedPayload),
+      );
+    }
+
+    // 7. Cập nhật Outbox sau khi Resend chấp nhận
     const [updated] = await db
       .update(outbox)
       .set({
@@ -127,12 +160,14 @@ const worker = new Worker<EmailJobData>(
       emailId,
     };
   },
+
   {
     connection,
     concurrency: 1,
   },
 );
 
+// Theo dõi trạng thái Worker
 worker.on("ready", () => {
   console.log("[Email Worker] Ready");
 });
@@ -149,6 +184,7 @@ worker.on("error", (error) => {
   console.error("[Email Worker] Error:", error.message);
 });
 
+// Đóng kết nối khi dừng chương trình
 async function shutdown() {
   await worker.close();
   await connection.quit();

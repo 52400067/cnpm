@@ -39,6 +39,11 @@ export const EnvSchema = z
       ),
     RESEND_API_KEY: z.string().optional(),
     EMAIL_FROM: z.string().default("onboarding@resend.dev"),
+    S3_REGION: z.string().default("ap-southeast-1"),
+    S3_BUCKET: z.string().default("tickethub-media"),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_PUBLIC_BASE_URL: z.string().optional(),
   })
   .superRefine((config, ctx) => {
     if (
