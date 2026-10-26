@@ -35,6 +35,16 @@ export class AuthService {
     }
   }
 
+  async checkIdentifier(identifier: string): Promise<boolean> {
+    const email = identifier.toLowerCase().trim();
+    if (!email) return false;
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email),
+      columns: { id: true },
+    });
+    return Boolean(user);
+  }
+
   async register(dto: RegisterRequest) {
     const existing = await db.query.users.findFirst({
       where: eq(users.email, dto.email.toLowerCase().trim()),

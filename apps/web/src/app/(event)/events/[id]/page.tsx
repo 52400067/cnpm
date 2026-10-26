@@ -28,6 +28,7 @@ import {
   type TicketListing,
 } from "@/lib/events-catalog";
 import { SeatMap } from "@/components/events/seat-map";
+import { useSession } from "@/providers/session-provider";
 
 export default function EventDetailPage() {
   const params = useParams<{ id: string }>();
@@ -38,13 +39,24 @@ export default function EventDetailPage() {
   }, [eventId]);
 
   return (
-    <Suspense fallback={<div className="h-screen flex items-center justify-center text-[13px] text-[#606970]">Đang tải sơ đồ sự kiện...</div>}>
+    <Suspense
+      fallback={
+        <div className="h-screen flex items-center justify-center text-[13px] text-[#606970]">
+          Đang tải sơ đồ sự kiện...
+        </div>
+      }
+    >
       <EventSplitView key={event.id} event={event} />
     </Suspense>
   );
 }
 
 function EventSplitView({ event }: { event: EventItem }) {
+  const { user } = useSession();
+  const isAdmin = user?.role === "ADMIN";
+  const isOrganizer = user?.role === "ORGANIZER";
+  const cannotBuyTickets = isAdmin || isOrganizer;
+
   const mapKey = useMemo(() => getEventVenueMapKey(event), [event]);
   const allListings = useMemo(() => getEventListings(event), [event]);
   const searchParams = useSearchParams();
@@ -53,13 +65,15 @@ function EventSplitView({ event }: { event: EventItem }) {
   const [ticketQuantity, setTicketQuantity] = useState<number>(2);
   // Modal automatically pops up on initial load unless disabled via query param
   const [showQtyModal, setShowQtyModal] = useState<boolean>(
-    searchParams.get("modal") !== "false"
+    searchParams.get("modal") !== "false",
   );
   const [activeZoneId, setActiveZoneId] = useState<string | null>(
-    searchParams.get("zone") || null
+    searchParams.get("zone") || null,
   );
   const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
-  const [selectedListing, setSelectedListing] = useState<TicketListing | null>(null);
+  const [selectedListing, setSelectedListing] = useState<TicketListing | null>(
+    null,
+  );
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
   // 5-minute Hold countdown
@@ -89,7 +103,10 @@ function EventSplitView({ event }: { event: EventItem }) {
 
   // Map of zone information for map tooltips
   const zoneInfoMap = useMemo(() => {
-    const map: Record<string, { name: string; minPrice: number; count: number }> = {};
+    const map: Record<
+      string,
+      { name: string; minPrice: number; count: number }
+    > = {};
     for (const l of allListings) {
       if (!map[l.zoneId] || l.price < map[l.zoneId].minPrice) {
         map[l.zoneId] = {
@@ -185,41 +202,95 @@ function EventSplitView({ event }: { event: EventItem }) {
             <ChevronDown className="size-3.5" />
           </div>
 
-          <Link
-            href="/organizer/events/new"
-            className="hidden sm:inline-block hover:text-primary transition-colors text-[13px]"
-          >
-            Bán vé
-          </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-50 border border-rose-200 text-rose-700 font-semibold text-xs hover:bg-rose-100 transition-colors"
+            >
+              <ShieldCheck className="size-3.5" />
+              <span>Cổng Quản trị</span>
+            </Link>
+          )}
 
-          <Link
-            href="/my-tickets"
-            className="hover:text-primary transition-colors text-[13px]"
-          >
-            Vé của tôi
-          </Link>
+          {isOrganizer && (
+            <>
+              <Link
+                href="/organizer/events"
+                className="hidden sm:inline-block hover:text-primary transition-colors text-[13px]"
+              >
+                Quản lý sự kiện
+              </Link>
+              <Link
+                href="/organizer/events/new"
+                className="hidden sm:inline-flex items-center gap-1 text-emerald-600 font-semibold hover:text-emerald-700 transition-colors text-[13px]"
+              >
+                <span>Tạo sự kiện</span>
+              </Link>
+            </>
+          )}
 
-          <Link
-            href="/login"
-            className="hidden sm:inline-block hover:text-primary transition-colors text-[13px]"
-          >
-            Đăng nhập
-          </Link>
+          {(!user || user.role === "BUYER") && (
+            <>
+              <Link
+                href="/register?role=ORGANIZER"
+                className="hidden sm:inline-block hover:text-primary transition-colors text-[13px]"
+              >
+                Bán vé
+              </Link>
+              <Link
+                href="/my-tickets"
+                className="hover:text-primary transition-colors text-[13px]"
+              >
+                Vé của tôi
+              </Link>
+            </>
+          )}
 
-          <Link
-            href="/login"
-            aria-label="Tài khoản"
-            className="size-8 rounded-full bg-[#eff1f2] hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-[#141d23] transition-colors shrink-0"
-          >
-            <User className="size-4 fill-current" />
-          </Link>
+          {/* Auth State */}
+          {!user ? (
+            <>
+              <Link
+                href="/auth"
+                className="hidden sm:inline-block hover:text-primary transition-colors text-[13px]"
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                href="/auth"
+                aria-label="Đăng nhập"
+                className="size-8 rounded-full bg-[#eff1f2] hover:bg-emerald-50 hover:text-primary flex items-center justify-center text-[#141d23] transition-colors shrink-0"
+              >
+                <User className="size-4 fill-current" />
+              </Link>
+            </>
+          ) : (
+            <Link
+              href={
+                isAdmin
+                  ? "/admin"
+                  : isOrganizer
+                    ? "/organizer/events"
+                    : "/my-tickets"
+              }
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-[#141d23] transition-colors"
+            >
+              <div className="size-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] flex items-center justify-center">
+                {user.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
+              </div>
+              <span className="max-w-[100px] truncate">
+                {user.fullName || user.email}
+              </span>
+            </Link>
+          )}
         </div>
       </header>
 
       {/* 2. Slim Urgency Strip */}
       <div className="h-[32px] bg-[#fdf2f4] border-b border-[#fee2e2] px-4 sm:px-6 flex items-center justify-center text-center gap-2 text-[12px] text-[#991b1b] font-medium shrink-0">
         <Flame className="size-3.5 text-[#e11d48] shrink-0" />
-        <span>Sắp hết vé! Hơn 70 người đang xem sự kiện này trong 1 giờ qua</span>
+        <span>
+          Sắp hết vé! Hơn 70 người đang xem sự kiện này trong 1 giờ qua
+        </span>
       </div>
 
       {/* 3. Full-Height Split Screen Workspace */}
@@ -304,7 +375,8 @@ function EventSplitView({ event }: { event: EventItem }) {
                   Khu vực đã chọn hiện chưa có vé phù hợp
                 </h3>
                 <p className="text-[13px] text-[#606970] max-w-xs mx-auto">
-                  Khu vực này hiện đã bán hết hoặc không đủ số lượng vé bạn chọn. Quý khách vui lòng chọn các khu vực khác.
+                  Khu vực này hiện đã bán hết hoặc không đủ số lượng vé bạn
+                  chọn. Quý khách vui lòng chọn các khu vực khác.
                 </p>
                 <button
                   type="button"
@@ -329,8 +401,8 @@ function EventSplitView({ event }: { event: EventItem }) {
                       isSelected
                         ? "bg-emerald-50/70 border-l-4 border-l-primary"
                         : isHovered
-                        ? "bg-[#f8fafc]"
-                        : "hover:bg-[#f8fafc]"
+                          ? "bg-[#f8fafc]"
+                          : "hover:bg-[#f8fafc]"
                     }`}
                   >
                     {/* Left: Clean Thumbnail Stage Photo */}
@@ -392,11 +464,12 @@ function EventSplitView({ event }: { event: EventItem }) {
                       <div className="text-[16px] sm:text-[17px] font-extrabold text-[#141d23] leading-tight">
                         {formatVnd(listing.price)}
                       </div>
-                      {listing.originalPrice && listing.originalPrice > listing.price && (
-                        <div className="text-[11px] text-[#606970] line-through">
-                          {formatVnd(listing.originalPrice)}
-                        </div>
-                      )}
+                      {listing.originalPrice &&
+                        listing.originalPrice > listing.price && (
+                          <div className="text-[11px] text-[#606970] line-through">
+                            {formatVnd(listing.originalPrice)}
+                          </div>
+                        )}
 
                       {/* Clean Deal Score: solid green square + green text, unboxed */}
                       <div className="mt-1.5 flex items-center gap-1.5">
@@ -542,12 +615,15 @@ function EventSplitView({ event }: { event: EventItem }) {
               <div className="flex items-center justify-between">
                 <span className="text-[#606970]">Khu vực &amp; Vị trí:</span>
                 <span className="font-bold text-[#141d23]">
-                  {selectedListing.zoneName} {selectedListing.row ? `• ${selectedListing.row}` : ""}
+                  {selectedListing.zoneName}{" "}
+                  {selectedListing.row ? `• ${selectedListing.row}` : ""}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#606970]">Số lượng vé:</span>
-                <span className="font-bold text-[#141d23]">{ticketQuantity} vé</span>
+                <span className="font-bold text-[#141d23]">
+                  {ticketQuantity} vé
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#606970]">Đơn giá:</span>
@@ -570,22 +646,55 @@ function EventSplitView({ event }: { event: EventItem }) {
             </div>
 
             {/* Action Buttons */}
-            <div className="space-y-2 pt-1">
-              <Link
-                href={`/my-tickets?event=${event.id}&order=${holdOrderCode || "ORD-88412"}&zone=${encodeURIComponent(selectedListing.zoneName)}&row=${encodeURIComponent(selectedListing.row || "")}&qty=${ticketQuantity}&price=${selectedListing.price}`}
-                className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors"
-              >
-                <CheckCircle2 className="size-4.5" />
-                Thanh toán qua VNPay &amp; Nhận vé QR
-              </Link>
-              <button
-                type="button"
-                onClick={handleCancelHold}
-                className="w-full h-9 rounded-[8px] border border-[#dfe3e5] bg-white hover:bg-[#f5f7f8] text-[12px] font-semibold text-[#606970] transition-colors"
-              >
-                Hủy giữ chỗ &amp; chọn khu vực khác
-              </button>
-            </div>
+            {cannotBuyTickets ? (
+              <div className="rounded-[10px] bg-amber-50 border border-amber-200 p-3.5 space-y-2 mt-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-[13px]">
+                  <ShieldCheck className="size-4.5 text-amber-600 shrink-0" />
+                  <span>
+                    {isAdmin
+                      ? "Tài khoản Quản trị viên không thể mua vé sự kiện."
+                      : "Tài khoản Ban tổ chức không thể mua vé sự kiện."}
+                  </span>
+                </div>
+                <p className="text-[12px] text-amber-700 leading-relaxed">
+                  {isAdmin
+                    ? "Nhằm ngăn ngừa xung đột lợi ích, tài khoản Admin không tham gia luồng thanh toán mua vé."
+                    : "Nhằm tuân thủ quy chuẩn chống găm vé nội bộ và gian lận thanh toán, vui lòng sử dụng tài khoản Người mua (Buyer) để đặt vé."}
+                </p>
+                <div className="space-y-1.5 pt-1">
+                  <Link
+                    href={isAdmin ? "/admin" : "/organizer/events"}
+                    className="inline-flex items-center justify-center w-full h-10 rounded-[8px] bg-amber-600 hover:bg-amber-700 text-white text-[13px] font-bold transition-colors"
+                  >
+                    {isAdmin ? "Về Cổng Quản trị" : "Về Quản lý sự kiện"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleCancelHold}
+                    className="w-full h-8 rounded-[8px] border border-amber-200 bg-white hover:bg-amber-100/50 text-[12px] font-semibold text-amber-800 transition-colors cursor-pointer"
+                  >
+                    Hủy xem chỗ này
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 pt-1">
+                <Link
+                  href={`/my-tickets?event=${event.id}&order=${holdOrderCode || "ORD-88412"}&zone=${encodeURIComponent(selectedListing.zoneName)}&row=${encodeURIComponent(selectedListing.row || "")}&qty=${ticketQuantity}&price=${selectedListing.price}`}
+                  className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <CheckCircle2 className="size-4.5" />
+                  Thanh toán qua VNPay &amp; Nhận vé QR
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleCancelHold}
+                  className="w-full h-9 rounded-[8px] border border-[#dfe3e5] bg-white hover:bg-[#f5f7f8] text-[12px] font-semibold text-[#606970] transition-colors"
+                >
+                  Hủy giữ chỗ &amp; chọn khu vực khác
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -10,7 +10,17 @@ export function setAccessToken(token: string | null): void {
 }
 
 export function getAccessToken(): string | null {
-  return inMemoryAccessToken;
+  if (inMemoryAccessToken) return inMemoryAccessToken;
+  if (typeof document !== "undefined") {
+    const match = document.cookie.match(
+      /(?:^|;\s*)(?:accessToken|access_token)=([^;]+)/,
+    );
+    if (match?.[1]) {
+      inMemoryAccessToken = decodeURIComponent(match[1]);
+      return inMemoryAccessToken;
+    }
+  }
+  return null;
 }
 
 export interface ApiStandardResponse<T> {
@@ -91,8 +101,9 @@ export async function apiClient<T>(
     ...(options?.headers as Record<string, string> | undefined),
   };
 
-  if (inMemoryAccessToken && !headers.Authorization) {
-    headers.Authorization = `Bearer ${inMemoryAccessToken}`;
+  const token = getAccessToken();
+  if (token && !headers.Authorization) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   let response: Response;

@@ -71,6 +71,31 @@ Thất bại (`HTTP 4xx` hoặc `5xx`):
 
 ### Xác thực tài khoản (`/auth`)
 
+#### `POST /api/v1/auth/check-identifier`
+
+Kiểm tra định danh người dùng (email) đã tồn tại trong hệ thống hay chưa phục vụ luồng Identifier-first Auth.
+
+- Quyền: Công khai
+- Request body:
+
+```json
+{
+  "identifier": "organizer@tickethub.vn"
+}
+```
+
+- Response: `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "exists": true,
+    "methods": ["password"]
+  }
+}
+```
+
 #### `POST /api/v1/auth/register`
 
 Đăng ký tài khoản người mua hoặc ban tổ chức.
@@ -364,6 +389,7 @@ Gửi tín hiệu duy trì vị trí hàng chờ mỗi 15 giây.
 
 Giữ chỗ ghế trong thời hạn 5 phút.
 
+- Quyền: Người mua vé (`BUYER`). Nghiêm cấm tài khoản Quản trị viên (`ADMIN`) và Ban tổ chức (`ORGANIZER`) thực hiện giữ chỗ hoặc mua vé.
 - Header:
   - `Authorization: Bearer <accessToken>`
   - `Idempotency-Key: <UUID>`
@@ -396,12 +422,14 @@ Giữ chỗ ghế trong thời hạn 5 phút.
 }
 ```
 
+- Response 403: Mã lỗi `FORBIDDEN_RESOURCE` nếu tài khoản có vai trò `ADMIN`, `ORGANIZER` hoặc `GATE_STAFF` gửi yêu cầu giữ chỗ.
 - Response 409: Mã lỗi `SEAT_ALREADY_HELD` nếu có ít nhất một ghế không còn trống.
 
 #### `POST /api/v1/booking/release`
 
 Hủy giữ chỗ chủ động khi người dùng rời màn hình thanh toán.
 
+- Quyền: Người mua vé (`BUYER`)
 - Request body: `{ "orderId": "ord-uuid" }`
 - Response 200: `{ "success": true, "data": { "message": "Đã giải phóng ghế" } }`
 
@@ -411,6 +439,7 @@ Hủy giữ chỗ chủ động khi người dùng rời màn hình thanh toán.
 
 Khởi tạo giao dịch thanh toán và lấy URL cổng VNPay.
 
+- Quyền: Người mua vé (`BUYER`). Nghiêm cấm tài khoản Quản trị viên (`ADMIN`) và Ban tổ chức (`ORGANIZER`) thanh toán mua vé.
 - Header: `Authorization: Bearer <accessToken>`, `Idempotency-Key: <UUID>`
 - Request body:
 

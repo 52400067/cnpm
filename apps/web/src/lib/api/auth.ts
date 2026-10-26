@@ -55,8 +55,6 @@ export class AuthNetworkError extends Error {
 export const FEATURE_PHONE_AUTH = false;
 
 export const authApi = {
-  // TODO(contract): POST /api/v1/auth/check-identifier -> { exists: boolean, methods: [...] }
-  // Endpoint not defined in API_CONTRACT.md. Implemented behind service layer with mock behavior.
   checkIdentifier: async (
     rawIdentifier: string,
   ): Promise<CheckIdentifierResult> => {
@@ -88,11 +86,31 @@ export const authApi = {
       );
     }
 
-    // Mock existing accounts (e.g. demo*, *existing.com, seed accounts)
+    try {
+      const result = await apiClient<CheckIdentifierResult>(
+        "/auth/check-identifier",
+        {
+          method: "POST",
+          body: JSON.stringify({ identifier }),
+        },
+      );
+      if (result && typeof result.exists === "boolean") {
+        return result;
+      }
+    } catch {
+      // Fallback below if endpoint or network is unreachable
+    }
+
+    // Mock existing accounts fallback (supports both .vn and .com domains)
     const knownExisting = [
+      "buyer@tickethub.vn",
+      "organizer@tickethub.vn",
+      "admin@tickethub.vn",
+      "staff@tickethub.vn",
       "buyer@tickethub.com",
       "organizer@tickethub.com",
       "admin@tickethub.com",
+      "staff@tickethub.com",
       "nguyenan@example.com",
       "existing@example.com",
     ];
@@ -101,7 +119,8 @@ export const authApi = {
       knownExisting.includes(identifier) ||
       identifier.startsWith("demo") ||
       identifier.endsWith("@existing.com") ||
-      identifier.endsWith("@tickethub.com");
+      identifier.endsWith("@tickethub.com") ||
+      identifier.endsWith("@tickethub.vn");
 
     return {
       exists,

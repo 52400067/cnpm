@@ -27,6 +27,25 @@ import {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Post("check-identifier")
+  @HttpCode(HttpStatus.OK)
+  async checkIdentifier(@Body() body: Record<string, unknown>) {
+    const raw =
+      typeof body?.identifier === "string"
+        ? body.identifier
+        : typeof body?.email === "string"
+          ? body.email
+          : "";
+    const exists = await this.authService.checkIdentifier(raw);
+    return {
+      success: true,
+      data: {
+        exists,
+        methods: ["password"],
+      },
+    };
+  }
+
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() body: unknown) {

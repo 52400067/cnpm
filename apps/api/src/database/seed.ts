@@ -20,14 +20,16 @@ import {
 async function seed() {
   console.log("Seeding initial database records...");
 
-  // 1. Users
+  // 1. Users (default password: Password123!)
+  const defaultPasswordHash =
+    "$argon2id$v=19$m=65536,p=4,t=3$ZizAyGaEgeq8Olc9I4nW4g$kJQV9gHwtfhN6I8kFpDZ6fIfV+VNfn9tMTB9jtyYukA";
+
   const [adminUser] = await db
     .insert(users)
     .values({
       email: "admin@tickethub.vn",
       fullName: "Quản trị viên Hệ thống",
-      passwordHash:
-        "$argon2id$v=19$m=65536,t=3,p=4$dummyhashforadminuserpassword123",
+      passwordHash: defaultPasswordHash,
       role: UserRole.ADMIN,
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
@@ -40,8 +42,7 @@ async function seed() {
     .values({
       email: "organizer@tickethub.vn",
       fullName: "Đại diện Ban tổ chức",
-      passwordHash:
-        "$argon2id$v=19$m=65536,t=3,p=4$dummyhashfororganizerpassword123",
+      passwordHash: defaultPasswordHash,
       role: UserRole.ORGANIZER,
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
@@ -54,8 +55,7 @@ async function seed() {
     .values({
       email: "staff@tickethub.vn",
       fullName: "Nhân viên Soát vé Cổng",
-      passwordHash:
-        "$argon2id$v=19$m=65536,t=3,p=4$dummyhashforstaffpassword123",
+      passwordHash: defaultPasswordHash,
       role: UserRole.GATE_STAFF,
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
@@ -68,8 +68,7 @@ async function seed() {
     .values({
       email: "buyer@tickethub.vn",
       fullName: "Nguyễn Văn Người Mua",
-      passwordHash:
-        "$argon2id$v=19$m=65536,t=3,p=4$dummyhashforbuyerpassword123",
+      passwordHash: defaultPasswordHash,
       role: UserRole.BUYER,
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),

@@ -3,6 +3,8 @@ tmp/
 notes/
 .agents/
 skills-lock.json
+design-reference/
+*.ods
 
 # Environment variables
 .env

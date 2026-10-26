@@ -41,6 +41,17 @@ Bảng `audit_log` chỉ tiếp nhận thao tác ghi mới (`INSERT`). Không vi
 
 Các thao tác gửi thông báo bên ngoài (email Resend/SES, SMS) không được gọi trực tiếp bên trong database transaction đang xử lý đơn hàng. Bản ghi sự kiện được ghi vào bảng `outbox` cùng transaction với đơn hàng; worker nền sẽ đọc bảng này và gửi đi với cơ chế thử lại có khoảng lùi thời gian (retry backoff).
 
+### Ranh giới vai trò và Chống xung đột lợi ích (RBAC Boundaries & Anti-Conflict of Interest)
+
+Hệ thống phân định ranh giới nghiêm ngặt giữa 4 vai trò người dùng nhằm ngăn ngừa xung đột lợi ích và bảo vệ quyền lợi người mua vé:
+
+1. **Quản trị viên (`ADMIN`)**: Giám sát hệ thống, kiểm duyệt hồ sơ Ban tổ chức, phê duyệt sự kiện và đối soát quyết toán. Nghiêm cấm tài khoản Admin thực hiện thao tác giữ chỗ hoặc mua vé để tránh can thiệp quy trình vận hành và thiên vị lợi ích.
+2. **Ban tổ chức (`ORGANIZER`)**: Tạo và quản lý sự kiện, cấu hình hạng vé, theo dõi doanh thu. Nghiêm cấm tài khoản Ban tổ chức mua vé sự kiện trên nền tảng nhằm triệt tiêu nguy cơ găm vé nội bộ, thao túng giá thị trường thứ cấp hoặc tự tạo giao dịch ảo.
+3. **Người mua vé (`BUYER`)**: Vai trò người dùng cá nhân duy nhất được phép tham gia hàng chờ ảo, thực hiện giữ chỗ nguyên tử (`POST /booking/hold`), thanh toán đơn hàng qua VNPay và sở hữu vé điện tử QR.
+4. **Nhân viên soát vé (`GATE_STAFF`)**: Được gán theo cổng sự kiện, chỉ sử dụng ứng dụng PWA quét mã QR xác thực vào cổng, không có quyền mua vé hay can thiệp dữ liệu sự kiện.
+
+Toàn bộ các endpoint giữ chỗ (`/booking/*`), tạo giao dịch thanh toán (`/checkout/*`) và giao diện xem vé (`/my-tickets`) bắt buộc phải kiểm tra và chỉ cho phép vai trò `BUYER` ở cả tầng Routing (Next.js Edge Proxy) lẫn tầng API (NestJS RolesGuard).
+
 ## Tiêu chuẩn mã nguồn
 
 ### Cấu hình TypeScript

@@ -363,21 +363,21 @@ Lưu hồ sơ pháp lý của ban tổ chức để quản trị viên kiểm du
 
 Lưu thông tin các địa điểm tổ chức sự kiện tiêu chuẩn (Curated Venues) đã được quản trị viên kiểm duyệt tại 3 thành phố lớn: TP. Hồ Chí Minh, Hà Nội và Đà Nẵng.
 
-| Cột            | Kiểu         | Ràng buộc                                                                                           | Diễn giải                               |
-| :------------- | :----------- | :-------------------------------------------------------------------------------------------------- | :-------------------------------------- |
-| id             | UUID         | PRIMARY KEY DEFAULT gen_random_uuid()                                                               | Khóa chính                              |
-| name           | VARCHAR(255) | NOT NULL                                                                                            | Tên đầy đủ của địa điểm                 |
-| short_name     | VARCHAR(100) | NOT NULL                                                                                            | Tên gọi rút gọn hoặc viết tắt           |
-| city           | VARCHAR(50)  | NOT NULL CHECK (city IN ('TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng'))                                   | Thành phố trực thuộc trung ương         |
-| district       | VARCHAR(100) | NOT NULL                                                                                            | Quận / Huyện                            |
-| address        | TEXT         | NOT NULL                                                                                            | Địa chỉ số nhà và tên đường             |
-| category       | VARCHAR(50)  | NOT NULL CHECK (category IN ('stadium', 'arena', 'theater', 'sports'))                              | Loại hình không gian                    |
-| total_capacity | VARCHAR(50)  | NOT NULL                                                                                            | Sức chứa tổng thể ước tính              |
-| thumbnail_url  | VARCHAR(500) | NULL                                                                                                | Đường dẫn ảnh đại diện địa điểm         |
-| description    | TEXT         | NULL                                                                                                | Giới thiệu cơ sở vật chất và tiện ích   |
-| is_active      | BOOLEAN      | NOT NULL DEFAULT true                                                                               | Trạng thái khả dụng để ban tổ chức chọn |
-| created_at     | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                                                              | Thời điểm tạo                           |
-| updated_at     | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                                                              | Thời điểm cập nhật cuối                 |
+| Cột            | Kiểu         | Ràng buộc                                                              | Diễn giải                               |
+| :------------- | :----------- | :--------------------------------------------------------------------- | :-------------------------------------- |
+| id             | UUID         | PRIMARY KEY DEFAULT gen_random_uuid()                                  | Khóa chính                              |
+| name           | VARCHAR(255) | NOT NULL                                                               | Tên đầy đủ của địa điểm                 |
+| short_name     | VARCHAR(100) | NOT NULL                                                               | Tên gọi rút gọn hoặc viết tắt           |
+| city           | VARCHAR(50)  | NOT NULL CHECK (city IN ('TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng'))      | Thành phố trực thuộc trung ương         |
+| district       | VARCHAR(100) | NOT NULL                                                               | Quận / Huyện                            |
+| address        | TEXT         | NOT NULL                                                               | Địa chỉ số nhà và tên đường             |
+| category       | VARCHAR(50)  | NOT NULL CHECK (category IN ('stadium', 'arena', 'theater', 'sports')) | Loại hình không gian                    |
+| total_capacity | VARCHAR(50)  | NOT NULL                                                               | Sức chứa tổng thể ước tính              |
+| thumbnail_url  | VARCHAR(500) | NULL                                                                   | Đường dẫn ảnh đại diện địa điểm         |
+| description    | TEXT         | NULL                                                                   | Giới thiệu cơ sở vật chất và tiện ích   |
+| is_active      | BOOLEAN      | NOT NULL DEFAULT true                                                  | Trạng thái khả dụng để ban tổ chức chọn |
+| created_at     | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                                 | Thời điểm tạo                           |
+| updated_at     | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                                 | Thời điểm cập nhật cuối                 |
 
 Chỉ mục:
 
@@ -392,21 +392,21 @@ CREATE INDEX idx_venues_fts ON venues USING gin (
 
 Lưu trữ các cấu hình sân khấu và sơ đồ khán đài kiến trúc chuẩn dạng SVG (Live Concert T-stage, Mega Concert, Sân bóng đá, Sàn thi đấu thể thao, Khán phòng nhà hát) liên kết với từng địa điểm tổ chức.
 
-| Cột               | Kiểu         | Ràng buộc                                            | Diễn giải                                                |
-| :---------------- | :----------- | :--------------------------------------------------- | :------------------------------------------------------- |
-| id                | UUID         | PRIMARY KEY DEFAULT gen_random_uuid()                | Khóa chính                                               |
-| venue_id          | UUID         | NOT NULL REFERENCES venues(id) ON DELETE CASCADE     | Khóa ngoại tham chiếu địa điểm                           |
-| name              | VARCHAR(255) | NOT NULL                                             | Tên cấu hình sân khấu (VD: Live Concert Sân Khấu Chữ T)  |
-| category_name     | VARCHAR(100) | NOT NULL                                             | Phân loại mục đích sử dụng                               |
-| description       | TEXT         | NULL                                                 | Chi tiết góc nhìn, vị trí sân khấu và tầm quan sát       |
-| capacity_estimate | VARCHAR(50)  | NOT NULL                                             | Phạm vi sức chứa dự kiến                                 |
-| map_key           | VARCHAR(100) | NOT NULL                                             | Mã định danh sơ đồ SVG tương thích trong hệ thống        |
-| svg_content       | TEXT         | NULL                                                 | Mã nguồn SVG đã được admin tối ưu hóa và sanitize        |
-| default_zones     | JSONB        | NOT NULL DEFAULT '[]'::jsonb                         | Cấu hình mặc định các phân khu, giá tham chiếu và vị trí |
-| is_default        | BOOLEAN      | NOT NULL DEFAULT false                               | Sơ đồ mặc định ưu tiên hiển thị                          |
-| is_active         | BOOLEAN      | NOT NULL DEFAULT true                                | Trạng thái cho phép áp dụng                             |
-| created_at        | TIMESTAMPTZ  | NOT NULL DEFAULT now()                               | Thời điểm tạo                                            |
-| updated_at        | TIMESTAMPTZ  | NOT NULL DEFAULT now()                               | Thời điểm cập nhật cuối                                  |
+| Cột               | Kiểu         | Ràng buộc                                        | Diễn giải                                                |
+| :---------------- | :----------- | :----------------------------------------------- | :------------------------------------------------------- |
+| id                | UUID         | PRIMARY KEY DEFAULT gen_random_uuid()            | Khóa chính                                               |
+| venue_id          | UUID         | NOT NULL REFERENCES venues(id) ON DELETE CASCADE | Khóa ngoại tham chiếu địa điểm                           |
+| name              | VARCHAR(255) | NOT NULL                                         | Tên cấu hình sân khấu (VD: Live Concert Sân Khấu Chữ T)  |
+| category_name     | VARCHAR(100) | NOT NULL                                         | Phân loại mục đích sử dụng                               |
+| description       | TEXT         | NULL                                             | Chi tiết góc nhìn, vị trí sân khấu và tầm quan sát       |
+| capacity_estimate | VARCHAR(50)  | NOT NULL                                         | Phạm vi sức chứa dự kiến                                 |
+| map_key           | VARCHAR(100) | NOT NULL                                         | Mã định danh sơ đồ SVG tương thích trong hệ thống        |
+| svg_content       | TEXT         | NULL                                             | Mã nguồn SVG đã được admin tối ưu hóa và sanitize        |
+| default_zones     | JSONB        | NOT NULL DEFAULT '[]'::jsonb                     | Cấu hình mặc định các phân khu, giá tham chiếu và vị trí |
+| is_default        | BOOLEAN      | NOT NULL DEFAULT false                           | Sơ đồ mặc định ưu tiên hiển thị                          |
+| is_active         | BOOLEAN      | NOT NULL DEFAULT true                            | Trạng thái cho phép áp dụng                              |
+| created_at        | TIMESTAMPTZ  | NOT NULL DEFAULT now()                           | Thời điểm tạo                                            |
+| updated_at        | TIMESTAMPTZ  | NOT NULL DEFAULT now()                           | Thời điểm cập nhật cuối                                  |
 
 Chỉ mục:
 
@@ -423,7 +423,7 @@ Lưu thông tin sự kiện, địa điểm, cấu hình hàng chờ và chính 
 | :---------------------- | :----------- | :----------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------- |
 | id                      | UUID         | PRIMARY KEY DEFAULT gen_random_uuid()                                                                                    | Khóa chính                                             |
 | organizer_id            | UUID         | NOT NULL REFERENCES organizer_profiles(id)                                                                               | Ban tổ chức sự kiện                                    |
-| venue_id                | UUID         | NULL REFERENCES venues(id)                                                                                               | Khóa ngoại địa điểm chuẩn (nếu chọn từ Curated Venues)  |
+| venue_id                | UUID         | NULL REFERENCES venues(id)                                                                                               | Khóa ngoại địa điểm chuẩn (nếu chọn từ Curated Venues) |
 | venue_layout_id         | UUID         | NULL REFERENCES venue_layouts(id)                                                                                        | Khóa ngoại mẫu sơ đồ khán đài SVG tương ứng            |
 | title                   | VARCHAR(255) | NOT NULL                                                                                                                 | Tên sự kiện                                            |
 | slug                    | VARCHAR(255) | NOT NULL UNIQUE                                                                                                          | Định danh đường dẫn                                    |
@@ -520,21 +520,23 @@ CREATE INDEX idx_seats_hold_expiry ON seats(status, hold_expires_at) WHERE statu
 
 Lưu thông tin đơn hàng và thời hạn thanh toán.
 
-| Cột             | Kiểu          | Ràng buộc                                                                                                      | Diễn giải                     |
-| :-------------- | :------------ | :------------------------------------------------------------------------------------------------------------- | :---------------------------- |
-| id              | UUID          | PRIMARY KEY DEFAULT gen_random_uuid()                                                                          | Khóa chính                    |
-| order_code      | VARCHAR(32)   | NOT NULL UNIQUE                                                                                                | Mã đơn hàng hiển thị          |
-| user_id         | UUID          | NOT NULL REFERENCES users(id)                                                                                  | Người mua                     |
-| event_id        | UUID          | NOT NULL REFERENCES events(id)                                                                                 | Sự kiện                       |
-| total_amount    | NUMERIC(14,2) | NOT NULL CHECK (total_amount >= 0)                                                                             | Tổng tiền gốc                 |
-| discount_amount | NUMERIC(14,2) | NOT NULL DEFAULT 0 CHECK (discount_amount >= 0)                                                                | Số tiền giảm                  |
-| final_amount    | NUMERIC(14,2) | NOT NULL CHECK (final_amount >= 0)                                                                             | Số tiền thực trả              |
-| status          | VARCHAR(20)   | NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'EXPIRED', 'FAILED', 'CANCELLED', 'REFUNDED')) | Trạng thái đơn                |
-| expires_at      | TIMESTAMPTZ   | NOT NULL                                                                                                       | Thời điểm hết hạn giữ chỗ     |
-| paid_at         | TIMESTAMPTZ   | NULL                                                                                                           | Thời điểm hoàn tất thanh toán |
-| voucher_code    | VARCHAR(50)   | NULL                                                                                                           | Mã giảm giá                   |
-| created_at      | TIMESTAMPTZ   | NOT NULL DEFAULT now()                                                                                         | Thời điểm tạo                 |
-| updated_at      | TIMESTAMPTZ   | NOT NULL DEFAULT now()                                                                                         | Thời điểm cập nhật cuối       |
+| Cột             | Kiểu          | Ràng buộc                                                                                                      | Diễn giải                          |
+| :-------------- | :------------ | :------------------------------------------------------------------------------------------------------------- | :--------------------------------- |
+| id              | UUID          | PRIMARY KEY DEFAULT gen_random_uuid()                                                                          | Khóa chính                         |
+| order_code      | VARCHAR(32)   | NOT NULL UNIQUE                                                                                                | Mã đơn hàng hiển thị               |
+| user_id         | UUID          | NOT NULL REFERENCES users(id)                                                                                  | Người mua (Bắt buộc vai trò BUYER) |
+| event_id        | UUID          | NOT NULL REFERENCES events(id)                                                                                 | Sự kiện                            |
+| total_amount    | NUMERIC(14,2) | NOT NULL CHECK (total_amount >= 0)                                                                             | Tổng tiền gốc                      |
+| discount_amount | NUMERIC(14,2) | NOT NULL DEFAULT 0 CHECK (discount_amount >= 0)                                                                | Số tiền giảm                       |
+| final_amount    | NUMERIC(14,2) | NOT NULL CHECK (final_amount >= 0)                                                                             | Số tiền thực trả                   |
+| status          | VARCHAR(20)   | NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'EXPIRED', 'FAILED', 'CANCELLED', 'REFUNDED')) | Trạng thái đơn                     |
+| expires_at      | TIMESTAMPTZ   | NOT NULL                                                                                                       | Thời điểm hết hạn giữ chỗ          |
+| paid_at         | TIMESTAMPTZ   | NULL                                                                                                           | Thời điểm hoàn tất thanh toán      |
+| voucher_code    | VARCHAR(50)   | NULL                                                                                                           | Mã giảm giá                        |
+| created_at      | TIMESTAMPTZ   | NOT NULL DEFAULT now()                                                                                         | Thời điểm tạo                      |
+| updated_at      | TIMESTAMPTZ   | NOT NULL DEFAULT now()                                                                                         | Thời điểm cập nhật cuối            |
+
+> **Ràng buộc nghiệp vụ toàn vẹn (Integrity Constraint)**: Cột `user_id` chỉ liên kết với bản ghi người dùng có `role = 'BUYER'`. Các tài khoản có vai trò `ADMIN`, `ORGANIZER` hoặc `GATE_STAFF` bị cấm tạo đơn hàng và sở hữu vé cá nhân nhằm ngăn ngừa xung đột lợi ích và găm vé nội bộ.
 
 Chỉ mục:
 
