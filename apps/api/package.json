@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test test/**/*.test.ts",
-    "dev": "tsc-watch -p tsconfig.json --onSuccess \"node dist/main.js\"",
+    "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/database/migrate.ts",
@@ -39,7 +39,6 @@
   "devDependencies": {
     "@types/node": "^22.13.9",
     "drizzle-kit": "^0.30.5",
-    "tsc-watch": "^7.2.1",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }

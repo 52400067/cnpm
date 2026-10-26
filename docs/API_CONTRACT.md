@@ -562,12 +562,147 @@ Gửi yêu cầu hủy vé.
 
 ### Quản trị hệ thống (`/admin`)
 
+#### `GET /api/v1/admin/organizers`
+
+Lấy danh sách hồ sơ ban tổ chức đang chờ quản trị viên phê duyệt (trạng thái `PENDING_VERIFICATION`).
+
+- Header: `Authorization: Bearer <adminToken>`
+- Response 200:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "org-uuid",
+      "userId": "usr-uuid",
+      "organizationName": "Công ty TNHH Sự Kiện Âm Nhạc",
+      "representativeName": "Nguyễn Văn A",
+      "taxCode": "0101234567",
+      "businessLicenseUrl": "https://media.tickethub.vn/licenses/lic-123.jpg",
+      "status": "PENDING_VERIFICATION",
+      "version": 1,
+      "createdAt": "2026-10-22T08:00:00.000Z",
+      "email": "btc@concert.vn"
+    }
+  ],
+  "meta": {
+    "total": 1
+  }
+}
+```
+
+#### `POST /api/v1/admin/organizers/:id/approve`
+
+Phê duyệt hồ sơ ban tổ chức chuyển sang trạng thái `VERIFIED`.
+
+- Header: `Authorization: Bearer <adminToken>`
+- Request body (tùy chọn): `{ "version": 1 }`
+- Response 200: Hồ sơ chuyển trạng thái `VERIFIED` và tự động ghi outbox gửi email thông báo.
+
+#### `POST /api/v1/admin/organizers/:id/reject`
+
+Từ chối hồ sơ ban tổ chức chuyển sang trạng thái `REJECTED` kèm lý do.
+
+- Header: `Authorization: Bearer <adminToken>`
+- Request body: `{ "reason": "Giấy phép kinh doanh không khớp", "version": 1 }`
+- Response 200: Hồ sơ chuyển trạng thái `REJECTED`.
+
+#### `POST /api/v1/admin/organizers/:id/review`
+
+Duyệt hoặc từ chối hồ sơ ban tổ chức (alias hợp nhất).
+
+- Header: `Authorization: Bearer <adminToken>`
+- Request body:
+
+```json
+{
+  "decision": "APPROVE",
+  "version": 1
+}
+```
+
+hoặc
+
+```json
+{
+  "decision": "REJECT",
+  "reason": "Mã số thuế không hợp lệ",
+  "version": 1
+}
+```
+
+- Response 200: Trả về thông tin hồ sơ đã cập nhật.
+
+#### `GET /api/v1/admin/events`
+
+Lấy danh sách sự kiện đang chờ quản trị viên phê duyệt (trạng thái `PENDING_APPROVAL`).
+
+- Header: `Authorization: Bearer <adminToken>`
+- Response 200:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "evt-uuid",
+      "title": "Liveshow Âm Nhạc 2026",
+      "organizerId": "org-uuid",
+      "organizationName": "Công ty Âm Nhạc",
+      "status": "PENDING_APPROVAL",
+      "version": 1,
+      "startTime": "2026-11-20T19:00:00.000Z",
+      "createdAt": "2026-10-22T09:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "total": 1
+  }
+}
+```
+
 #### `POST /api/v1/admin/events/:id/approve`
 
 Phê duyệt sự kiện chuyển sang trạng thái `PUBLISHED`.
 
 - Header: `Authorization: Bearer <adminToken>`
-- Response 200: Sự kiện chuyển trạng thái và tự động tạo tồn kho ghế.
+- Request body (tùy chọn): `{ "version": 1 }`
+- Response 200: Sự kiện chuyển trạng thái `PUBLISHED` và tạo outbox gửi email thông báo.
+
+#### `POST /api/v1/admin/events/:id/reject`
+
+Từ chối sự kiện chuyển về trạng thái `DRAFT` kèm lý do để ban tổ chức chỉnh sửa.
+
+- Header: `Authorization: Bearer <adminToken>`
+- Request body: `{ "reason": "Sơ đồ ghế thiếu lối thoát hiểm", "version": 1 }`
+- Response 200: Sự kiện chuyển `DRAFT`.
+
+#### `POST /api/v1/admin/events/:id/review`
+
+Duyệt hoặc từ chối sự kiện (alias hợp nhất).
+
+- Header: `Authorization: Bearer <adminToken>`
+- Request body:
+
+```json
+{
+  "decision": "APPROVE",
+  "version": 1
+}
+```
+
+hoặc
+
+```json
+{
+  "decision": "REJECT",
+  "reason": "Thiếu thông tin hạng vé",
+  "version": 1
+}
+```
+
+- Response 200: Trả về thông tin sự kiện đã cập nhật.
 
 #### `POST /api/v1/admin/events/:id/kill-switch`
 
@@ -637,8 +772,20 @@ Quản trị viên liên kết mẫu sơ đồ SVG đã chuẩn hóa (hoặc t�
   "mapKey": "arena-t-stage",
   "capacityEstimate": "8.000 - 15.000 chỗ",
   "defaultZones": [
-    { "zoneId": "495", "name": "VIP Đặc Biệt", "price": 2500000, "capacity": 1200, "isSeated": true },
-    { "zoneId": "496", "name": "VIP Vàng", "price": 1900000, "capacity": 2500, "isSeated": true }
+    {
+      "zoneId": "495",
+      "name": "VIP Đặc Biệt",
+      "price": 2500000,
+      "capacity": 1200,
+      "isSeated": true
+    },
+    {
+      "zoneId": "496",
+      "name": "VIP Vàng",
+      "price": 1900000,
+      "capacity": 2500,
+      "isSeated": true
+    }
   ]
 }
 ```
@@ -662,3 +809,69 @@ Quản trị viên cập nhật thông tin địa điểm hoặc tạm ngưng kh
 - Header: `Authorization: Bearer <adminToken>`
 - Request body: `{ "isActive": false }`
 - Response 200: `{ "success": true, "data": { "message": "Cập nhật địa điểm thành công" } }`
+
+---
+
+### Tải lên tệp đa phương tiện (`/uploads`)
+
+#### `POST /api/v1/uploads/event-image/presign`
+
+Tạo presigned URL để ban tổ chức tải ảnh trực tiếp lên bộ lưu trữ đám mây (S3/R2).
+
+- Header: `Authorization: Bearer <organizerToken>`
+- Request body:
+
+```json
+{
+  "filename": "banner-concert.jpg",
+  "contentType": "image/jpeg",
+  "sizeBytes": 2097152
+}
+```
+
+- Response 200:
+
+```json
+{
+  "success": true,
+  "data": {
+    "uploadUrl": "https://s3.ap-southeast-1.amazonaws.com/tickethub-media/events/org-id/uuid.jpg?X-Amz-...",
+    "key": "events/org-id/uuid.jpg",
+    "publicUrl": "https://media.tickethub.vn/events/org-id/uuid.jpg",
+    "method": "PUT",
+    "headers": {
+      "Content-Type": "image/jpeg"
+    },
+    "expiresIn": 300,
+    "maxBytes": 5242880
+  }
+}
+```
+
+#### `POST /api/v1/uploads/event-image/confirm`
+
+Xác thực tính hợp lệ của tệp ảnh sau khi ban tổ chức hoàn tất tải lên S3 (kiểm tra dung lượng, Content-Type và magic bytes).
+
+- Header: `Authorization: Bearer <organizerToken>`
+- Request body:
+
+```json
+{
+  "key": "events/org-id/uuid.jpg"
+}
+```
+
+- Response 200:
+
+```json
+{
+  "success": true,
+  "data": {
+    "key": "events/org-id/uuid.jpg",
+    "contentType": "image/jpeg",
+    "sizeBytes": 2097152,
+    "verified": true,
+    "publicUrl": "https://media.tickethub.vn/events/org-id/uuid.jpg"
+  }
+}
+```

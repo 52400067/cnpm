@@ -2,38 +2,69 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  ServiceUnavailableException,
+  NotFoundException,
 } from "@nestjs/common";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import {
-  PutObjectCommand,
-  HeadObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import { OrganizerStatus, UserRole, UserStatus } from "@tickethub/shared";
+import {
+  OrganizerStatus,
+  type PresignImageRequest,
+  UserRole,
+  UserStatus,
+} from "@tickethub/shared";
 
+import { env } from "../config/env.config";
 import { db } from "../database/db";
-
 import { organizerProfiles, users } from "../database/schema";
 
-// Du lieu nhan tu Controller
-export interface PresignImageDto {
-  filename: string;
-  contentType: "image/jpeg" | "image/png" | "image/webp";
-  sizeBytes: number;
-}
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const PNG_MAGIC_BYTES = [137, 80, 78, 71, 13, 10, 26, 10];
 
 @Injectable()
 export class UploadsService {
-  async presignEventImage(userId: string, dto: PresignImageDto) {
-    // 1. Kiem tra Organizer da duoc xac minh
+  private readonly s3Client: S3Client;
+  private readonly bucket: string;
+
+  constructor() {
+    this.bucket = env.S3_BUCKET;
+
+    const s3Config: {
+      region: string;
+      requestChecksumCalculation: "WHEN_REQUIRED";
+      credentials?: { accessKeyId: string; secretAccessKey: string };
+    } = {
+      region: env.S3_REGION,
+      requestChecksumCalculation: "WHEN_REQUIRED",
+    };
+
+    if (env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY) {
+      s3Config.credentials = {
+        accessKeyId: env.S3_ACCESS_KEY_ID,
+        secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+      };
+    }
+
+    this.s3Client = new S3Client(s3Config);
+  }
+
+  private getPublicUrl(key: string): string | null {
+    const base = env.S3_PUBLIC_BASE_URL?.trim().replace(/\/+$/, "");
+    return base ? `${base}/${key}` : null;
+  }
+
+  async presignEventImage(userId: string, dto: PresignImageRequest) {
+    // 1. Kiểm tra Ban tổ chức đã được xác minh
     const [profile] = await db
       .select({
         id: organizerProfiles.id,
@@ -51,109 +82,82 @@ export class UploadsService {
       .limit(1);
 
     if (!profile) {
-      throw new ForbiddenException("Ban to chuc chua duoc xac minh");
+      throw new ForbiddenException({
+        success: false,
+        error: {
+          code: "ORGANIZER_NOT_VERIFIED",
+          message: "Ban tổ chức chưa được xác minh tài khoản",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
-    // 2. Kiem tra du lieu anh
-    const maxSize = 5 * 1024 * 1024;
-
+    // 2. Kiểm tra dung lượng và đuôi tệp
     if (
       !Number.isInteger(dto.sizeBytes) ||
       dto.sizeBytes <= 0 ||
-      dto.sizeBytes > maxSize
+      dto.sizeBytes > MAX_IMAGE_BYTES
     ) {
-      throw new BadRequestException(
-        "Kich thuoc anh khong hop le (toi da 5 MiB)",
-      );
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: "INVALID_IMAGE_SIZE",
+          message: "Kích thước ảnh không hợp lệ (tối đa 5 MiB)",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
-    const extensions: Record<PresignImageDto["contentType"], string> = {
+    const extensions: Record<PresignImageRequest["contentType"], string> = {
       "image/jpeg": "jpg",
       "image/png": "png",
       "image/webp": "webp",
     };
 
     const extension = extensions[dto.contentType];
-
     if (!extension) {
-      throw new BadRequestException("Chi ho tro anh JPG, PNG va WebP");
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: "UNSUPPORTED_IMAGE_FORMAT",
+          message: "Hệ thống chỉ hỗ trợ định dạng JPG, PNG và WebP",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
-    // Kiem tra duoi file phu hop voi contentType
-    const validFilename =
-      dto.contentType === "image/jpeg"
-        ? /\.jpe?g$/i.test(dto.filename)
-        : dto.contentType === "image/png"
-          ? /\.png$/i.test(dto.filename)
-          : /\.webp$/i.test(dto.filename);
-
-    if (!validFilename) {
-      throw new BadRequestException("Ten file khong khop voi dinh dang anh");
-    }
-
-    // 3. Lay cau hinh AWS S3 tu .env
-    const region = process.env.S3_REGION;
-    const bucket = process.env.S3_BUCKET;
-    const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-
-    if (!region || !bucket || !accessKeyId || !secretAccessKey) {
-      throw new ServiceUnavailableException("AWS S3 chua duoc cau hinh");
-    }
-
-    // 4. Tao AWS S3 Client
-    const s3 = new S3Client({
-      region,
-      requestChecksumCalculation: "WHEN_REQUIRED",
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
-    });
-
-    // 5. Tao ten file duy nhat
+    // 3. Tạo định danh duy nhất và đường dẫn lưu trữ S3
     const fileName = `${randomUUID()}.${extension}`;
-
-    // Luu anh theo tung Organizer
     const key = `events/${profile.id}/${fileName}`;
 
-    // 6. Tao lenh upload anh
+    // 4. Khởi tạo PutObjectCommand
     const command = new PutObjectCommand({
-      Bucket: bucket,
+      Bucket: this.bucket,
       Key: key,
       ContentType: dto.contentType,
     });
 
-    // 7. Tao Presigned URL het han sau 5 phut
-    const uploadUrl = await getSignedUrl(s3, command, {
+    // 5. Ký Presigned URL có thời hạn 5 phút
+    const uploadUrl = await getSignedUrl(this.s3Client, command, {
       expiresIn: 300,
       signableHeaders: new Set(["content-type"]),
     });
 
-    // 8. URL cong khai (neu da cau hinh CloudFront)
-    const publicBaseUrl = process.env.S3_PUBLIC_BASE_URL?.trim().replace(
-      /\/+$/,
-      "",
-    );
-
-    const publicUrl = publicBaseUrl ? `${publicBaseUrl}/${key}` : null;
-
-    // 9. Tra ket qua cho Controller
     return {
       uploadUrl,
       key,
-      publicUrl,
+      publicUrl: this.getPublicUrl(key),
       method: "PUT",
       headers: {
         "Content-Type": dto.contentType,
       },
       expiresIn: 300,
-      maxBytes: maxSize,
+      maxBytes: MAX_IMAGE_BYTES,
     };
   }
 
   async confirmEventImage(userId: string, key: string) {
-    // 1. Kiem tra tai khoan Organizer
+    // 1. Kiểm tra tài khoản Ban tổ chức
     const [profile] = await db
       .select({
         id: organizerProfiles.id,
@@ -171,24 +175,35 @@ export class UploadsService {
       .limit(1);
 
     if (!profile) {
-      throw new ForbiddenException("Ban to chuc chua duoc xac minh");
+      throw new ForbiddenException({
+        success: false,
+        error: {
+          code: "ORGANIZER_NOT_VERIFIED",
+          message: "Ban tổ chức chưa được xác minh tài khoản",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
-    // 2. Kiem tra anh thuoc dung Organizer
+    // 2. Kiểm tra quyền sở hữu ảnh theo thư mục ban tổ chức
     const prefix = `events/${profile.id}/`;
-
     if (
       !key.startsWith(prefix) ||
       !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\.(jpg|png|webp)$/i.test(
         key.slice(prefix.length),
       )
     ) {
-      throw new ForbiddenException("Ban khong co quyen xac nhan anh nay");
+      throw new ForbiddenException({
+        success: false,
+        error: {
+          code: "FORBIDDEN_IMAGE_KEY",
+          message: "Bạn không có quyền xác nhận tập tin này",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
-    // 3. Xac dinh MIME type tu duoi file
     const extension = key.split(".").pop()?.toLowerCase();
-
     const contentType =
       extension === "jpg"
         ? "image/jpeg"
@@ -196,64 +211,96 @@ export class UploadsService {
           ? "image/png"
           : "image/webp";
 
-    // 4. Lay cau hinh AWS S3
-    const bucket = process.env.S3_BUCKET;
-    const region = process.env.S3_REGION;
-    const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-
-    if (!bucket || !region || !accessKeyId || !secretAccessKey) {
-      throw new ServiceUnavailableException("AWS S3 chua duoc cau hinh");
+    // 3. Kiểm tra metadata đối tượng trên S3
+    let metadata;
+    try {
+      metadata = await this.s3Client.send(
+        new HeadObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
+      );
+    } catch {
+      throw new NotFoundException({
+        success: false,
+        error: {
+          code: "IMAGE_NOT_FOUND",
+          message: "Không tìm thấy tệp ảnh trên lưu trữ đám mây",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
-    const s3 = new S3Client({
-      region,
-      requestChecksumCalculation: "WHEN_REQUIRED",
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
-    });
+    if (
+      !metadata.ContentLength ||
+      metadata.ContentLength <= 0 ||
+      metadata.ContentLength > MAX_IMAGE_BYTES
+    ) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: "INVALID_IMAGE_SIZE",
+          message: "Dung lượng ảnh không hợp lệ hoặc vượt quá giới hạn 5 MiB",
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
 
-    // 5. Kiem tra kich thuoc va Content-Type thuc te
-    const metadata = await s3.send(
-      new HeadObjectCommand({
-        Bucket: bucket,
-        Key: key,
-      }),
-    );
-
-    const maxSize = 5 * 1024 * 1024;
-
-    if (!metadata.ContentLength || metadata.ContentLength > maxSize) {
-      throw new BadRequestException("Anh khong hop le hoac vuot qua 5 MiB");
+    // Định dạng ảnh hợp lệ cần tối thiểu 12 bytes
+    if (metadata.ContentLength < 12) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: "IMAGE_TOO_SMALL",
+          message: "Tập tin không đủ dung lượng của một định dạng ảnh hợp lệ",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
     if (metadata.ContentType !== contentType) {
-      throw new BadRequestException("Content-Type cua anh khong hop le");
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: "CONTENT_TYPE_MISMATCH",
+          message: "Content-Type của tệp tải lên không khớp",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
-    // 6. Doc 12 byte dau de kiem tra chu ky anh
-    const object = await s3.send(
-      new GetObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Range: "bytes=0-11",
-      }),
-    );
+    // 4. Đọc 12 byte đầu để xác thực magic bytes
+    let bytes: Uint8Array;
+    try {
+      const object = await this.s3Client.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Range: "bytes=0-11",
+        }),
+      );
 
-    const bytes = await object.Body?.transformToByteArray();
-
-    if (!bytes) {
-      throw new BadRequestException("Khong doc duoc noi dung anh");
+      const buffer = await object.Body?.transformToByteArray();
+      if (!buffer || buffer.length < 12) {
+        throw new Error("Missing buffer");
+      }
+      bytes = buffer;
+    } catch {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: "IMAGE_READ_ERROR",
+          message: "Không thể đọc nội dung kiểm tra định dạng tệp ảnh",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
 
     let validImage = false;
-
     if (contentType === "image/png") {
-      const signature = [137, 80, 78, 71, 13, 10, 26, 10];
-
-      validImage = signature.every((value, index) => bytes[index] === value);
+      validImage = PNG_MAGIC_BYTES.every(
+        (value, index) => bytes[index] === value,
+      );
     } else if (contentType === "image/jpeg") {
       validImage = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
     } else if (contentType === "image/webp") {
@@ -263,23 +310,22 @@ export class UploadsService {
     }
 
     if (!validImage) {
-      throw new BadRequestException(
-        "Noi dung file khong phai dinh dang anh hop le",
-      );
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: "INVALID_IMAGE_SIGNATURE",
+          message: "Nội dung tệp không khớp với chữ ký định dạng ảnh hợp lệ",
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
-
-    // 7. Tra thong tin anh da xac nhan
-    const publicBaseUrl = process.env.S3_PUBLIC_BASE_URL?.trim().replace(
-      /\/+$/,
-      "",
-    );
 
     return {
       key,
       contentType,
       sizeBytes: metadata.ContentLength,
       verified: true,
-      publicUrl: publicBaseUrl ? `${publicBaseUrl}/${key}` : null,
+      publicUrl: this.getPublicUrl(key),
     };
   }
 }

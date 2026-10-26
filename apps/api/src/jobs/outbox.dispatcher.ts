@@ -133,12 +133,10 @@ async function main() {
 
         enqueueReviewTest
           ? inArray(outbox.eventType, [...REVIEW_EVENT_TYPES])
-          : dryRun
-            ? inArray(outbox.eventType, [
-                "USER_REGISTERED",
-                ...REVIEW_EVENT_TYPES,
-              ])
-            : eq(outbox.eventType, "USER_REGISTERED"),
+          : inArray(outbox.eventType, [
+              "USER_REGISTERED",
+              ...REVIEW_EVENT_TYPES,
+            ]),
 
         lte(outbox.nextRetryAt, new Date()),
 
@@ -189,24 +187,18 @@ async function main() {
           console.log(`[Dispatcher] Skipped recipient: ${event.id}`);
           continue;
         }
-      } else {
-        // Các chế độ cũ chỉ xử lý USER_REGISTERED
-        if (!registrationPayload) {
-          console.log(`[Dispatcher] Skipped review: ${event.id}`);
-          continue;
-        }
-
+      } else if (enqueueEmailTest) {
         if (
-          enqueueEmailTest &&
+          !registrationPayload ||
           registrationPayload.email.toLowerCase() !== testEmail
         ) {
           continue;
         }
-
+      } else if (enqueueTest) {
         if (
-          enqueueTest &&
-          (registrationPayload.email !== "outbox-smoke@example.invalid" ||
-            registrationPayload.verificationToken !== "fake-test-token")
+          !registrationPayload ||
+          registrationPayload.email !== "outbox-smoke@example.invalid" ||
+          registrationPayload.verificationToken !== "fake-test-token"
         ) {
           continue;
         }
@@ -244,8 +236,8 @@ async function main() {
       }
 
       try {
-        // 7. Đưa Job vào BullMQ
-        const job = enqueueReviewTest
+        // 7. Đưa Job vào BullMQ theo đúng loại sự kiện
+        const job = isReview
           ? await enqueueReviewEmail(
               event.id,
               event.eventType as ReviewEventType,
