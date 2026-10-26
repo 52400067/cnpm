@@ -28,6 +28,7 @@ import {
   type TicketListing,
 } from "@/lib/events-catalog";
 import { SeatMap } from "@/components/events/seat-map";
+import { type SelectedSeatItem } from "@/components/events/seat-map.types";
 import { useSession } from "@/providers/session-provider";
 
 export default function EventDetailPage() {
@@ -74,6 +75,9 @@ function EventSplitView({ event }: { event: EventItem }) {
   const [selectedListing, setSelectedListing] = useState<TicketListing | null>(
     null,
   );
+  const [selectedInteractiveSeats, setSelectedInteractiveSeats] = useState<
+    SelectedSeatItem[]
+  >([]);
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
   // 5-minute Hold countdown
@@ -324,6 +328,19 @@ function EventSplitView({ event }: { event: EventItem }) {
               zoneInfoMap={zoneInfoMap}
               onSelectZone={(zid) => setActiveZoneId(zid)}
               onHoverZone={(zid) => setHoveredZoneId(zid)}
+              selectedSeats={selectedInteractiveSeats}
+              onSeatsChange={(seats) => {
+                setSelectedInteractiveSeats(seats);
+                if (seats.length > 0) {
+                  setTicketQuantity(seats.length);
+                }
+              }}
+              maxSeats={6}
+              onProceedToHold={() => {
+                if (filteredListings[0]) {
+                  handleStartHold(filteredListings[0]);
+                }
+              }}
             />
           </div>
         </div>
@@ -619,6 +636,14 @@ function EventSplitView({ event }: { event: EventItem }) {
                   {selectedListing.row ? `• ${selectedListing.row}` : ""}
                 </span>
               </div>
+              {selectedInteractiveSeats.length > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[#606970]">Mã ghế đã chọn:</span>
+                  <span className="font-bold text-primary font-mono text-[12.5px]">
+                    {selectedInteractiveSeats.map((s) => s.code).join(", ")}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-[#606970]">Số lượng vé:</span>
                 <span className="font-bold text-[#141d23]">
