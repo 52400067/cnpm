@@ -143,11 +143,12 @@ function EventSplitView({ event }: { event: EventItem }) {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-32px)] bg-white overflow-hidden text-[#141d23]">
-      {/* 1. Clean Top Header Bar */}
-      <header className="h-[64px] border-b border-[#dfe3e5] bg-white px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-30">
-        {/* Left: Event thumbnail + Title + Date & Venue */}
-        <div className="flex items-center gap-3.5 min-w-0">
+    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden text-[#141d23]">
+      {/* 1. Clean Top Header Bar with 2 bên lề */}
+      <header className="h-[64px] border-b border-[#dfe3e5] bg-white px-4 sm:px-6 shrink-0 z-30">
+        <div className="max-w-[1360px] h-full mx-auto flex items-center justify-between gap-4">
+          {/* Left: Event thumbnail + Title + Date & Venue */}
+          <div className="flex items-center gap-3.5 min-w-0">
           <Link
             href="/"
             className="size-11 rounded-[8px] overflow-hidden bg-[#eff1f2] shrink-0 border border-[#dfe3e5] hover:opacity-90 transition-opacity"
@@ -287,18 +288,22 @@ function EventSplitView({ event }: { event: EventItem }) {
             </Link>
           )}
         </div>
+      </div>
       </header>
 
-      {/* 2. Slim Urgency Strip */}
-      <div className="h-[32px] bg-[#fdf2f4] border-b border-[#fee2e2] px-4 sm:px-6 flex items-center justify-center text-center gap-2 text-[12px] text-[#991b1b] font-medium shrink-0">
-        <Flame className="size-3.5 text-[#e11d48] shrink-0" />
-        <span>
-          Sắp hết vé! Hơn 70 người đang xem sự kiện này trong 1 giờ qua
-        </span>
+      {/* 2. Slim Urgency Strip with 2 bên lề */}
+      <div className="h-[32px] bg-[#fdf2f4] border-b border-[#fee2e2] px-4 sm:px-6 shrink-0">
+        <div className="max-w-[1360px] h-full mx-auto flex items-center justify-center text-center gap-2 text-[12px] text-[#991b1b] font-medium">
+          <Flame className="size-3.5 text-[#e11d48] shrink-0" />
+          <span>
+            Sắp hết vé! Hơn 70 người đang xem sự kiện này trong 1 giờ qua
+          </span>
+        </div>
       </div>
 
-      {/* 3. Full-Height Split Screen Workspace */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+      {/* 3. Full-Height Split Screen Workspace with 2 bên lề */}
+      <div className="flex-1 w-full bg-[#f8fafc] py-2 sm:py-3.5 px-3 sm:px-5 lg:px-6 overflow-hidden">
+        <div className="max-w-[1360px] h-full mx-auto flex flex-col lg:flex-row overflow-hidden rounded-[16px] border border-[#dfe3e5] shadow-xs bg-white relative">
         {/* LEFT PANE: Interactive Architectural Stadium/Arena SVG Map */}
         <div className="w-full lg:w-[58%] xl:w-[62%] h-[42vh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#dfe3e5] bg-[#f8fafc] flex flex-col">
           {/* Active section filter badge if selected */}
@@ -505,6 +510,7 @@ function EventSplitView({ event }: { event: EventItem }) {
           </div>
         </div>
       </div>
+    </div>
 
       {/* 4. "Bạn cần bao nhiêu vé?" Minimalist Popup Modal */}
       {showQtyModal && (
