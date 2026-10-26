@@ -45,7 +45,9 @@ function SeatMapView({
   const mapData = VENUE_SVG[mapKey] || VENUE_SVG["arena-t-stage"];
 
   // View mode: "OVERVIEW" (stadium SVG) or "SECTION_SEATS" (detailed seat grid)
-  const [viewMode, setViewMode] = useState<"OVERVIEW" | "SECTION_SEATS">("OVERVIEW");
+  const [viewMode, setViewMode] = useState<"OVERVIEW" | "SECTION_SEATS">(
+    activeZoneId ? "SECTION_SEATS" : "OVERVIEW"
+  );
 
   // Local state for internal selected seats if not controlled from parent
   const [internalSelected, setInternalSelected] = useState<SelectedSeatItem[]>(selectedSeats);
@@ -93,12 +95,12 @@ function SeatMapView({
 
   // When activeZoneId changes, switch to detailed view if a valid zone is selected
   useEffect(() => {
-    if (activeZoneId && zoneInfoMap[activeZoneId]) {
+    if (activeZoneId) {
       setViewMode("SECTION_SEATS");
     } else {
       setViewMode("OVERVIEW");
     }
-  }, [activeZoneId, zoneInfoMap]);
+  }, [activeZoneId]);
 
   // Tooltip for overview hover
   const [tooltip, setTooltip] = useState<{
