@@ -57,3 +57,33 @@ export const EventFilterQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 export type EventFilterQuery = z.infer<typeof EventFilterQuerySchema>;
+
+export const SearchQuerySchema = EventFilterQuerySchema.extend({
+  keyword: z.string().trim().max(120).optional(),
+  city: z.string().trim().max(100).optional(),
+  category: z.string().trim().max(50).optional(),
+  minPrice: z.coerce.number().nonnegative().optional(),
+  maxPrice: z.coerce.number().nonnegative().optional(),
+}).superRefine((query, ctx) => {
+  if (
+    query.minPrice !== undefined &&
+    query.maxPrice !== undefined &&
+    query.minPrice > query.maxPrice
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["maxPrice"],
+      message: "maxPrice phai >= minPrice",
+    });
+  }
+
+  if (query.fromDate && query.toDate && query.fromDate > query.toDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["toDate"],
+      message: "Khoang ngay khong hop le",
+    });
+  }
+});
+export type SearchQuery = z.infer<typeof SearchQuerySchema>;
+
