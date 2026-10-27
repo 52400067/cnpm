@@ -12,6 +12,25 @@ export const HoldSeatsRequestSchema = z.object({
 });
 export type HoldSeatsRequest = z.infer<typeof HoldSeatsRequestSchema>;
 
+export const AllocatedSeatItemSchema = z.object({
+  id: z.string().uuid(),
+  zoneName: z.string(),
+  rowLabel: z.string(),
+  seatNumber: z.string(),
+});
+export type AllocatedSeatItem = z.infer<typeof AllocatedSeatItemSchema>;
+
+export const HoldSeatsResponseDataSchema = z.object({
+  orderId: z.string().uuid(),
+  orderCode: z.string(),
+  heldSeats: z.array(z.string().uuid()),
+  allocatedSeats: z.array(AllocatedSeatItemSchema).default([]),
+  totalAmount: z.number(),
+  holdExpiresAt: z.string(),
+  remainingSeconds: z.number(),
+});
+export type HoldSeatsResponseData = z.infer<typeof HoldSeatsResponseDataSchema>;
+
 export const ReleaseHoldRequestSchema = z.object({
   orderId: z.string().uuid(),
 });

@@ -29,6 +29,7 @@ import {
 } from "@/lib/events-catalog";
 import { SeatMap } from "@/components/events/seat-map";
 import { useSession } from "@/providers/session-provider";
+import { getAccessToken } from "@/lib/api/client";
 
 export default function EventDetailPage() {
   const params = useParams<{ id: string }>();
@@ -79,6 +80,14 @@ function EventSplitView({ event }: { event: EventItem }) {
   // 5-minute Hold countdown
   const [holdSecondsLeft, setHoldSecondsLeft] = useState<number | null>(null);
   const [holdOrderCode, setHoldOrderCode] = useState<string | null>(null);
+  const [allocatedSeats, setAllocatedSeats] = useState<
+    Array<{
+      id: string;
+      zoneName: string;
+      rowLabel: string;
+      seatNumber: string;
+    }>
+  >([]);
 
   useEffect(() => {
     if (holdSecondsLeft === null || holdSecondsLeft <= 0) return;
@@ -119,17 +128,51 @@ function EventSplitView({ event }: { event: EventItem }) {
     return map;
   }, [allListings]);
 
-  const handleStartHold = (listing: TicketListing) => {
+  const handleStartHold = async (listing: TicketListing) => {
     setSelectedListing(listing);
     setHoldSecondsLeft(300); // 5 minutes
     const orderNum = (listing.price % 89999) + 10000;
     setHoldOrderCode(`ORD-${orderNum}`);
+    setAllocatedSeats([]);
+
+    try {
+      const token = getAccessToken();
+      const response = await fetch("/api/v1/booking/hold", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          eventId: event.id,
+          items: [
+            {
+              ticketTypeId: listing.id,
+              quantity: ticketQuantity,
+            },
+          ],
+        }),
+      });
+      if (response.ok) {
+        const json = await response.json();
+        if (json.data) {
+          if (json.data.orderCode) setHoldOrderCode(json.data.orderCode);
+          if (json.data.remainingSeconds)
+            setHoldSecondsLeft(json.data.remainingSeconds);
+          if (json.data.allocatedSeats)
+            setAllocatedSeats(json.data.allocatedSeats);
+        }
+      }
+    } catch {
+      // Graceful fallback to client timer if offline or demo event
+    }
   };
 
   const handleCancelHold = () => {
     setHoldSecondsLeft(null);
     setHoldOrderCode(null);
     setSelectedListing(null);
+    setAllocatedSeats([]);
   };
 
   const formatCountdown = (seconds: number) => {
@@ -577,14 +620,25 @@ function EventSplitView({ event }: { event: EventItem }) {
 
             {/* 5-Minute Hold Notice Banner */}
             {holdSecondsLeft !== null && holdSecondsLeft > 0 && (
-              <div className="rounded-[10px] bg-emerald-50 border border-emerald-200 p-3.5 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-primary font-bold text-[13px]">
-                  <Timer className="size-4.5" />
-                  <span>Đang giữ chỗ • Mã {holdOrderCode}</span>
+              <div className="rounded-[10px] bg-emerald-50 border border-emerald-200 p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-primary font-bold text-[13px]">
+                    <Timer className="size-4.5" />
+                    <span>Đang giữ chỗ • Mã {holdOrderCode}</span>
+                  </div>
+                  <span className="font-mono text-[16px] font-extrabold text-primary">
+                    {formatCountdown(holdSecondsLeft)}
+                  </span>
                 </div>
-                <span className="font-mono text-[16px] font-extrabold text-primary">
-                  {formatCountdown(holdSecondsLeft)}
-                </span>
+                {allocatedSeats.length > 0 && (
+                  <div className="text-[12px] font-medium text-emerald-800 border-t border-emerald-200/60 pt-1.5 flex items-center justify-between">
+                    <span>Vị trí ghế đã cấp tự động:</span>
+                    <span className="font-mono font-bold">
+                      Hàng {allocatedSeats[0]?.rowLabel} - Ghế{" "}
+                      {allocatedSeats.map((s) => s.seatNumber).join(", ")}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

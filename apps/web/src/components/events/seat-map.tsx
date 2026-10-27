@@ -101,13 +101,13 @@ function SeatMapView({
     const target = (e.target as Element).closest("[data-zone]");
     if (target) {
       const zid = target.getAttribute("data-zone");
-      // Only available seats with active tickets can be clicked/selected
+      // Only available zones with active tickets can be clicked/selected
       if (zid && zoneInfoMap[zid]) {
         onSelectZone(activeZoneId === zid ? null : zid);
         return;
       }
     }
-    // Clicked on empty space, non-selling seat, or sold-out seat: clear selection
+    // Clicked on empty space, non-selling zone, or sold-out zone: clear selection
     onSelectZone(null);
   };
 
@@ -208,7 +208,7 @@ function SeatMapView({
           cursor: pointer;
         }
 
-        /* Non-selling & Priority seats (simply gray and not clickable) */
+        /* Non-selling & Priority zones (simply gray and not clickable) */
         g[data-zone="11448"],
         g[data-zone="885"] {
           cursor: not-allowed !important;
