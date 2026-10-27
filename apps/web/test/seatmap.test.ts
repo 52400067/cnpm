@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { SeatStatus } from "@tickethub/shared";
 import { VENUE_SVG } from "../src/lib/venue-svg.generated.ts";
 import {
+  clampPanToMap,
   calculateMinimapViewport,
+  fitMapRect,
   minimapClickToPan,
   parseViewBox,
 } from "../src/components/events/seat-map.utils.ts";
@@ -18,9 +20,18 @@ describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
 
   test("VENUE_SVG chua cac ban do khan dai hop le va parse duoc viewBox", () => {
     const venueKeys = Object.keys(VENUE_SVG);
-    assert.ok(venueKeys.length >= 4, "Phai co it nhat 4 loai ban do san van dong / nha hat");
-    assert.ok(venueKeys.includes("arena-t-stage"), "Phai co ban do arena-t-stage");
-    assert.ok(venueKeys.includes("stadium-football"), "Phai co ban do stadium-football");
+    assert.ok(
+      venueKeys.length >= 4,
+      "Phai co it nhat 4 loai ban do san van dong / nha hat",
+    );
+    assert.ok(
+      venueKeys.includes("arena-t-stage"),
+      "Phai co ban do arena-t-stage",
+    );
+    assert.ok(
+      venueKeys.includes("stadium-football"),
+      "Phai co ban do stadium-football",
+    );
 
     for (const key of venueKeys) {
       const map = VENUE_SVG[key];
@@ -32,92 +43,146 @@ describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
       const parsed = parseViewBox(map.viewBox);
       assert.ok(parsed.width > 0, `viewBox width cua ${key} phai > 0`);
       assert.ok(parsed.height > 0, `viewBox height cua ${key} phai > 0`);
-      assert.ok(map.markup.includes("data-zone"), `Markup ${key} phai chua it nhat 1 khu vuc data-zone`);
+      assert.ok(
+        map.markup.includes("data-zone"),
+        `Markup ${key} phai chua it nhat 1 khu vuc data-zone`,
+      );
     }
   });
 
-  test("calculateMinimapViewport tinh toan scale va clamping chinh xac", () => {
-    const mapWidth = 120;
-    const mapHeight = 90;
-    const containerWidth = 800;
-    const containerHeight = 600;
-
-    // Truong hop 1: Zoom = 1 (toan canh mac dinh), pan = (0, 0)
-    const vp1 = calculateMinimapViewport({
-      zoom: 1,
-      pan: { x: 0, y: 0 },
-      mapWidth,
-      mapHeight,
-      containerWidth,
-      containerHeight,
+  test("fitMapRect giu ti le SVG va can giua map doc/ngang", () => {
+    assert.deepEqual(fitMapRect(120, 90, "0 0 2 4"), {
+      x: 37.5,
+      y: 0,
+      width: 45,
+      height: 90,
     });
-    assert.equal(vp1.scaleRatio, 1);
-    assert.equal(vp1.rectWidth, 120);
-    assert.equal(vp1.rectHeight, 90);
-    assert.equal(vp1.rectX, 0);
-    assert.equal(vp1.rectY, 0);
-
-    // Truong hop 2: Zoom = 2 (phong to 2x)
-    const vp2 = calculateMinimapViewport({
-      zoom: 2,
-      pan: { x: 0, y: 0 },
-      mapWidth,
-      mapHeight,
-      containerWidth,
-      containerHeight,
+    assert.deepEqual(fitMapRect(120, 90, "0 0 4 2"), {
+      x: 0,
+      y: 15,
+      width: 120,
+      height: 60,
     });
-    assert.equal(vp2.scaleRatio, 0.5);
-    assert.equal(vp2.rectWidth, 60);
-    assert.equal(vp2.rectHeight, 45);
-    assert.equal(vp2.rectX, 30); // Căn giữa
-    assert.equal(vp2.rectY, 22.5);
-
-    // Truong hop 3: Pan cuc dai sang trai / tren -> clamping khong bi am
-    const vpLeft = calculateMinimapViewport({
-      zoom: 2,
-      pan: { x: -99999, y: -99999 },
-      mapWidth,
-      mapHeight,
-      containerWidth,
-      containerHeight,
-    });
-    assert.ok(vpLeft.rectX >= 0, "rectX phai >= 0 khi pan am lon");
-    assert.ok(vpLeft.rectY >= 0, "rectY phai >= 0 khi pan am lon");
-
-    // Truong hop 4: Pan cuc dai sang phai / duoi -> clamping khong tran khoi map
-    const vpRight = calculateMinimapViewport({
-      zoom: 2,
-      pan: { x: 99999, y: 99999 },
-      mapWidth,
-      mapHeight,
-      containerWidth,
-      containerHeight,
-    });
-    assert.ok(vpRight.rectX <= mapWidth - vpRight.rectWidth, "rectX phai nam trong gioi han mapWidth");
-    assert.ok(vpRight.rectY <= mapHeight - vpRight.rectHeight, "rectY phai nam trong gioi han mapHeight");
   });
 
-  test("minimapClickToPan chuyen doi toa do click thanh pan canvas hop le", () => {
-    const mapWidth = 120;
-    const mapHeight = 90;
-    const containerWidth = 800;
-    const containerHeight = 600;
-    const zoom = 2;
+  test("calculateMinimapViewport tinh viewport theo ti le SVG va pan", () => {
+    const common = {
+      minimapWidth: 120,
+      minimapHeight: 90,
+      containerWidth: 800,
+      containerHeight: 600,
+      svgWidth: 800,
+      svgHeight: 600,
+    };
 
-    // Click chinh giua minimap (60, 45) -> pan canvas ve trung tam (0, 0)
-    const centerPan = minimapClickToPan(60, 45, mapWidth, mapHeight, containerWidth, containerHeight, zoom);
-    assert.equal(centerPan.x, 0);
-    assert.equal(centerPan.y, 0);
+    const fullView = calculateMinimapViewport({
+      ...common,
+      viewBox: "0 0 4 3",
+      zoom: 1,
+      pan: { x: 0, y: 0 },
+    });
+    assert.equal(fullView.rectWidth, 120);
+    assert.equal(fullView.rectHeight, 90);
+    assert.equal(fullView.rectX, 0);
+    assert.equal(fullView.rectY, 0);
 
-    // Click goc tren ben trai (0, 0) -> pan canvas sang duong
-    const topLeftPan = minimapClickToPan(0, 0, mapWidth, mapHeight, containerWidth, containerHeight, zoom);
-    assert.ok(topLeftPan.x > 0, "Pan X phai duong khi click goc trai");
-    assert.ok(topLeftPan.y > 0, "Pan Y phai duong khi click goc tren");
+    const zoomed = calculateMinimapViewport({
+      ...common,
+      viewBox: "0 0 4 3",
+      zoom: 2,
+      pan: { x: 0, y: 0 },
+    });
+    assert.equal(zoomed.scaleRatio, 0.5);
+    assert.equal(zoomed.rectWidth, 60);
+    assert.equal(zoomed.rectHeight, 45);
+    assert.equal(zoomed.rectX, 30);
+    assert.equal(zoomed.rectY, 22.5);
 
-    // Click goc duoi ben phai (120, 90) -> pan canvas sang am
-    const bottomRightPan = minimapClickToPan(120, 90, mapWidth, mapHeight, containerWidth, containerHeight, zoom);
-    assert.ok(bottomRightPan.x < 0, "Pan X phai am khi click goc phai");
-    assert.ok(bottomRightPan.y < 0, "Pan Y phai am khi click goc duoi");
+    const portrait = calculateMinimapViewport({
+      ...common,
+      viewBox: "0 0 2 4",
+      zoom: 2,
+      pan: { x: 0, y: 0 },
+      svgWidth: 500,
+      svgHeight: 500,
+      containerWidth: 500,
+      containerHeight: 500,
+    });
+    assert.deepEqual(portrait.mapBounds, {
+      x: 37.5,
+      y: 0,
+      width: 45,
+      height: 90,
+    });
+    assert.equal(portrait.rectWidth, 45);
+    assert.equal(portrait.rectHeight, 45);
+    assert.equal(portrait.rectX, 37.5);
+    assert.equal(portrait.rectY, 22.5);
+  });
+
+  test("minimapClickToPan gioi han pan va quy doi theo vung SVG thuc", () => {
+    const params = {
+      mapBounds: { x: 0, y: 0, width: 120, height: 90 },
+      containerWidth: 400,
+      containerHeight: 300,
+      svgWidth: 800,
+      svgHeight: 600,
+      viewBox: "0 0 4 3",
+      zoom: 2,
+    };
+
+    const centerPan = minimapClickToPan({ clickX: 60, clickY: 45, ...params });
+    assert.deepEqual(centerPan, { x: 0, y: 0 });
+
+    const topLeftPan = minimapClickToPan({ clickX: 0, clickY: 0, ...params });
+    assert.deepEqual(topLeftPan, { x: 600, y: 450 });
+
+    const bottomRightPan = minimapClickToPan({
+      clickX: 120,
+      clickY: 90,
+      ...params,
+    });
+    assert.deepEqual(bottomRightPan, { x: -600, y: -450 });
+
+    const portraitMapClick = minimapClickToPan({
+      ...params,
+      clickX: 0,
+      clickY: 0,
+      mapBounds: { x: 37.5, y: 0, width: 45, height: 90 },
+      containerWidth: 500,
+      containerHeight: 500,
+      svgWidth: 500,
+      svgHeight: 500,
+      viewBox: "0 0 2 4",
+    });
+    assert.deepEqual(portraitMapClick, { x: 0, y: 250 });
+  });
+
+  test("clampPanToMap khong de lo khoang trong va khong pan khi xem toan canh", () => {
+    assert.deepEqual(
+      clampPanToMap({
+        pan: { x: 99999, y: -99999 },
+        zoom: 2,
+        containerWidth: 400,
+        containerHeight: 300,
+        svgWidth: 800,
+        svgHeight: 600,
+        viewBox: "0 0 4 3",
+      }),
+      { x: 600, y: -450 },
+    );
+    assert.deepEqual(
+      clampPanToMap({
+        pan: { x: 500, y: -500 },
+        zoom: 1,
+        containerWidth: 800,
+        containerHeight: 600,
+        svgWidth: 800,
+        svgHeight: 600,
+        viewBox: "0 0 4 3",
+      }),
+      { x: 0, y: 0 },
+    );
   });
 
   test("parseViewBox xu ly viewBox hop le va chuoi rong an toan", () => {
@@ -127,5 +192,12 @@ describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
     const fallback = parseViewBox("");
     assert.equal(fallback.minX, 0);
     assert.equal(fallback.width, 0);
+
+    assert.deepEqual(parseViewBox("0 0 invalid 300"), {
+      minX: 0,
+      minY: 0,
+      width: 0,
+      height: 0,
+    });
   });
 });

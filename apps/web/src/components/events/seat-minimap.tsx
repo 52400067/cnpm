@@ -13,6 +13,8 @@ interface SeatMinimapProps {
   pan: { x: number; y: number };
   containerWidth: number;
   containerHeight: number;
+  svgWidth: number;
+  svgHeight: number;
   onNavigate?: (pan: { x: number; y: number }) => void;
   className?: string;
 }
@@ -24,6 +26,8 @@ export const SeatMinimap = memo(function SeatMinimap({
   pan,
   containerWidth,
   containerHeight,
+  svgWidth,
+  svgHeight,
   onNavigate,
   className = "",
 }: SeatMinimapProps) {
@@ -34,14 +38,18 @@ export const SeatMinimap = memo(function SeatMinimap({
   const mapH = 90;
 
   // Calculate viewport rectangle percentage on minimap using shared utility
-  const { rectWidth, rectHeight, rectX, rectY } = calculateMinimapViewport({
-    zoom,
-    pan,
-    mapWidth: mapW,
-    mapHeight: mapH,
-    containerWidth,
-    containerHeight,
-  });
+  const { rectWidth, rectHeight, rectX, rectY, mapBounds } =
+    calculateMinimapViewport({
+      zoom,
+      pan,
+      minimapWidth: mapW,
+      minimapHeight: mapH,
+      containerWidth,
+      containerHeight,
+      svgWidth,
+      svgHeight,
+      viewBox,
+    });
 
   const handleMinimapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -51,15 +59,17 @@ export const SeatMinimap = memo(function SeatMinimap({
     const clickY = e.clientY - rect.top;
 
     onNavigate(
-      minimapClickToPan(
+      minimapClickToPan({
         clickX,
         clickY,
-        mapW,
-        mapH,
+        mapBounds,
         containerWidth,
         containerHeight,
+        svgWidth,
+        svgHeight,
+        viewBox,
         zoom,
-      ),
+      }),
     );
   };
 
@@ -69,10 +79,9 @@ export const SeatMinimap = memo(function SeatMinimap({
       onClick={handleMinimapClick}
       onMouseDown={(e) => e.stopPropagation()}
       onMouseMove={(e) => e.stopPropagation()}
-      onMouseUp={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       title="Bản đồ thu nhỏ (Minimap) - Nhấp để định vị góc nhìn"
-      className={`relative w-[120px] h-[90px] rounded-[8px] bg-white border border-[#dfe3e5] shadow-xs overflow-hidden cursor-crosshair select-none ${className}`}
+      className={`relative w-[120px] h-[90px] rounded-md bg-background border border-border shadow-xs overflow-hidden cursor-crosshair select-none ${className}`}
       style={{ width: `${mapW}px`, height: `${mapH}px` }}
       aria-label="Minimap toàn cảnh khán đài"
     >
@@ -99,7 +108,7 @@ export const SeatMinimap = memo(function SeatMinimap({
       />
 
       {/* Label */}
-      <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded-[3px] bg-white/90 border border-[#dfe3e5] text-[8.5px] font-bold text-[#606970] pointer-events-none leading-none">
+      <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded-[3px] bg-background/90 border border-border text-[8.5px] font-bold text-muted-foreground pointer-events-none leading-none">
         Minimap
       </div>
     </div>

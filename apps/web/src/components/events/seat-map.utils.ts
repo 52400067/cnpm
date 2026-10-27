@@ -2,13 +2,23 @@
  * Utility functions for SeatMap and Minimap calculations (UC04)
  */
 
+export interface MapRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface MinimapViewportParams {
   zoom: number;
   pan: { x: number; y: number };
-  mapWidth: number;
-  mapHeight: number;
+  minimapWidth: number;
+  minimapHeight: number;
   containerWidth: number;
   containerHeight: number;
+  svgWidth: number;
+  svgHeight: number;
+  viewBox: string;
 }
 
 export interface MinimapViewportResult {
@@ -17,86 +27,194 @@ export interface MinimapViewportResult {
   rectHeight: number;
   rectX: number;
   rectY: number;
+  mapBounds: MapRect;
 }
 
-/**
- * Calculates minimap indicator rectangle position and dimensions
- * based on current zoom level and pan coordinates.
- */
-export function calculateMinimapViewport({
-  zoom,
-  pan,
-  mapWidth,
-  mapHeight,
-  containerWidth,
-  containerHeight,
-}: MinimapViewportParams): MinimapViewportResult {
-  const safeZoom = Math.max(0.1, zoom);
-  const scaleRatio = 1 / safeZoom;
-  const rectWidth = Math.min(mapWidth, Math.max(16, mapWidth * scaleRatio));
-  const rectHeight = Math.min(mapHeight, Math.max(12, mapHeight * scaleRatio));
-
-  const panRatioX =
-    containerWidth > 0 ? pan.x / (containerWidth * safeZoom) : 0;
-  const panRatioY =
-    containerHeight > 0 ? pan.y / (containerHeight * safeZoom) : 0;
-
-  const rectX = Math.max(
-    0,
-    Math.min(
-      mapWidth - rectWidth,
-      mapWidth / 2 - rectWidth / 2 - panRatioX * mapWidth,
-    ),
-  );
-  const rectY = Math.max(
-    0,
-    Math.min(
-      mapHeight - rectHeight,
-      mapHeight / 2 - rectHeight / 2 - panRatioY * mapHeight,
-    ),
-  );
-
-  return { scaleRatio, rectWidth, rectHeight, rectX, rectY };
+export interface MapPanParams {
+  pan: { x: number; y: number };
+  zoom: number;
+  containerWidth: number;
+  containerHeight: number;
+  svgWidth: number;
+  svgHeight: number;
+  viewBox: string;
 }
 
-/**
- * Translates a click inside the minimap to canvas pan coordinates
- */
-export function minimapClickToPan(
-  clickX: number,
-  clickY: number,
-  mapWidth: number,
-  mapHeight: number,
-  containerWidth: number,
-  containerHeight: number,
-  zoom: number,
-): { x: number; y: number } {
-  const normalizedX = clickX / mapWidth - 0.5;
-  const normalizedY = clickY / mapHeight - 0.5;
+export interface MinimapClickParams extends Omit<MapPanParams, "pan"> {
+  clickX: number;
+  clickY: number;
+  mapBounds: MapRect;
+}
 
-  const x = -normalizedX * containerWidth * zoom;
-  const y = -normalizedY * containerHeight * zoom;
+/** Fit the SVG viewBox into a box using the browser's xMidYMid meet behavior. */
+export function fitMapRect(
+  boxWidth: number,
+  boxHeight: number,
+  viewBox: string,
+): MapRect {
+  const parsed = parseViewBox(viewBox);
+  if (
+    !Number.isFinite(boxWidth) ||
+    !Number.isFinite(boxHeight) ||
+    boxWidth <= 0 ||
+    boxHeight <= 0 ||
+    parsed.width <= 0 ||
+    parsed.height <= 0
+  ) {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
 
+  const scale = Math.min(boxWidth / parsed.width, boxHeight / parsed.height);
+  const width = parsed.width * scale;
+  const height = parsed.height * scale;
   return {
-    x: x === 0 ? 0 : x,
-    y: y === 0 ? 0 : y,
+    x: (boxWidth - width) / 2,
+    y: (boxHeight - height) / 2,
+    width,
+    height,
   };
 }
 
-/**
- * Parses SVG viewBox string "minX minY width height" into numeric components
- */
+/** Keep the transformed map within the visible canvas instead of exposing blank space. */
+export function clampPanToMap({
+  pan,
+  zoom,
+  containerWidth,
+  containerHeight,
+  svgWidth,
+  svgHeight,
+  viewBox,
+}: MapPanParams): { x: number; y: number } {
+  const canvasMap = fitMapRect(svgWidth, svgHeight, viewBox);
+  if (!canvasMap.width || !canvasMap.height) return pan;
+
+  const safeZoom = Math.max(0.1, Number.isFinite(zoom) ? zoom : 1);
+  const maxX = Math.max(0, (canvasMap.width * safeZoom - containerWidth) / 2);
+  const maxY = Math.max(0, (canvasMap.height * safeZoom - containerHeight) / 2);
+  const clampAxis = (value: number, max: number) => {
+    const clamped = Math.min(max, Math.max(-max, value));
+    return Object.is(clamped, -0) ? 0 : clamped;
+  };
+  return {
+    x: clampAxis(pan.x, maxX),
+    y: clampAxis(pan.y, maxY),
+  };
+}
+
+/** Calculate the visible canvas rectangle inside the minimap, including letterboxing. */
+export function calculateMinimapViewport({
+  zoom,
+  pan,
+  minimapWidth,
+  minimapHeight,
+  containerWidth,
+  containerHeight,
+  svgWidth,
+  svgHeight,
+  viewBox,
+}: MinimapViewportParams): MinimapViewportResult {
+  const safeZoom = Math.max(0.1, Number.isFinite(zoom) ? zoom : 1);
+  const mapBounds = fitMapRect(minimapWidth, minimapHeight, viewBox);
+  const canvasMap = fitMapRect(svgWidth, svgHeight, viewBox);
+  const visibleRatioX = canvasMap.width
+    ? Math.max(0, containerWidth / (canvasMap.width * safeZoom))
+    : 1;
+  const visibleRatioY = canvasMap.height
+    ? Math.max(0, containerHeight / (canvasMap.height * safeZoom))
+    : 1;
+  const rectWidth = Math.min(mapBounds.width, mapBounds.width * visibleRatioX);
+  const rectHeight = Math.min(
+    mapBounds.height,
+    mapBounds.height * visibleRatioY,
+  );
+  const panRatioX = canvasMap.width ? pan.x / (canvasMap.width * safeZoom) : 0;
+  const panRatioY = canvasMap.height
+    ? pan.y / (canvasMap.height * safeZoom)
+    : 0;
+
+  const rectX = Math.min(
+    mapBounds.x + mapBounds.width - rectWidth,
+    Math.max(
+      mapBounds.x,
+      mapBounds.x +
+        mapBounds.width / 2 -
+        rectWidth / 2 -
+        panRatioX * mapBounds.width,
+    ),
+  );
+  const rectY = Math.min(
+    mapBounds.y + mapBounds.height - rectHeight,
+    Math.max(
+      mapBounds.y,
+      mapBounds.y +
+        mapBounds.height / 2 -
+        rectHeight / 2 -
+        panRatioY * mapBounds.height,
+    ),
+  );
+
+  return {
+    scaleRatio: 1 / safeZoom,
+    rectWidth,
+    rectHeight,
+    rectX,
+    rectY,
+    mapBounds,
+  };
+}
+
+/** Translate a minimap click into a clamped canvas pan position. */
+export function minimapClickToPan({
+  clickX,
+  clickY,
+  mapBounds,
+  ...panParams
+}: MinimapClickParams): { x: number; y: number } {
+  if (!mapBounds.width || !mapBounds.height) return { x: 0, y: 0 };
+  const normalizedX = Math.min(
+    1,
+    Math.max(0, (clickX - mapBounds.x) / mapBounds.width),
+  );
+  const normalizedY = Math.min(
+    1,
+    Math.max(0, (clickY - mapBounds.y) / mapBounds.height),
+  );
+  const canvasMap = fitMapRect(
+    panParams.svgWidth,
+    panParams.svgHeight,
+    panParams.viewBox,
+  );
+  if (!canvasMap.width || !canvasMap.height) return { x: 0, y: 0 };
+
+  return clampPanToMap({
+    ...panParams,
+    pan: {
+      x: (0.5 - normalizedX) * canvasMap.width * panParams.zoom,
+      y: (0.5 - normalizedY) * canvasMap.height * panParams.zoom,
+    },
+  });
+}
+
+/** Parses SVG viewBox string "minX minY width height" into numeric components. */
 export function parseViewBox(viewBox: string): {
   minX: number;
   minY: number;
   width: number;
   height: number;
 } {
-  const parts = viewBox.trim().split(/\s+/).map(Number);
+  const parts = viewBox
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  if (parts.length !== 4 || !parts.every(Number.isFinite)) {
+    return { minX: 0, minY: 0, width: 0, height: 0 };
+  }
+
+  const [minX, minY, width, height] = parts;
   return {
-    minX: parts[0] ?? 0,
-    minY: parts[1] ?? 0,
-    width: parts[2] ?? 0,
-    height: parts[3] ?? 0,
+    minX,
+    minY,
+    width: width > 0 ? width : 0,
+    height: height > 0 ? height : 0,
   };
 }

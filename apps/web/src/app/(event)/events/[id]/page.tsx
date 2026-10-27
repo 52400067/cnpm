@@ -116,12 +116,16 @@ function EventSplitView({ event }: { event: EventItem }) {
       string,
       { name: string; minPrice: number; count: number }
     > = {};
-    for (const l of allListings) {
-      if (!map[l.zoneId] || l.price < map[l.zoneId].minPrice) {
-        map[l.zoneId] = {
-          name: l.zoneName,
-          minPrice: l.price,
-          count: (map[l.zoneId]?.count ?? 0) + l.availableTickets,
+    for (const listing of allListings) {
+      const zone = map[listing.zoneId];
+      if (zone) {
+        zone.minPrice = Math.min(zone.minPrice, listing.price);
+        zone.count += listing.availableTickets;
+      } else {
+        map[listing.zoneId] = {
+          name: listing.zoneName,
+          minPrice: listing.price,
+          count: listing.availableTickets,
         };
       }
     }
