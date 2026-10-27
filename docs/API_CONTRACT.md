@@ -220,7 +220,7 @@ Lấy chi tiết sự kiện phục vụ SSR.
 
 #### `GET /api/v1/events/:id/seatmap`
 
-Lấy sơ đồ ghế và trạng thái chỗ ngồi.
+Lấy sơ đồ phân bố khu vực, hàng ghế và trạng thái chỗ ngồi (dùng cho hiển thị trực quan bản đồ SVG; hệ thống áp dụng tự động phân bổ ghế liền kề khi đặt vé chứ không yêu cầu người dùng chọn từng vị trí thủ công).
 
 - Response 200:
 
@@ -347,10 +347,10 @@ Lấy danh sách các mẫu sơ đồ khán đài của địa điểm kèm danh
 
 #### `POST /api/v1/waiting-room/:eventId/join`
 
-Gia nhập hàng chờ trước khi vào màn hình chọn ghế.
+Gia nhập hàng chờ trước khi vào màn hình giữ chỗ và mua vé.
 
 - Header: `Authorization: Bearer <accessToken>`
-- Response 200 (khi số người chọn ghế còn dưới ngưỡng `MAX_ACTIVE`):
+- Response 200 (khi số người mua vé đồng thời còn dưới ngưỡng `MAX_ACTIVE`):
 
 ```json
 {
@@ -387,14 +387,26 @@ Gửi tín hiệu duy trì vị trí hàng chờ mỗi 15 giây.
 
 #### `POST /api/v1/booking/hold`
 
-Giữ chỗ ghế trong thời hạn 5 phút.
+Giữ chỗ vé trong thời hạn 5 phút với cơ chế tự động phân bổ ghế liền kề (Auto Seat Allocation) cho vé có số ghế.
 
 - Quyền: Người mua vé (`BUYER`). Nghiêm cấm tài khoản Quản trị viên (`ADMIN`) và Ban tổ chức (`ORGANIZER`) thực hiện giữ chỗ hoặc mua vé.
 - Header:
   - `Authorization: Bearer <accessToken>`
   - `Idempotency-Key: <UUID>`
   - `X-Admission-Token: <token>` (khi sự kiện bật hàng chờ)
+- Cơ chế phân bổ: Người mua chọn hạng vé (`ticketTypeId`) và số lượng vé (`quantity`). Hệ thống tự động tìm và cấp các ghế còn trống liền kề trong cùng một hàng. Nếu hàng bị phân mảnh, hệ thống tự động quét và ưu tiên hàng có đủ ghế liền kề tiếp theo trong cùng hạng vé.
 - Request body:
+
+```json
+{
+  "eventId": "e1-uuid",
+  "items": [
+    { "ticketTypeId": "tt-vip-uuid", "quantity": 2 }
+  ]
+}
+```
+
+*Lưu ý: Hệ thống vẫn hỗ trợ tương thích trường hợp client chỉ định trực tiếp `seatId`:*
 
 ```json
 {
@@ -415,6 +427,22 @@ Giữ chỗ ghế trong thời hạn 5 phút.
     "orderId": "ord-uuid",
     "orderCode": "ORD-20261014-ABC12",
     "heldSeats": ["s1-uuid", "s2-uuid"],
+    "allocatedSeats": [
+      {
+        "id": "s1-uuid",
+        "zoneName": "Khu VIP A",
+        "rowLabel": "A",
+        "seatNumber": "01",
+        "ticketTypeId": "tt-vip-uuid"
+      },
+      {
+        "id": "s2-uuid",
+        "zoneName": "Khu VIP A",
+        "rowLabel": "A",
+        "seatNumber": "02",
+        "ticketTypeId": "tt-vip-uuid"
+      }
+    ],
     "totalAmount": 5000000,
     "holdExpiresAt": "2026-10-14T09:35:00.000Z",
     "remainingSeconds": 300
@@ -422,8 +450,9 @@ Giữ chỗ ghế trong thời hạn 5 phút.
 }
 ```
 
+- Response 400: Mã lỗi `INSUFFICIENT_TICKET_CAPACITY` nếu số lượng ghế trống khả dụng không đủ đáp ứng số lượng vé yêu cầu.
 - Response 403: Mã lỗi `FORBIDDEN_RESOURCE` nếu tài khoản có vai trò `ADMIN`, `ORGANIZER` hoặc `GATE_STAFF` gửi yêu cầu giữ chỗ.
-- Response 409: Mã lỗi `SEAT_ALREADY_HELD` nếu có ít nhất một ghế không còn trống.
+- Response 409: Mã lỗi `SEAT_ALREADY_HELD` nếu các vị trí ghế được chọn gặp xung đột khóa đồng thời sau các lượt thử lại (retry limit).
 
 #### `POST /api/v1/booking/release`
 

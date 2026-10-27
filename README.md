@@ -1,6 +1,6 @@
 # TicketHub
 
-TicketHub là nền tảng bán và quản lý vé sự kiện trực tuyến tại Việt Nam. Hệ thống hỗ trợ người mua chọn chỗ theo sơ đồ, thanh toán qua VNPay, nhận vé điện tử mã QR động và hỗ trợ ban tổ chức soát vé tại cổng.
+TicketHub là nền tảng bán và quản lý vé sự kiện trực tuyến tại Việt Nam. Hệ thống hỗ trợ người mua theo dõi sơ đồ chỗ ngồi trực quan, tự động phân bổ ghế liền kề thông minh (Auto Seat Allocation), thanh toán qua VNPay, nhận vé điện tử mã QR động và hỗ trợ ban tổ chức soát vé tại cổng.
 
 ## Yêu cầu môi trường
 

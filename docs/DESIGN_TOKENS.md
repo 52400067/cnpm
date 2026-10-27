@@ -103,21 +103,20 @@ Component `Button` mặc định dùng `bg-primary`, hover giảm độ đậm c
 ### Trạng thái focus
 Vòng `--ring` (`#10b981`) bán trong suốt, áp dụng qua `outline-ring/50` và `focus-visible:ring`.
 
-## 6. Trạng thái ghế (đề xuất cho SeatMap)
+## 6. Trạng thái và Sơ đồ ghế (SeatMap)
 
-Phần này chưa được cài đặt. Đây là đề xuất để FE2 hoặc người nhận việc SeatMap bám theo, dùng lại các token ở trên thay vì thêm màu mới:
+Sơ đồ ghế SVG đóng vai trò hiển thị trực quan cấu trúc khu vực, hàng ghế và số lượng ghế khả dụng của sự kiện. Nền tảng áp dụng cơ chế tự động phân bổ ghế liền kề (Auto Seat Allocation) theo hạng vé khi người mua đặt chỗ, không yêu cầu người mua phải bấm chọn từng vị trí ghế thủ công:
 
 | Trạng thái | Nền | Viền | Ghi chú |
 | :--- | :--- | :--- | :--- |
-| `AVAILABLE` | `--background` | `--border` | Hover: viền `--primary` |
-| `SELECTED` | `--primary` | `--primary` | Chữ `--primary-foreground` |
-| `HELD` | `--secondary` | `--border` | Người khác đang giữ, không bấm được |
-| `SOLD` | `--muted` | `--muted` | Mờ, `cursor-not-allowed` |
+| `AVAILABLE` | `--background` | `--border` | Ghế còn trống, sẵn sàng cho hệ thống phân bổ |
+| `HELD` | `--secondary` | `--border` | Ghế đang trong phiên giữ chỗ 5 phút |
+| `SOLD` | `--muted` | `--muted` | Ghế đã thanh toán xuất vé thành công |
 
-Mỗi ghế cần có `aria-label` (khu, hàng, số ghế, trạng thái) và thao tác được bằng bàn phím.
+Khi đặt chỗ thành công, giao diện hiển thị danh sách các ghế được cấp tự động (ví dụ: `Hàng A - Ghế 01, Hàng A - Ghế 02`) trên banner đếm ngược thời gian giữ chỗ.
 
 ## 7. Việc còn lại
 
 - Chuyển các `[#hex]` ở bảng mục 1 sang token, và thêm token cho `#2b343a`, `#868f97`, `#e2e6e8`, `#0c141a`.
 - Chưa có chế độ tối. Biến thể `dark` đã được khai báo trong `globals.css` nhưng chưa có giá trị.
-- Chưa có thiết kế cho trang chi tiết sự kiện, chọn ghế và thanh toán.
+- Hoàn thiện thiết kế chi tiết luồng cổng thanh toán VNPay và vé điện tử QR.

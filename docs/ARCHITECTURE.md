@@ -84,7 +84,7 @@ Hệ thống phân tách rõ trách nhiệm giữa các tầng client và vai tr
 
 ### Giữ chỗ và điều tiết hàng chờ
 
-Khi sự kiện mở bán lượng vé lớn, hàng chờ ảo được kích hoạt để giới hạn số lượng phiên chọn ghế đồng thời không vượt quá ngưỡng `MAX_ACTIVE`.
+Khi sự kiện mở bán lượng vé lớn, hàng chờ ảo được kích hoạt để giới hạn số lượng phiên giữ chỗ đồng thời không vượt quá ngưỡng `MAX_ACTIVE`. Nền tảng áp dụng cơ chế tự động phân bổ ghế liền kề (Auto Seat Allocation) theo hạng vé và số lượng, không yêu cầu người dùng chọn từng vị trí ghế thủ công nhằm tối ưu tốc độ mua vé và ngăn ngừa phân mảnh ghế ngồi.
 
 ```mermaid
 sequenceDiagram
@@ -109,21 +109,25 @@ sequenceDiagram
         API->>Web: SSE báo đến lượt kèm Admission Token (hiệu lực 10 phút)
     end
 
-    Buyer->>Web: Chọn ghế và gửi yêu cầu giữ chỗ
-    Web->>API: POST /booking/hold (kèm Idempotency-Key và admission token)
-    API->>DB: BEGIN TRANSACTION
-    API->>DB: SELECT id FROM seats WHERE id = ANY($1) ORDER BY id ASC FOR UPDATE
-    API->>DB: UPDATE seats SET status = 'HELD', hold_expires_at = now() + 5 phút WHERE id = ANY($1) AND (status='AVAILABLE' OR (status='HELD' AND hold_expires_at < now())) RETURNING id
+    Buyer->>Web: Chọn hạng vé và số lượng vé
+    Web->>API: POST /booking/hold (kèm Idempotency-Key và items ticketTypeId + quantity)
+    Note over API,DB: Thuật toán tìm ghế liền kề theo hàng (nhảy hàng khi phân mảnh)
+    loop Thử lại tối đa 10 lần nếu tranh chấp khóa ứng viên
+        API->>DB: BEGIN TRANSACTION
+        API->>DB: SELECT id FROM seats WHERE id = ANY($1) ORDER BY id ASC FOR UPDATE
+        API->>DB: UPDATE seats SET status = 'HELD', hold_expires_at = now() + 5 phút WHERE id = ANY($1) AND (status='AVAILABLE' OR (status='HELD' AND hold_expires_at < now())) RETURNING id
+    end
 
-    alt Số dòng cập nhật nhỏ hơn số ghế yêu cầu
+    alt Không đủ ghế hoặc tranh chấp không thể giải quyết
         API->>DB: ROLLBACK
-        API-->>Web: Báo lỗi SEAT_ALREADY_HELD
+        API-->>Web: Báo lỗi INSUFFICIENT_TICKET_CAPACITY hoặc SEAT_ALREADY_HELD
     else Cập nhật đủ số ghế
         API->>DB: INSERT INTO orders (status = 'PENDING', expires_at = now() + 5 phút)
+        API->>DB: INSERT INTO order_items (đính kèm seat_id đã tự động phân bổ)
         API->>DB: COMMIT
         API->>Redis: PUBLISH trạng thái ghế chuyển HELD
         Redis-->>Web: SSE cập nhật sơ đồ ghế tới các client khác
-        API-->>Web: Trả mã đơn hàng và bắt đầu đếm ngược 5 phút
+        API-->>Web: Trả mã đơn hàng, danh sách allocatedSeats và đếm ngược 5 phút
     end
 
     opt Quá hạn 5 phút chưa thanh toán

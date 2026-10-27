@@ -10,15 +10,26 @@ Tồn kho vé, phiên giữ chỗ và giao dịch tiền tệ được quản l�
 
 Redis được sử dụng cho việc xếp hàng chờ ảo, lưu tạm dữ liệu truy vấn (cache), xuất bản thông điệp thời gian thực (Pub/Sub) và hàng đợi nền BullMQ. Không đưa ra quyết định xác nhận đặt chỗ hay thanh toán dựa trên dữ liệu lưu tạm trong bộ nhớ Redis.
 
-### Kiểm soát tranh chấp ghế ngồi
+### Cơ chế tự động phân bổ ghế (Auto Seat Allocation) và Kiểm soát tranh chấp
 
-Thao tác giữ chỗ cho ghế có số bắt buộc sử dụng cơ chế khóa mức hàng:
+Nền tảng TicketHub không hỗ trợ người mua chọn từng vị trí ghế cụ thể trên sơ đồ; bản đồ SVG chỉ đóng vai trò hiển thị trực quan cấu trúc khu vực, hàng ghế và số lượng chỗ khả dụng. Khi người mua yêu cầu giữ chỗ theo `{ ticketTypeId, quantity }`, backend áp dụng thuật toán tự động phân bổ ghế liền kề:
 
-```sql
-SELECT id FROM seats WHERE id = ANY($1) ORDER BY id ASC FOR UPDATE;
-```
+1. **Thuật toán tìm ghế liền kề (`findContiguousSeats`)**:
+   - Truy vấn toàn bộ ghế có trạng thái `AVAILABLE` (hoặc `HELD` đã quá hạn 5 phút) thuộc `ticketTypeId` trong sự kiện.
+   - Gom nhóm các ghế khả dụng theo nhãn hàng ghế (`rowLabel`).
+   - Sắp xếp các ghế trong từng hàng theo số thứ tự số nguyên tăng dần (`seatNumber`).
+   - Tìm kiếm chuỗi `quantity` ghế có số ghế liên tiếp (`seatNumber[i+1] === seatNumber[i] + 1`).
+   - Nếu hàng hiện tại bị phân mảnh hoặc đứt đoạn, thuật toán tự động bỏ qua và chuyển sang kiểm tra hàng tiếp theo có đủ số lượng ghế liền kề trong cùng hạng vé.
+   - Trường hợp không có hàng nào đáp ứng đủ chuỗi liền kề, thuật toán fallback sang chọn `quantity` ghế trống có khoảng cách số gần nhau nhất trong cùng hàng khả dụng.
 
-Việc sắp xếp danh sách định danh ghế tăng dần (`ORDER BY id ASC`) là bắt buộc để ngăn ngừa deadlock giữa các transaction chạy song song.
+2. **Khóa mức hàng nguyên tử và cơ chế thử lại (Optimistic Retry Loop)**:
+   - Các ghế ứng viên được khóa bằng câu lệnh:
+     ```sql
+     SELECT id FROM seats WHERE id = ANY($1) ORDER BY id ASC FOR UPDATE;
+     ```
+   - Bắt buộc sắp xếp danh sách định danh ghế tăng dần (`ORDER BY id ASC`) để triệt tiêu nguy cơ deadlock giữa các transaction chạy đồng thời.
+   - Nếu các ghế ứng viên vừa bị giao dịch song song khác khóa hoặc giữ chỗ, transaction rollback và kích hoạt vòng lặp thử lại (retry loop tối đa 10 lần) để truy vấn lại trạng thái ghế mới nhất và chọn bộ ghế liền kề khác thay vì trả lỗi thất bại ngay lập tức.
+   - Nếu toàn bộ các hàng ghế không còn đủ số ghế trống đáp ứng yêu cầu, hệ thống trả về mã lỗi `INSUFFICIENT_TICKET_CAPACITY`.
 
 Ràng buộc `UNIQUE (event_id, seat_id)` trên bảng `tickets` với điều kiện vé chưa bị hủy là lớp kiểm tra bắt buộc ở tầng cơ sở dữ liệu.
 

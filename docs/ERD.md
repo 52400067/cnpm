@@ -732,34 +732,42 @@ CREATE INDEX idx_idempotency_expiry ON idempotency_keys(expires_at);
 
 ## Các truy vấn xử lý tranh chấp đồng thời
 
-### Giữ chỗ ghế trong thời hạn 5 phút
+### Giữ chỗ ghế và Tự động phân bổ liền kề (Auto Contiguous Allocation)
 
-Truy vấn thực thi trong một transaction:
+Khi người dùng gửi yêu cầu giữ chỗ cho hạng vé có chỗ ngồi (`is_seated = true`) mà không truyền `seat_id`, backend truy vấn các ghế khả dụng, tự động tìm chuỗi ghế liền kề trong cùng hàng ghế, và thực thi khóa giao dịch:
 
 ```sql
 BEGIN;
 
--- 1. Khóa các hàng ghế theo thứ tự ID tăng dần để ngăn ngừa deadlock
+-- 1. Tìm các ứng viên ghế trống (AVAILABLE hoặc HELD quá hạn 5 phút) thuộc hạng vé
+SELECT id, row_label, seat_number, status, hold_expires_at
+FROM seats
+WHERE event_id = $1 AND ticket_type_id = $2
+  AND (status = 'AVAILABLE' OR (status = 'HELD' AND hold_expires_at < now()))
+ORDER BY row_label ASC, seat_number ASC;
+-- (Thuật toán findContiguousSeats gom nhóm theo row_label và chọn quantity ghế liền kề)
+
+-- 2. Khóa các ghế được chọn theo thứ tự ID tăng dần để ngăn ngừa deadlock
 SELECT id, status, hold_expires_at
 FROM seats
-WHERE id = ANY($1::uuid[]) AND event_id = $2
+WHERE id = ANY($3::uuid[]) AND event_id = $1
 ORDER BY id ASC
 FOR UPDATE;
 
--- 2. Cập nhật trạng thái ghế còn trống hoặc đã quá hạn giữ chỗ
+-- 3. Cập nhật trạng thái ghế còn trống hoặc đã quá hạn giữ chỗ
 UPDATE seats
 SET status = 'HELD',
-    hold_order_id = $3,
+    hold_order_id = $4,
     hold_expires_at = now() + interval '5 minutes',
     version = version + 1,
     updated_at = now()
-WHERE id = ANY($1::uuid[])
-  AND event_id = $2
+WHERE id = ANY($3::uuid[])
+  AND event_id = $1
   AND (status = 'AVAILABLE' OR (status = 'HELD' AND hold_expires_at < now()))
 RETURNING id;
 
--- 3. Kiểm tra số dòng được cập nhật:
--- Nếu số dòng trả về < số ghế yêu cầu: hủy transaction (ROLLBACK) và báo lỗi SEAT_ALREADY_HELD.
+-- 4. Kiểm tra số dòng được cập nhật:
+-- Nếu số dòng trả về < số ghế yêu cầu: hủy transaction (ROLLBACK) và kích hoạt vòng lặp thử lại (tối đa 10 lần) để chọn bộ ghế liền kề khác. Nếu vượt quá số lần thử hoặc không đủ sức chứa: báo lỗi SEAT_ALREADY_HELD hoặc INSUFFICIENT_TICKET_CAPACITY.
 -- Nếu số dòng trả về = số ghế yêu cầu: tạo đơn hàng PENDING và hoàn tất transaction (COMMIT).
 ```
 
