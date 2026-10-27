@@ -211,7 +211,7 @@ export class BookingService {
       }
     }
 
-    // Phân loại: có ghế chỉ định, tự động phân bổ ghế, và vé đứng
+    // Phân loại: tự động phân bổ ghế (chuẩn domain model), ghế chỉ định (tương thích ngược), và vé đứng
     const explicitSeatedItems = dto.items.filter((i) => Boolean(i.seatId));
     const autoSeatedItems = dto.items.filter(
       (i) => !i.seatId && ttMap.get(i.ticketTypeId)?.isSeated === true,
@@ -249,7 +249,7 @@ export class BookingService {
       }> = [];
       let totalAmount = 0;
 
-      // 1. Khóa và cập nhật ghế ngồi chỉ định cụ thể (nếu có)
+      // 1. Khóa và cập nhật ghế ngồi chỉ định cụ thể (hỗ trợ tương thích ngược cho test suites)
       if (sortedExplicitSeatIds.length > 0) {
         const lockedSeats = await tx
           .select({
