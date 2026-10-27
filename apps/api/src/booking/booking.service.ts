@@ -23,9 +23,78 @@ import {
   OutboxStatus,
   EventStatus,
   SeatStatus,
+  AllocatedSeatItem,
 } from "@tickethub/shared";
 import { WaitingRoomService } from "../waiting-room/waiting-room.service";
 import { EventReadCacheService } from "../events/event-read-cache.service";
+
+interface CandidateSeat {
+  id: string;
+  zoneName: string;
+  rowLabel: string;
+  seatNumber: string;
+}
+
+function parseSeatNumber(seatNum: string): number {
+  const match = seatNum.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+}
+
+function findContiguousSeats(
+  candidates: CandidateSeat[],
+  quantity: number,
+): CandidateSeat[] {
+  if (candidates.length < quantity) {
+    return [];
+  }
+
+  // Gom nhom theo rowLabel
+  const byRow = new Map<string, CandidateSeat[]>();
+  for (const seat of candidates) {
+    if (!byRow.has(seat.rowLabel)) {
+      byRow.set(seat.rowLabel, []);
+    }
+    byRow.get(seat.rowLabel)!.push(seat);
+  }
+
+  // Pass 1: Tim chuoi quantity ghe lien tiep trong cung 1 hang
+  for (const [, rowSeats] of byRow.entries()) {
+    const sorted = [...rowSeats].sort(
+      (a, b) => parseSeatNumber(a.seatNumber) - parseSeatNumber(b.seatNumber),
+    );
+    if (sorted.length >= quantity) {
+      for (let i = 0; i <= sorted.length - quantity; i++) {
+        let isConsecutive = true;
+        for (let j = 0; j < quantity - 1; j++) {
+          if (
+            parseSeatNumber(sorted[i + j + 1]!.seatNumber) !==
+            parseSeatNumber(sorted[i + j]!.seatNumber) + 1
+          ) {
+            isConsecutive = false;
+            break;
+          }
+        }
+        if (isConsecutive) {
+          return sorted.slice(i, i + quantity);
+        }
+      }
+    }
+  }
+
+  // Pass 2: Fallback lay quantity ghe trong cung 1 hang du khong lien tiep
+  for (const [, rowSeats] of byRow.entries()) {
+    if (rowSeats.length >= quantity) {
+      const sorted = [...rowSeats].sort(
+        (a, b) => parseSeatNumber(a.seatNumber) - parseSeatNumber(b.seatNumber),
+      );
+      return sorted.slice(0, quantity);
+    }
+  }
+
+  // Pass 3: Fallback lay cac ghe trong khac hang
+  return candidates.slice(0, quantity);
+}
+
 @Injectable()
 export class BookingService {
   constructor(
@@ -116,12 +185,42 @@ export class BookingService {
       });
     }
 
-    // Phân loại ghế ngồi và vé đứng
-    const seatedItems = dto.items.filter((i) => Boolean(i.seatId));
-    const standingItems = dto.items.filter((i) => !i.seatId);
+    // Tải thông tin các hạng vé trước
+    const allTicketTypeIds = Array.from(
+      new Set(dto.items.map((i) => i.ticketTypeId)),
+    );
+    const ticketTypeRows = await db.query.ticketTypes.findMany({
+      where: and(
+        inArray(ticketTypes.id, allTicketTypeIds),
+        eq(ticketTypes.eventId, dto.eventId),
+      ),
+    });
+    const ttMap = new Map(ticketTypeRows.map((tt) => [tt.id, tt]));
 
-    const seatIds = seatedItems.map((i) => i.seatId!);
-    if (new Set(seatIds).size !== seatIds.length) {
+    for (const item of dto.items) {
+      if (!ttMap.has(item.ticketTypeId)) {
+        throw new NotFoundException({
+          success: false,
+          error: {
+            code: "TICKET_TYPE_NOT_FOUND",
+            message: `Hạng vé ${item.ticketTypeId} không tồn tại trong sự kiện`,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
+    }
+
+    // Phân loại: có ghế chỉ định, tự động phân bổ ghế, và vé đứng
+    const explicitSeatedItems = dto.items.filter((i) => Boolean(i.seatId));
+    const autoSeatedItems = dto.items.filter(
+      (i) => !i.seatId && ttMap.get(i.ticketTypeId)?.isSeated === true,
+    );
+    const standingItems = dto.items.filter(
+      (i) => !i.seatId && ttMap.get(i.ticketTypeId)?.isSeated === false,
+    );
+
+    const explicitSeatIds = explicitSeatedItems.map((i) => i.seatId!);
+    if (new Set(explicitSeatIds).size !== explicitSeatIds.length) {
       throw new BadRequestException({
         success: false,
         error: {
@@ -132,30 +231,45 @@ export class BookingService {
       });
     }
 
-    // Sắp xếp ID ghế tăng dần để loại trừ deadlock
-    const sortedSeatIds = [...seatIds].sort();
+    const sortedExplicitSeatIds = [...explicitSeatIds].sort();
 
     const result = await db.transaction(async (tx) => {
-      // 1. Khóa và cập nhật ghế ngồi
-      if (sortedSeatIds.length > 0) {
-        // Khóa các dòng ghế theo thứ tự ID tăng dần
+      const now = new Date();
+      const holdExpiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+      const allHeldSeatIds: string[] = [];
+      const allHeldSeatIdsSet = new Set<string>();
+      const allocatedSeatItems: AllocatedSeatItem[] = [];
+      const orderItemPayloads: Array<{
+        ticketTypeId: string;
+        seatId: string | null;
+        quantity: number;
+        unitPrice: string;
+        subtotal: string;
+      }> = [];
+      let totalAmount = 0;
+
+      // 1. Khóa và cập nhật ghế ngồi chỉ định cụ thể (nếu có)
+      if (sortedExplicitSeatIds.length > 0) {
         const lockedSeats = await tx
           .select({
             id: seats.id,
             status: seats.status,
             ticketTypeId: seats.ticketTypeId,
+            zoneName: seats.zoneName,
+            rowLabel: seats.rowLabel,
+            seatNumber: seats.seatNumber,
           })
           .from(seats)
           .where(
             and(
-              inArray(seats.id, sortedSeatIds),
+              inArray(seats.id, sortedExplicitSeatIds),
               eq(seats.eventId, dto.eventId),
             ),
           )
           .orderBy(asc(seats.id))
           .for("update");
 
-        if (lockedSeats.length < sortedSeatIds.length) {
+        if (lockedSeats.length < sortedExplicitSeatIds.length) {
           throw new NotFoundException({
             success: false,
             error: {
@@ -165,12 +279,12 @@ export class BookingService {
             },
           });
         }
-        // Kiem tra ghe co dung hang ve da chon khong.
+
         const seatTypeById = new Map(
           lockedSeats.map((seat) => [seat.id, seat.ticketTypeId]),
         );
 
-        for (const item of seatedItems) {
+        for (const item of explicitSeatedItems) {
           if (
             (item.quantity ?? 1) !== 1 ||
             seatTypeById.get(item.seatId!) !== item.ticketTypeId
@@ -187,10 +301,6 @@ export class BookingService {
           }
         }
 
-        const now = new Date();
-        const holdExpiresAt = new Date(now.getTime() + 5 * 60 * 1000);
-
-        // Cập nhật nguyên tử trạng thái ghế: Chỉ nhận ghế AVAILABLE hoặc HELD đã quá hạn 5 phút
         const updatedSeats = await tx
           .update(seats)
           .set({
@@ -201,7 +311,7 @@ export class BookingService {
           })
           .where(
             and(
-              inArray(seats.id, sortedSeatIds),
+              inArray(seats.id, sortedExplicitSeatIds),
               eq(seats.eventId, dto.eventId),
               or(
                 eq(seats.status, SeatStatus.AVAILABLE),
@@ -214,7 +324,7 @@ export class BookingService {
           )
           .returning({ id: seats.id });
 
-        if (updatedSeats.length < sortedSeatIds.length) {
+        if (updatedSeats.length < sortedExplicitSeatIds.length) {
           throw new ConflictException({
             success: false,
             error: {
@@ -225,13 +335,152 @@ export class BookingService {
             },
           });
         }
+
+        for (const s of lockedSeats) {
+          allHeldSeatIds.push(s.id);
+          allHeldSeatIdsSet.add(s.id);
+          allocatedSeatItems.push({
+            id: s.id,
+            zoneName: s.zoneName,
+            rowLabel: s.rowLabel,
+            seatNumber: s.seatNumber,
+          });
+
+          const tt = ttMap.get(s.ticketTypeId)!;
+          const price = Number(tt.price);
+          totalAmount += price;
+          orderItemPayloads.push({
+            ticketTypeId: s.ticketTypeId,
+            seatId: s.id,
+            quantity: 1,
+            unitPrice: price.toFixed(2),
+            subtotal: price.toFixed(2),
+          });
+        }
       }
 
-      // 2. Khóa và cập nhật khu đứng không số
+      // 2. Tự động phân bổ ghế ngồi liền kề cho vé ngồi không chỉ định seatId
+      for (const autoItem of autoSeatedItems) {
+        const qty = autoItem.quantity ?? 1;
+
+        const candidateSeats = await tx
+          .select({
+            id: seats.id,
+            zoneName: seats.zoneName,
+            rowLabel: seats.rowLabel,
+            seatNumber: seats.seatNumber,
+            ticketTypeId: seats.ticketTypeId,
+          })
+          .from(seats)
+          .where(
+            and(
+              eq(seats.eventId, dto.eventId),
+              eq(seats.ticketTypeId, autoItem.ticketTypeId),
+              or(
+                eq(seats.status, SeatStatus.AVAILABLE),
+                and(
+                  eq(seats.status, SeatStatus.HELD),
+                  lt(seats.holdExpiresAt, now),
+                ),
+              ),
+            ),
+          )
+          .orderBy(asc(seats.rowLabel), asc(seats.seatNumber));
+
+        const availableCandidates = candidateSeats.filter(
+          (s) => !allHeldSeatIdsSet.has(s.id),
+        );
+
+        const chosenSeats = findContiguousSeats(availableCandidates, qty);
+        if (chosenSeats.length < qty) {
+          throw new ConflictException({
+            success: false,
+            error: {
+              code: "INSUFFICIENT_TICKET_CAPACITY",
+              message: "Số lượng ghế trống không còn đủ để giữ chỗ theo yêu cầu",
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }
+
+        const chosenSeatIds = chosenSeats.map((s) => s.id).sort();
+
+        // Khóa các ghế được chọn bằng SELECT ... FOR UPDATE theo thứ tự id tăng dần
+        const lockedAutoSeats = await tx
+          .select({
+            id: seats.id,
+            zoneName: seats.zoneName,
+            rowLabel: seats.rowLabel,
+            seatNumber: seats.seatNumber,
+            ticketTypeId: seats.ticketTypeId,
+          })
+          .from(seats)
+          .where(
+            and(
+              inArray(seats.id, chosenSeatIds),
+              eq(seats.eventId, dto.eventId),
+              or(
+                eq(seats.status, SeatStatus.AVAILABLE),
+                and(
+                  eq(seats.status, SeatStatus.HELD),
+                  lt(seats.holdExpiresAt, now),
+                ),
+              ),
+            ),
+          )
+          .orderBy(asc(seats.id))
+          .for("update");
+
+        if (lockedAutoSeats.length < chosenSeatIds.length) {
+          throw new ConflictException({
+            success: false,
+            error: {
+              code: "SEAT_ALREADY_HELD",
+              message:
+                "Một số ghế phân bổ vừa được người khác giữ chỗ. Vui lòng thử lại.",
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }
+
+        await tx
+          .update(seats)
+          .set({
+            status: SeatStatus.HELD,
+            holdExpiresAt,
+            version: sql`${seats.version} + 1`,
+            updatedAt: now,
+          })
+          .where(inArray(seats.id, chosenSeatIds));
+
+        const tt = ttMap.get(autoItem.ticketTypeId)!;
+        const price = Number(tt.price);
+
+        for (const s of lockedAutoSeats) {
+          allHeldSeatIds.push(s.id);
+          allHeldSeatIdsSet.add(s.id);
+          allocatedSeatItems.push({
+            id: s.id,
+            zoneName: s.zoneName,
+            rowLabel: s.rowLabel,
+            seatNumber: s.seatNumber,
+          });
+
+          totalAmount += price;
+          orderItemPayloads.push({
+            ticketTypeId: s.ticketTypeId,
+            seatId: s.id,
+            quantity: 1,
+            unitPrice: price.toFixed(2),
+            subtotal: price.toFixed(2),
+          });
+        }
+      }
+
+      // 3. Khóa và cập nhật khu đứng không số
       for (const item of standingItems) {
         const qty = item.quantity ?? 1;
 
-        // Khóa dòng hạng vé
         const [lockedTT] = await tx
           .select({
             id: ticketTypes.id,
@@ -275,51 +524,18 @@ export class BookingService {
           .update(ticketTypes)
           .set({
             heldCount: sql`${ticketTypes.heldCount} + ${qty}`,
-            updatedAt: new Date(),
+            updatedAt: now,
           })
           .where(eq(ticketTypes.id, item.ticketTypeId));
-      }
 
-      // 3. Tính toán tổng tiền
-      const allTicketTypeIds = Array.from(
-        new Set(dto.items.map((i) => i.ticketTypeId)),
-      );
-      const ticketTypeRows = await tx.query.ticketTypes.findMany({
-        where: inArray(ticketTypes.id, allTicketTypeIds),
-      });
-
-      const ttMap = new Map(ticketTypeRows.map((tt) => [tt.id, tt]));
-
-      let totalAmount = 0;
-      const orderItemPayloads: Array<{
-        ticketTypeId: string;
-        seatId: string | null;
-        quantity: number;
-        unitPrice: string;
-        subtotal: string;
-      }> = [];
-
-      for (const item of dto.items) {
-        const tt = ttMap.get(item.ticketTypeId);
-        if (!tt) {
-          throw new NotFoundException({
-            success: false,
-            error: {
-              code: "TICKET_TYPE_NOT_FOUND",
-              message: `Hạng vé ${item.ticketTypeId} không tồn tại`,
-              timestamp: new Date().toISOString(),
-            },
-          });
-        }
-
+        const tt = ttMap.get(item.ticketTypeId)!;
         const price = Number(tt.price);
-        const qty = item.quantity ?? 1;
         const subtotal = price * qty;
         totalAmount += subtotal;
 
         orderItemPayloads.push({
           ticketTypeId: item.ticketTypeId,
-          seatId: item.seatId ?? null,
+          seatId: null,
           quantity: qty,
           unitPrice: price.toFixed(2),
           subtotal: subtotal.toFixed(2),
@@ -327,8 +543,6 @@ export class BookingService {
       }
 
       // 4. Tạo bản ghi đơn hàng PENDING có hạn 5 phút
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
       const randomSuffix = crypto.randomBytes(3).toString("hex").toUpperCase();
       const orderCode = `ORD-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}-${randomSuffix}`;
 
@@ -342,7 +556,7 @@ export class BookingService {
           discountAmount: "0.00",
           finalAmount: totalAmount.toFixed(2),
           status: OrderStatus.PENDING,
-          expiresAt,
+          expiresAt: holdExpiresAt,
         })
         .returning();
 
@@ -351,11 +565,11 @@ export class BookingService {
       }
 
       // 5. Gắn orderId vào các ghế đã giữ
-      if (sortedSeatIds.length > 0) {
+      if (allHeldSeatIds.length > 0) {
         await tx
           .update(seats)
           .set({ holdOrderId: newOrder.id })
-          .where(inArray(seats.id, sortedSeatIds));
+          .where(inArray(seats.id, allHeldSeatIds));
       }
 
       // 6. Thêm các dòng chi tiết đơn hàng
@@ -378,9 +592,10 @@ export class BookingService {
           orderCode: newOrder.orderCode,
           userId,
           eventId: dto.eventId,
-          heldSeats: sortedSeatIds,
+          heldSeats: allHeldSeatIds,
+          allocatedSeats: allocatedSeatItems,
           totalAmount,
-          expiresAt: expiresAt.toISOString(),
+          expiresAt: holdExpiresAt.toISOString(),
         },
         status: OutboxStatus.PENDING,
       });
@@ -388,9 +603,10 @@ export class BookingService {
       return {
         orderId: newOrder.id,
         orderCode: newOrder.orderCode,
-        heldSeats: sortedSeatIds,
+        heldSeats: allHeldSeatIds,
+        allocatedSeats: allocatedSeatItems,
         totalAmount,
-        holdExpiresAt: expiresAt.toISOString(),
+        holdExpiresAt: holdExpiresAt.toISOString(),
         remainingSeconds: 300,
       };
     });
