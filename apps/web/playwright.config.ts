@@ -57,10 +57,18 @@ export default defineConfig({
       ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: "pnpm dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true,
-    timeout: 120 * 1000,
-  },
+  webServer: [
+    {
+      command: "node ../api/dist/main.js",
+      url: "http://localhost:4000/health",
+      reuseExistingServer: true,
+      timeout: 30 * 1000,
+    },
+    {
+      command: "pnpm dev",
+      url: "http://localhost:3000",
+      reuseExistingServer: true,
+      timeout: 120 * 1000,
+    },
+  ],
 });
