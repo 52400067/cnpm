@@ -362,76 +362,88 @@ export class BookingService {
       // 2. Tự động phân bổ ghế ngồi liền kề cho vé ngồi không chỉ định seatId
       for (const autoItem of autoSeatedItems) {
         const qty = autoItem.quantity ?? 1;
+        let chosenAutoSeats: CandidateSeat[] = [];
+        let allocated = false;
+        const maxRetries = 10;
 
-        const candidateSeats = await tx
-          .select({
-            id: seats.id,
-            zoneName: seats.zoneName,
-            rowLabel: seats.rowLabel,
-            seatNumber: seats.seatNumber,
-            ticketTypeId: seats.ticketTypeId,
-          })
-          .from(seats)
-          .where(
-            and(
-              eq(seats.eventId, dto.eventId),
-              eq(seats.ticketTypeId, autoItem.ticketTypeId),
-              or(
-                eq(seats.status, SeatStatus.AVAILABLE),
-                and(
-                  eq(seats.status, SeatStatus.HELD),
-                  lt(seats.holdExpiresAt, now),
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          const candidateSeats = await tx
+            .select({
+              id: seats.id,
+              zoneName: seats.zoneName,
+              rowLabel: seats.rowLabel,
+              seatNumber: seats.seatNumber,
+              ticketTypeId: seats.ticketTypeId,
+            })
+            .from(seats)
+            .where(
+              and(
+                eq(seats.eventId, dto.eventId),
+                eq(seats.ticketTypeId, autoItem.ticketTypeId),
+                or(
+                  eq(seats.status, SeatStatus.AVAILABLE),
+                  and(
+                    eq(seats.status, SeatStatus.HELD),
+                    lt(seats.holdExpiresAt, now),
+                  ),
                 ),
               ),
-            ),
-          )
-          .orderBy(asc(seats.rowLabel), asc(seats.seatNumber));
+            )
+            .orderBy(asc(seats.rowLabel), asc(seats.seatNumber));
 
-        const availableCandidates = candidateSeats.filter(
-          (s) => !allHeldSeatIdsSet.has(s.id),
-        );
+          const availableCandidates = candidateSeats.filter(
+            (s) => !allHeldSeatIdsSet.has(s.id),
+          );
 
-        const chosenSeats = findContiguousSeats(availableCandidates, qty);
-        if (chosenSeats.length < qty) {
-          throw new ConflictException({
-            success: false,
-            error: {
-              code: "INSUFFICIENT_TICKET_CAPACITY",
-              message: "Số lượng ghế trống không còn đủ để giữ chỗ theo yêu cầu",
-              timestamp: new Date().toISOString(),
-            },
-          });
+          const chosen = findContiguousSeats(availableCandidates, qty);
+          if (chosen.length < qty) {
+            throw new ConflictException({
+              success: false,
+              error: {
+                code: "INSUFFICIENT_TICKET_CAPACITY",
+                message: "Số lượng ghế trống không còn đủ để giữ chỗ theo yêu cầu",
+                timestamp: new Date().toISOString(),
+              },
+            });
+          }
+
+          const chosenSeatIds = chosen.map((s) => s.id).sort();
+
+          // Khóa các ghế được chọn bằng SELECT ... FOR UPDATE theo thứ tự id tăng dần
+          const lockedAutoSeats = await tx
+            .select({
+              id: seats.id,
+              zoneName: seats.zoneName,
+              rowLabel: seats.rowLabel,
+              seatNumber: seats.seatNumber,
+              ticketTypeId: seats.ticketTypeId,
+            })
+            .from(seats)
+            .where(
+              and(
+                inArray(seats.id, chosenSeatIds),
+                eq(seats.eventId, dto.eventId),
+                or(
+                  eq(seats.status, SeatStatus.AVAILABLE),
+                  and(
+                    eq(seats.status, SeatStatus.HELD),
+                    lt(seats.holdExpiresAt, now),
+                  ),
+                ),
+              ),
+            )
+            .orderBy(asc(seats.id))
+            .for("update");
+
+          if (lockedAutoSeats.length === chosenSeatIds.length) {
+            chosenAutoSeats = lockedAutoSeats;
+            allocated = true;
+            break;
+          }
+          // Neu bi transaction khac chiem mat, thu tim tiep o vong lap sau
         }
 
-        const chosenSeatIds = chosenSeats.map((s) => s.id).sort();
-
-        // Khóa các ghế được chọn bằng SELECT ... FOR UPDATE theo thứ tự id tăng dần
-        const lockedAutoSeats = await tx
-          .select({
-            id: seats.id,
-            zoneName: seats.zoneName,
-            rowLabel: seats.rowLabel,
-            seatNumber: seats.seatNumber,
-            ticketTypeId: seats.ticketTypeId,
-          })
-          .from(seats)
-          .where(
-            and(
-              inArray(seats.id, chosenSeatIds),
-              eq(seats.eventId, dto.eventId),
-              or(
-                eq(seats.status, SeatStatus.AVAILABLE),
-                and(
-                  eq(seats.status, SeatStatus.HELD),
-                  lt(seats.holdExpiresAt, now),
-                ),
-              ),
-            ),
-          )
-          .orderBy(asc(seats.id))
-          .for("update");
-
-        if (lockedAutoSeats.length < chosenSeatIds.length) {
+        if (!allocated || chosenAutoSeats.length < qty) {
           throw new ConflictException({
             success: false,
             error: {
@@ -442,6 +454,8 @@ export class BookingService {
             },
           });
         }
+
+        const chosenSeatIds = chosenAutoSeats.map((s) => s.id).sort();
 
         await tx
           .update(seats)
@@ -456,7 +470,7 @@ export class BookingService {
         const tt = ttMap.get(autoItem.ticketTypeId)!;
         const price = Number(tt.price);
 
-        for (const s of lockedAutoSeats) {
+        for (const s of chosenAutoSeats) {
           allHeldSeatIds.push(s.id);
           allHeldSeatIdsSet.add(s.id);
           allocatedSeatItems.push({
@@ -585,6 +599,13 @@ export class BookingService {
       await tx.insert(orderItems).values(itemsToInsert);
 
       // 7. Ghi nhận sự kiện Outbox
+      allocatedSeatItems.sort((a, b) => {
+        if (a.rowLabel !== b.rowLabel) {
+          return a.rowLabel.localeCompare(b.rowLabel);
+        }
+        return parseSeatNumber(a.seatNumber) - parseSeatNumber(b.seatNumber);
+      });
+
       await tx.insert(outbox).values({
         eventType: "ORDER_HOLD_CREATED",
         payload: {
