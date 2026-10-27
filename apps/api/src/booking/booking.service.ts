@@ -33,6 +33,7 @@ interface CandidateSeat {
   zoneName: string;
   rowLabel: string;
   seatNumber: string;
+  ticketTypeId: string;
 }
 
 function parseSeatNumber(seatNum: string): number {
