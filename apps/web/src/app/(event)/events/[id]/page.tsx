@@ -897,7 +897,7 @@ function EventSplitView({ event }: { event: EventItem }) {
             {/* Buyer Protection Guarantee */}
             <div className="flex items-center gap-2 text-[12px] text-[#606970]">
               <ShieldCheck className="size-4 text-primary shrink-0" />
-              <span>Cam kết vé chính thức 100% • Quét mã QR vào cổng</span>
+              <span>Ghế được giữ tạm thời trong thời gian đếm ngược</span>
             </div>
 
             {/* Action Buttons */}
@@ -940,7 +940,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                   className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <CheckCircle2 className="size-4.5" />
-                  Thanh toán qua VNPay &amp; Nhận vé QR
+                  Xem tạm tính đơn hàng
                 </button>
                 <button
                   type="button"
@@ -1035,19 +1035,20 @@ function EventSplitView({ event }: { event: EventItem }) {
             <div className="flex items-center gap-2 text-[12px] text-[#606970] bg-emerald-50/70 border border-emerald-100 rounded-[8px] p-2.5">
               <ShieldCheck className="size-4 text-primary shrink-0" />
               <span>
-                Vé điện tử có mã QR bảo mật cao, quét trực tiếp tại cổng vào sự kiện.
+                Thanh toán VNPay sẽ được bổ sung ở giai đoạn sau (UC05).
               </span>
             </div>
 
             {/* Actions */}
             <div className="space-y-2 pt-1">
-              <Link
-                href={`/my-tickets?event=${event.id}&order=${holdOrderCode || "ORD-88412"}&zone=${encodeURIComponent(selectedListing.zoneName)}&row=${encodeURIComponent(selectedListing.row || "")}&qty=${ticketQuantity}&price=${selectedListing.price}`}
-                className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+              <button
+                type="button"
+                disabled
+                className="w-full h-11 rounded-[10px] bg-primary/40 text-white text-[14px] font-bold flex items-center justify-center gap-2 cursor-not-allowed"
               >
                 <CheckCircle2 className="size-4.5" />
-                Xác nhận chuyển sang trang thanh toán
-              </Link>
+                Thanh toán VNPay (sắp ra mắt)
+              </button>
               <button
                 type="button"
                 onClick={() => setShowSubtotalModal(false)}
