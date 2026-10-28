@@ -180,6 +180,67 @@ function SeatMapView({
   // Mouseup must bubble from the minimap so canvas drags always finish.
   const handleMouseUp = () => setIsDragging(false);
 
+  // Touch (mobile): one finger pans, two fingers pinch-zoom.
+  const pinchStartRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const touchDistance = (touches: React.TouchList) =>
+    Math.hypot(
+      touches[0].clientX - touches[1].clientX,
+      touches[0].clientY - touches[1].clientY,
+    );
+  const clampTo = (nextPan: { x: number; y: number }, nextZoom: number) =>
+    clampPanToMap({
+      pan: nextPan,
+      zoom: nextZoom,
+      containerWidth: viewportSize.canvasWidth,
+      containerHeight: viewportSize.canvasHeight,
+      svgWidth: viewportSize.svgWidth,
+      svgHeight: viewportSize.svgHeight,
+      viewBox: mapData.viewBox,
+    });
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      pinchStartRef.current = { distance: touchDistance(e.touches), zoom };
+      setIsDragging(false);
+      return;
+    }
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      setIsDragging(true);
+      dragStartRef.current = { x: t.clientX, y: t.clientY };
+      panStartRef.current = { ...visiblePan };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartRef.current) {
+      const ratio = touchDistance(e.touches) / pinchStartRef.current.distance;
+      const nextZoom = Math.min(
+        2.5,
+        Math.max(0.75, Number((pinchStartRef.current.zoom * ratio).toFixed(2))),
+      );
+      updateZoom(nextZoom);
+      return;
+    }
+    if (e.touches.length === 1 && isDragging) {
+      const t = e.touches[0];
+      setPan(
+        clampTo(
+          {
+            x: panStartRef.current.x + (t.clientX - dragStartRef.current.x),
+            y: panStartRef.current.y + (t.clientY - dragStartRef.current.y),
+          },
+          zoom,
+        ),
+      );
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) pinchStartRef.current = null;
+    if (e.touches.length === 0) setIsDragging(false);
+  };
+
   // Click on overview zone
   const handleClick = (e: React.MouseEvent) => {
     const dx = Math.abs(e.clientX - dragStartRef.current.x);
@@ -250,6 +311,11 @@ function SeatMapView({
           setTooltip(null);
         }}
         onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{ touchAction: "none" }}
         className="flex-1 w-full h-full relative cursor-grab active:cursor-grabbing overflow-hidden"
       >
         {/* Floating Hover Tooltip on Section */}
@@ -303,6 +369,8 @@ function SeatMapView({
             className="absolute bottom-4 right-4 z-20 hidden sm:block"
             onMouseDown={(e) => e.stopPropagation()}
             onMouseMove={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             <SeatMinimap
