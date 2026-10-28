@@ -697,11 +697,10 @@ function EventSplitView({ event }: { event: EventItem }) {
                       </div>
                     </div>
 
-                    {/* Right: Price & Deal Score Badge & Temporary Subtotal */}
+                    {/* Right: Price & Deal Score Badge */}
                     <div className="text-right shrink-0 flex flex-col items-end">
-                      <div className="text-[15px] sm:text-[16px] font-extrabold text-foreground leading-tight">
+                      <div className="text-[16px] sm:text-[17px] font-extrabold text-foreground leading-tight">
                         {formatVnd(listing.price)}
-                        <span className="text-[11px] font-normal text-muted-foreground">/vé</span>
                       </div>
                       {!isAvailable && (
                         <div className="text-[11px] text-destructive font-semibold pt-0.5">
@@ -715,7 +714,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                           </div>
                         )}
 
-                      {/* Clean Deal Score */}
+                      {/* Clean Deal Score: solid green square + green text, unboxed */}
                       <div className="mt-1.5 flex items-center gap-1.5">
                         <span className="size-5 rounded-[4px] bg-[#059669] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                           {listing.dealScore}
@@ -733,14 +732,14 @@ function EventSplitView({ event }: { event: EventItem }) {
         </div>
       </div>
 
-      {/* 4. "Bạn cần bao nhiêu vé?" Minimalist Popup Modal (Supports 1-6 tickets per UC04) */}
+      {/* 4. "Bạn cần bao nhiêu vé?" Minimalist Popup Modal */}
       {showQtyModal && (
         <div
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150"
         >
-          <div className="w-full max-w-[380px] bg-background rounded-[20px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 relative">
+          <div className="w-full max-w-[360px] bg-background rounded-[20px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 relative">
             {/* Close button */}
             <button
               type="button"
@@ -755,12 +754,12 @@ function EventSplitView({ event }: { event: EventItem }) {
                 Bạn cần bao nhiêu vé?
               </h2>
               <p className="text-[13px] text-[#606970]">
-                Tối đa 6 vé/đơn. Các ghế ngồi sẽ được xếp cạnh nhau.
+                Các ghế ngồi sẽ được xếp cạnh nhau
               </p>
             </div>
 
-            {/* 3x2 Ticket Quantity Grid: 1, 2, 3, 4, 5, 6 */}
-            <div className="grid grid-cols-3 gap-2.5 pt-1">
+            {/* Ticket Quantity Grid: 1 to 6 (UC04 limit) */}
+            <div className="grid grid-cols-3 gap-3 pt-1">
               {[1, 2, 3, 4, 5, 6].map((qty) => {
                 const isSelected = ticketQuantity === qty;
                 return (
@@ -768,13 +767,13 @@ function EventSplitView({ event }: { event: EventItem }) {
                     key={qty}
                     type="button"
                     onClick={() => setTicketQuantity(qty)}
-                    className={`h-12 rounded-[12px] border text-[17px] font-extrabold transition-all flex items-center justify-center ${
+                    className={`h-14 rounded-[12px] border text-[20px] font-extrabold transition-all flex items-center justify-center ${
                       isSelected
                         ? "border-primary bg-primary text-white shadow-xs"
                         : "border-[#dfe3e5] bg-white text-[#141d23] hover:border-primary hover:bg-[#f8fafc]"
                     }`}
                   >
-                    {qty} vé
+                    {qty}
                   </button>
                 );
               })}
@@ -785,7 +784,7 @@ function EventSplitView({ event }: { event: EventItem }) {
               onClick={() => setShowQtyModal(false)}
               className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white font-bold text-[14px] transition-colors shadow-xs"
             >
-              Áp dụng
+              Tiếp tục
             </button>
           </div>
         </div>
@@ -897,7 +896,7 @@ function EventSplitView({ event }: { event: EventItem }) {
             {/* Buyer Protection Guarantee */}
             <div className="flex items-center gap-2 text-[12px] text-[#606970]">
               <ShieldCheck className="size-4 text-primary shrink-0" />
-              <span>Ghế được giữ tạm thời trong thời gian đếm ngược</span>
+              <span>Cam kết vé chính thức 100% • Quét mã QR vào cổng</span>
             </div>
 
             {/* Action Buttons */}
@@ -940,7 +939,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                   className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <CheckCircle2 className="size-4.5" />
-                  Xem tạm tính đơn hàng
+                  Thanh toán qua VNPay &amp; Nhận vé QR
                 </button>
                 <button
                   type="button"
