@@ -95,6 +95,7 @@ function EventSplitView({ event }: { event: EventItem }) {
   // 5-minute Hold countdown & server state (UC04)
   const [holdOrderId, setHoldOrderId] = useState<string | null>(null);
   const [holdExpiresAtMs, setHoldExpiresAtMs] = useState<number | null>(null);
+  const [holdTotalAmount, setHoldTotalAmount] = useState<number | null>(null);
   const [holdSecondsLeft, setHoldSecondsLeft] = useState<number | null>(null);
   const [holdOrderCode, setHoldOrderCode] = useState<string | null>(null);
   const [allocatedSeats, setAllocatedSeats] = useState<
@@ -123,6 +124,7 @@ function EventSplitView({ event }: { event: EventItem }) {
       setSelectedListing(null);
       setHoldSecondsLeft(null);
       setHoldExpiresAtMs(null);
+      setHoldTotalAmount(null);
       setHoldOrderCode(null);
       setHoldOrderId(null);
       setAllocatedSeats([]);
@@ -132,6 +134,26 @@ function EventSplitView({ event }: { event: EventItem }) {
     }, 1000);
     return () => clearInterval(timer);
   }, [holdExpiresAtMs]);
+
+  // Rời trang/đóng tab khi đang giữ chỗ: cố gắng nhả ghế ngay (UC04-E3).
+  // Nếu không gửi kịp, job quét 30 giây/lần sẽ trả ghế sau khi hết hạn (UC04-E2).
+  useEffect(() => {
+    if (!holdOrderId) return;
+    const releaseOnLeave = () => {
+      const token = getAccessToken();
+      void fetch("/api/v1/booking/release", {
+        method: "POST",
+        keepalive: true,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ orderId: holdOrderId }),
+      }).catch(() => undefined);
+    };
+    window.addEventListener("pagehide", releaseOnLeave);
+    return () => window.removeEventListener("pagehide", releaseOnLeave);
+  }, [holdOrderId]);
 
   // Filter listings based on activeZoneId
   const filteredListings = useMemo(() => {
@@ -170,6 +192,7 @@ function EventSplitView({ event }: { event: EventItem }) {
     setSelectedListing(null);
     setHoldSecondsLeft(null);
     setHoldExpiresAtMs(null);
+    setHoldTotalAmount(null);
     setHoldOrderCode(null);
     setHoldOrderId(null);
     setAllocatedSeats([]);
@@ -258,6 +281,9 @@ function EventSplitView({ event }: { event: EventItem }) {
         Number.isFinite(expiresMs) ? expiresMs : nowMs() + remaining * 1000,
       );
       setHoldSecondsLeft(remaining);
+      setHoldTotalAmount(
+        typeof data.totalAmount === "number" ? data.totalAmount : null,
+      );
       setAllocatedSeats(data.allocatedSeats || []);
       setSelectedListing(listing);
       setHoldErrorMessage(null);
@@ -863,7 +889,7 @@ function EventSplitView({ event }: { event: EventItem }) {
               <div className="flex items-center justify-between border-t border-[#dfe3e5] pt-2">
                 <span className="font-bold text-[#141d23]">Tổng cộng:</span>
                 <span className="text-[18px] font-extrabold text-primary">
-                  {formatVnd(selectedListing.price * ticketQuantity)}
+                  {formatVnd(holdTotalAmount ?? selectedListing.price * ticketQuantity)}
                 </span>
               </div>
             </div>
@@ -1000,7 +1026,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                   Tạm tính tổng cộng:
                 </span>
                 <span className="text-[20px] font-black text-primary">
-                  {formatVnd(selectedListing.price * ticketQuantity)}
+                  {formatVnd(holdTotalAmount ?? selectedListing.price * ticketQuantity)}
                 </span>
               </div>
             </div>
