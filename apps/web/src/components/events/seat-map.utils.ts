@@ -267,3 +267,95 @@ export function calculateOrderSubtotal(
   }
   return Math.round(unitPrice * quantity);
 }
+
+/** Đồng hồ hệ thống tách riêng để component không gọi Date.now trực tiếp (React purity). */
+export function nowMs(): number {
+  return Date.now();
+}
+
+/**
+ * Giây còn lại của phiên giữ chỗ, tính theo holdExpiresAt của server (UC04-E2).
+ * Làm tròn lên để đồng hồ không về 0 sớm; không bao giờ âm.
+ */
+export function computeRemainingSeconds(
+  expiresAtMs: number,
+  nowMs: number,
+): number {
+  if (!Number.isFinite(expiresAtMs) || !Number.isFinite(nowMs)) return 0;
+  return Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000));
+}
+
+export interface HoldErrorInfo {
+  message: string;
+  action: "LOGIN" | "WAITING_ROOM" | "REFRESH" | "RETRY" | "NONE";
+}
+
+/**
+ * Ánh xạ lỗi API giữ chỗ theo mã HTTP/mã lỗi sang thông điệp + hành động (UC04-E1, E5, E6, E7).
+ */
+export function getHoldErrorInfo(
+  status: number,
+  code?: string,
+  serverMessage?: string,
+): HoldErrorInfo {
+  switch (status) {
+    case 401:
+      return {
+        message:
+          "Vui lòng đăng nhập tài khoản Người mua (Buyer) để giữ chỗ và thanh toán vé.",
+        action: "LOGIN",
+      };
+    case 403:
+      if (
+        code === "MISSING_ADMISSION_TOKEN" ||
+        code === "INVALID_ADMISSION_TOKEN"
+      ) {
+        return {
+          message:
+            "Sự kiện đang bật hàng chờ ảo. Vui lòng xếp hàng để được vào chọn vé.",
+          action: "WAITING_ROOM",
+        };
+      }
+      return {
+        message:
+          serverMessage ??
+          "Tài khoản của bạn không có quyền thực hiện thao tác này.",
+        action: "NONE",
+      };
+    case 404:
+      return {
+        message: serverMessage ?? "Không tìm thấy sự kiện hoặc hạng vé.",
+        action: "REFRESH",
+      };
+    case 409:
+      return {
+        message:
+          "Vé hoặc ghế vừa được người khác giữ hoặc mua. Vui lòng chọn lại.",
+        action: "REFRESH",
+      };
+    case 422:
+      return {
+        message:
+          serverMessage ??
+          "Yêu cầu vi phạm quy định đặt vé (tối đa 6 vé/đơn, mỗi sự kiện 1 phiên giữ chỗ).",
+        action: "NONE",
+      };
+    case 429:
+      return {
+        message: "Bạn thao tác quá nhanh. Vui lòng thử lại sau ít giây.",
+        action: "RETRY",
+      };
+    case 503:
+      return {
+        message: "Hệ thống đang bận, vui lòng thử lại sau.",
+        action: "RETRY",
+      };
+    default:
+      return {
+        message:
+          serverMessage ??
+          "Không thể thực hiện giữ chỗ vé lúc này. Vui lòng thử lại sau.",
+        action: "NONE",
+      };
+  }
+}

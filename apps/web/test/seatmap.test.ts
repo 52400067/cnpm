@@ -12,6 +12,8 @@ import {
   isZoneAvailable,
   shouldShowMinimap,
   calculateOrderSubtotal,
+  computeRemainingSeconds,
+  getHoldErrorInfo,
 } from "../src/components/events/seat-map.utils.ts";
 
 describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
@@ -245,5 +247,31 @@ describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
     assert.equal(calculateOrderSubtotal(0, 2), 0);
     assert.equal(calculateOrderSubtotal(500000, 0), 0);
     assert.equal(calculateOrderSubtotal(-100, 2), 0);
+  });
+
+  test("computeRemainingSeconds bam holdExpiresAt cua server, lam tron len, khong am", () => {
+    assert.equal(computeRemainingSeconds(300_000, 0), 300);
+    assert.equal(computeRemainingSeconds(300_000, 299_001), 1);
+    assert.equal(computeRemainingSeconds(300_000, 300_000), 0);
+    assert.equal(computeRemainingSeconds(300_000, 999_999), 0);
+    assert.equal(computeRemainingSeconds(Number.NaN, 0), 0);
+  });
+
+  test("getHoldErrorInfo anh xa dung ma loi UC04 (E1, E5, E6, E7)", () => {
+    assert.equal(getHoldErrorInfo(401).action, "LOGIN");
+    assert.equal(
+      getHoldErrorInfo(403, "MISSING_ADMISSION_TOKEN").action,
+      "WAITING_ROOM",
+    );
+    assert.equal(
+      getHoldErrorInfo(403, "INVALID_ADMISSION_TOKEN").action,
+      "WAITING_ROOM",
+    );
+    assert.equal(getHoldErrorInfo(403, "FORBIDDEN").action, "NONE");
+    assert.equal(getHoldErrorInfo(409).action, "REFRESH");
+    assert.equal(getHoldErrorInfo(422, undefined, "Qua 6 ve").message, "Qua 6 ve");
+    assert.equal(getHoldErrorInfo(429).action, "RETRY");
+    assert.equal(getHoldErrorInfo(503).action, "RETRY");
+    assert.ok(getHoldErrorInfo(500).message.length > 0);
   });
 });

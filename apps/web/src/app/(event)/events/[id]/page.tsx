@@ -2,7 +2,12 @@
 
 import { useState, useMemo, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import {
   Heart,
   Flame,
@@ -30,6 +35,11 @@ import {
   type TicketListing,
 } from "@/lib/events-catalog";
 import { SeatMap } from "@/components/events/seat-map";
+import {
+  computeRemainingSeconds,
+  getHoldErrorInfo,
+  nowMs,
+} from "@/components/events/seat-map.utils";
 import { useSession } from "@/providers/session-provider";
 import { getAccessToken } from "@/lib/api/client";
 
@@ -63,6 +73,8 @@ function EventSplitView({ event }: { event: EventItem }) {
   const mapKey = useMemo(() => getEventVenueMapKey(event), [event]);
   const allListings = useMemo(() => getEventListings(event), [event]);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Selected filters & state
   const [ticketQuantity, setTicketQuantity] = useState<number>(2);
@@ -82,6 +94,7 @@ function EventSplitView({ event }: { event: EventItem }) {
 
   // 5-minute Hold countdown & server state (UC04)
   const [holdOrderId, setHoldOrderId] = useState<string | null>(null);
+  const [holdExpiresAtMs, setHoldExpiresAtMs] = useState<number | null>(null);
   const [holdSecondsLeft, setHoldSecondsLeft] = useState<number | null>(null);
   const [holdOrderCode, setHoldOrderCode] = useState<string | null>(null);
   const [allocatedSeats, setAllocatedSeats] = useState<
@@ -95,13 +108,30 @@ function EventSplitView({ event }: { event: EventItem }) {
   const [isHoldingTicket, setIsHoldingTicket] = useState<boolean>(false);
   const [holdErrorMessage, setHoldErrorMessage] = useState<string | null>(null);
 
+  // Countdown bám theo holdExpiresAt của server (không tự đếm lùi theo client).
+  // Hết hạn: đóng drawer + popup tạm tính, vô hiệu thanh toán (UC04-E2).
   useEffect(() => {
-    if (holdSecondsLeft === null || holdSecondsLeft <= 0) return;
+    if (holdExpiresAtMs === null) return;
     const timer = setInterval(() => {
-      setHoldSecondsLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+      const left = computeRemainingSeconds(holdExpiresAtMs, Date.now());
+      if (left > 0) {
+        setHoldSecondsLeft(left);
+        return;
+      }
+      clearInterval(timer);
+      setShowSubtotalModal(false);
+      setSelectedListing(null);
+      setHoldSecondsLeft(null);
+      setHoldExpiresAtMs(null);
+      setHoldOrderCode(null);
+      setHoldOrderId(null);
+      setAllocatedSeats([]);
+      setHoldErrorMessage(
+        "Hết thời gian giữ chỗ 5 phút. Vé đã được trả lại hệ thống, vui lòng chọn lại.",
+      );
     }, 1000);
     return () => clearInterval(timer);
-  }, [holdSecondsLeft]);
+  }, [holdExpiresAtMs]);
 
   // Filter listings based on activeZoneId
   const filteredListings = useMemo(() => {
@@ -135,7 +165,20 @@ function EventSplitView({ event }: { event: EventItem }) {
     return map;
   }, [allListings]);
 
+  const resetHoldState = () => {
+    setShowSubtotalModal(false);
+    setSelectedListing(null);
+    setHoldSecondsLeft(null);
+    setHoldExpiresAtMs(null);
+    setHoldOrderCode(null);
+    setHoldOrderId(null);
+    setAllocatedSeats([]);
+  };
+
   const handleStartHold = async (listing: TicketListing) => {
+    // 1 phiên giữ chỗ / tài khoản / sự kiện: chặn bấm lặp hoặc giữ thêm khi đang giữ
+    if (isHoldingTicket || holdOrderId) return;
+
     if (listing.availableTickets < ticketQuantity) {
       setHoldErrorMessage(
         `Hạng vé ${listing.section} chỉ còn ${listing.availableTickets} vé, không đủ cho yêu cầu ${ticketQuantity} vé của bạn. Vui lòng giảm số lượng vé hoặc chọn hạng vé khác.`,
@@ -171,57 +214,60 @@ function EventSplitView({ event }: { event: EventItem }) {
       });
 
       if (!response.ok) {
-        let errMessage =
-          "Không thể thực hiện giữ chỗ vé lúc này. Vui lòng thử lại sau.";
+        let serverCode: string | undefined;
+        let serverMessage: string | undefined;
         try {
           const errData = await response.json();
-          if (errData?.error?.message) {
-            errMessage = errData.error.message;
-          } else if (response.status === 401) {
-            errMessage =
-              "Vui lòng đăng nhập tài khoản Người mua (Buyer) để thực hiện giữ chỗ và thanh toán vé.";
-          }
+          serverCode = errData?.error?.code;
+          serverMessage = errData?.error?.message;
         } catch {
-          if (response.status === 401) {
-            errMessage =
-              "Vui lòng đăng nhập tài khoản Người mua (Buyer) để thực hiện giữ chỗ và thanh toán vé.";
-          }
+          // Body không phải JSON: dùng thông điệp theo mã HTTP
         }
+        const info = getHoldErrorInfo(response.status, serverCode, serverMessage);
 
-        // Gia Khang comment 4: Tuyệt đối không mở checkout drawer khi API thất bại
-        setHoldErrorMessage(errMessage);
-        setSelectedListing(null);
-        setHoldSecondsLeft(null);
-        setHoldOrderCode(null);
-        setHoldOrderId(null);
-        setAllocatedSeats([]);
+        // Tuyệt đối không mở checkout drawer khi API thất bại
+        resetHoldState();
+        setHoldErrorMessage(info.message);
+        if (info.action === "LOGIN") {
+          router.push(`/auth?redirect=${encodeURIComponent(pathname)}`);
+        }
         return;
       }
 
       const json = await response.json();
-      if (json.success && json.data) {
-        setHoldOrderId(json.data.orderId || null);
-        setHoldOrderCode(json.data.orderCode || `ORD-${Date.now()}`);
-        setHoldSecondsLeft(json.data.remainingSeconds || 300);
-        setAllocatedSeats(json.data.allocatedSeats || []);
-        setSelectedListing(listing);
-        setHoldErrorMessage(null);
-      } else {
+      const data = json?.success ? json.data : null;
+      if (!data?.orderId || !data?.orderCode) {
         throw new Error(
           json?.error?.message || "Không thể khởi tạo phiên giữ chỗ vé.",
         );
       }
+
+      const expiresMs = data.holdExpiresAt
+        ? Date.parse(data.holdExpiresAt)
+        : Number.NaN;
+      const remaining = Number.isFinite(expiresMs)
+        ? computeRemainingSeconds(expiresMs, nowMs())
+        : Number(data.remainingSeconds) || 0;
+      if (remaining <= 0) {
+        throw new Error("Phiên giữ chỗ đã hết hạn ngay khi khởi tạo.");
+      }
+
+      setHoldOrderId(data.orderId);
+      setHoldOrderCode(data.orderCode);
+      setHoldExpiresAtMs(
+        Number.isFinite(expiresMs) ? expiresMs : nowMs() + remaining * 1000,
+      );
+      setHoldSecondsLeft(remaining);
+      setAllocatedSeats(data.allocatedSeats || []);
+      setSelectedListing(listing);
+      setHoldErrorMessage(null);
     } catch (err: unknown) {
-      const msg =
+      resetHoldState();
+      setHoldErrorMessage(
         err instanceof Error
           ? err.message
-          : "Đã xảy ra lỗi khi kết nối tới máy chủ giữ chỗ.";
-      setHoldErrorMessage(msg);
-      setSelectedListing(null);
-      setHoldSecondsLeft(null);
-      setHoldOrderCode(null);
-      setHoldOrderId(null);
-      setAllocatedSeats([]);
+          : "Đã xảy ra lỗi khi kết nối tới máy chủ giữ chỗ.",
+      );
     } finally {
       setIsHoldingTicket(false);
     }
@@ -230,20 +276,15 @@ function EventSplitView({ event }: { event: EventItem }) {
   const handleCancelHold = async () => {
     const currentOrderId = holdOrderId;
 
-    // Reset local state ngay lập tức để đóng checkout drawer
-    setShowSubtotalModal(false);
-    setHoldSecondsLeft(null);
-    setHoldOrderCode(null);
-    setHoldOrderId(null);
-    setSelectedListing(null);
-    setAllocatedSeats([]);
+    // Đóng drawer ngay để người dùng không thao tác tiếp trên phiên đã hủy
+    resetHoldState();
     setHoldErrorMessage(null);
 
-    // Gọi API release hold trên máy chủ để giải phóng hàng ghế & Redis
+    // Gọi API release hold để giải phóng ghế; báo lỗi thật nếu không nhả được
     if (currentOrderId) {
       try {
         const token = getAccessToken();
-        await fetch("/api/v1/booking/release", {
+        const res = await fetch("/api/v1/booking/release", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -251,8 +292,15 @@ function EventSplitView({ event }: { event: EventItem }) {
           },
           body: JSON.stringify({ orderId: currentOrderId }),
         });
-      } catch (err) {
-        console.error("Lỗi khi gửi yêu cầu hủy giữ chỗ lên máy chủ:", err);
+        if (!res.ok) {
+          setHoldErrorMessage(
+            "Chưa hủy được giữ chỗ trên máy chủ. Ghế sẽ tự được trả lại sau tối đa 5 phút.",
+          );
+        }
+      } catch {
+        setHoldErrorMessage(
+          "Mất kết nối khi hủy giữ chỗ. Ghế sẽ tự được trả lại sau tối đa 5 phút.",
+        );
       }
     }
   };
