@@ -10,7 +10,8 @@ import {
   parseViewBox,
   isValidTicketQuantity,
   isZoneAvailable,
-  ZONE_LEGEND_ITEMS,
+  shouldShowMinimap,
+  calculateOrderSubtotal,
 } from "../src/components/events/seat-map.utils.ts";
 
 describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
@@ -222,11 +223,27 @@ describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
     assert.equal(isZoneAvailable({ count: 10 }, 6), true, "Zone du 10 ve cho yeu cau 6 ve");
   });
 
-  test("ZONE_LEGEND_ITEMS dinh nghia day du 3 trang thai truc quan (available, selected, soldout)", () => {
-    assert.equal(ZONE_LEGEND_ITEMS.length, 3);
-    const keys = ZONE_LEGEND_ITEMS.map((item) => item.key);
-    assert.ok(keys.includes("available"), "Phai co chu thich Con ve kha dung");
-    assert.ok(keys.includes("selected"), "Phai co chu thich Dang chon");
-    assert.ok(keys.includes("soldout"), "Phai co chu thich Het ve / Da ban");
+  test("shouldShowMinimap chi hien thi voi san van dong quy mo lon hoac khi phong to (zoom > 1.25)", () => {
+    // Sân vận động lớn: luôn hiển thị minimap
+    assert.equal(shouldShowMinimap("stadium-concert", 1), true);
+    assert.equal(shouldShowMinimap("stadium-football", 1), true);
+
+    // Khán phòng/Nhà hát vừa & nhỏ: không hiển thị minimap ở tỉ lệ mặc định
+    assert.equal(shouldShowMinimap("theater-classic", 1), false);
+    assert.equal(shouldShowMinimap("arena-t-stage", 1), false);
+    assert.equal(shouldShowMinimap(null, 1), false);
+
+    // Khán phòng/Nhà hát vừa & nhỏ: tự động hiển thị minimap khi người dùng zoom sâu (> 1.25)
+    assert.equal(shouldShowMinimap("theater-classic", 1.2), false);
+    assert.equal(shouldShowMinimap("theater-classic", 1.3), true);
+    assert.equal(shouldShowMinimap("arena-t-stage", 2), true);
+  });
+
+  test("calculateOrderSubtotal tinh chinh xac tong tien tam tinh don hang", () => {
+    assert.equal(calculateOrderSubtotal(450000, 2), 900000);
+    assert.equal(calculateOrderSubtotal(1200000, 4), 4800000);
+    assert.equal(calculateOrderSubtotal(0, 2), 0);
+    assert.equal(calculateOrderSubtotal(500000, 0), 0);
+    assert.equal(calculateOrderSubtotal(-100, 2), 0);
   });
 });

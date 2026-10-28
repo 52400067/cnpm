@@ -78,6 +78,7 @@ function EventSplitView({ event }: { event: EventItem }) {
     null,
   );
   const [isSaved, setIsSaved] = useState<boolean>(false);
+  const [showSubtotalModal, setShowSubtotalModal] = useState<boolean>(false);
 
   // 5-minute Hold countdown & server state (UC04)
   const [holdOrderId, setHoldOrderId] = useState<string | null>(null);
@@ -230,6 +231,7 @@ function EventSplitView({ event }: { event: EventItem }) {
     const currentOrderId = holdOrderId;
 
     // Reset local state ngay lập tức để đóng checkout drawer
+    setShowSubtotalModal(false);
     setHoldSecondsLeft(null);
     setHoldOrderCode(null);
     setHoldOrderId(null);
@@ -535,7 +537,6 @@ function EventSplitView({ event }: { event: EventItem }) {
                 const isHovered = hoveredZoneId === listing.zoneId;
                 const isSelected = selectedListing?.id === listing.id;
                 const isAvailable = listing.availableTickets >= ticketQuantity;
-                const subtotal = listing.price * ticketQuantity;
 
                 return (
                   <div
@@ -628,11 +629,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                         {formatVnd(listing.price)}
                         <span className="text-[11px] font-normal text-[#606970]">/vé</span>
                       </div>
-                      {isAvailable ? (
-                        <div className="text-[11.5px] font-bold text-primary pt-0.5">
-                          Tạm tính: {formatVnd(subtotal)}
-                        </div>
-                      ) : (
+                      {!isAvailable && (
                         <div className="text-[11px] text-rose-600 font-semibold pt-0.5">
                           Không đủ {ticketQuantity} vé
                         </div>
@@ -863,22 +860,128 @@ function EventSplitView({ event }: { event: EventItem }) {
               </div>
             ) : (
               <div className="space-y-2 pt-1">
-                <Link
-                  href={`/my-tickets?event=${event.id}&order=${holdOrderCode || "ORD-88412"}&zone=${encodeURIComponent(selectedListing.zoneName)}&row=${encodeURIComponent(selectedListing.row || "")}&qty=${ticketQuantity}&price=${selectedListing.price}`}
-                  className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors"
+                <button
+                  type="button"
+                  onClick={() => setShowSubtotalModal(true)}
+                  className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <CheckCircle2 className="size-4.5" />
                   Thanh toán qua VNPay &amp; Nhận vé QR
-                </Link>
+                </button>
                 <button
                   type="button"
                   onClick={handleCancelHold}
-                  className="w-full h-9 rounded-[8px] border border-[#dfe3e5] bg-white hover:bg-[#f5f7f8] text-[12px] font-semibold text-[#606970] transition-colors"
+                  className="w-full h-9 rounded-[8px] border border-[#dfe3e5] bg-white hover:bg-[#f5f7f8] text-[12px] font-semibold text-[#606970] transition-colors cursor-pointer"
                 >
                   Hủy giữ chỗ &amp; chọn khu vực khác
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 5. Subtotal Confirmation Modal before Checkout */}
+      {showSubtotalModal && selectedListing && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="subtotal-dialog-title"
+          className="fixed inset-0 z-50 bg-[#141d23]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowSubtotalModal(false)}
+        >
+          <div
+            className="w-full max-w-[460px] bg-white rounded-[16px] shadow-2xl border border-[#dfe3e5] p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-[#dfe3e5] pb-3.5">
+              <div>
+                <h3
+                  id="subtotal-dialog-title"
+                  className="text-[17px] sm:text-[18px] font-extrabold text-[#141d23]"
+                >
+                  Xác nhận tạm tính đơn hàng
+                </h3>
+                <p className="text-[12px] text-[#606970] mt-0.5">
+                  Vui lòng kiểm tra lại thông tin vé trước khi chuyển sang cổng thanh toán
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSubtotalModal(false)}
+                className="size-8 rounded-[8px] flex items-center justify-center text-[#606970] hover:text-[#141d23] hover:bg-[#f5f7f8] transition-colors cursor-pointer"
+                aria-label="Đóng hộp thoại"
+              >
+                <X className="size-4.5" />
+              </button>
+            </div>
+
+            {/* Event & Ticket Details */}
+            <div className="rounded-[10px] bg-[#f8fafc] border border-[#dfe3e5] p-3.5 space-y-2.5 text-[13px]">
+              <div className="font-bold text-[#141d23] text-[14px] line-clamp-1">
+                {event.title}
+              </div>
+              <div className="flex items-center justify-between text-[#606970] text-[12.5px]">
+                <span>Khu vực khán đài:</span>
+                <span className="font-semibold text-[#141d23]">
+                  {selectedListing.zoneName}
+                  {selectedListing.row ? ` • ${selectedListing.row}` : ""}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[#606970] text-[12.5px]">
+                <span>Số lượng đặt:</span>
+                <span className="font-semibold text-[#141d23]">
+                  {ticketQuantity} vé
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[#606970] text-[12.5px]">
+                <span>Đơn giá mỗi vé:</span>
+                <span className="font-semibold text-[#141d23]">
+                  {formatVnd(selectedListing.price)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[#606970] text-[12.5px]">
+                <span>Phí dịch vụ &amp; nền tảng:</span>
+                <span className="font-semibold text-emerald-600">
+                  Miễn phí (0đ)
+                </span>
+              </div>
+              <div className="border-t border-[#dfe3e5] pt-2 flex items-center justify-between">
+                <span className="font-extrabold text-[#141d23] text-[14px]">
+                  Tạm tính tổng cộng:
+                </span>
+                <span className="text-[20px] font-black text-primary">
+                  {formatVnd(selectedListing.price * ticketQuantity)}
+                </span>
+              </div>
+            </div>
+
+            {/* Trust badge */}
+            <div className="flex items-center gap-2 text-[12px] text-[#606970] bg-emerald-50/70 border border-emerald-100 rounded-[8px] p-2.5">
+              <ShieldCheck className="size-4 text-primary shrink-0" />
+              <span>
+                Vé điện tử có mã QR bảo mật cao, quét trực tiếp tại cổng vào sự kiện.
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 pt-1">
+              <Link
+                href={`/my-tickets?event=${event.id}&order=${holdOrderCode || "ORD-88412"}&zone=${encodeURIComponent(selectedListing.zoneName)}&row=${encodeURIComponent(selectedListing.row || "")}&qty=${ticketQuantity}&price=${selectedListing.price}`}
+                className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+              >
+                <CheckCircle2 className="size-4.5" />
+                Xác nhận chuyển sang trang thanh toán
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowSubtotalModal(false)}
+                className="w-full h-9 rounded-[8px] border border-[#dfe3e5] bg-white hover:bg-[#f5f7f8] text-[12.5px] font-semibold text-[#606970] transition-colors cursor-pointer"
+              >
+                Quay lại xem lại
+              </button>
+            </div>
           </div>
         </div>
       )}

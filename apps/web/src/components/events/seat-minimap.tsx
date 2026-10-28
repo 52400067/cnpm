@@ -81,12 +81,12 @@ export const SeatMinimap = memo(function SeatMinimap({
       onMouseMove={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       title="Bản đồ thu nhỏ (Minimap) - Nhấp để định vị góc nhìn"
-      className={`relative w-[120px] h-[90px] rounded-md bg-background border border-border shadow-xs overflow-hidden cursor-crosshair select-none ${className}`}
+      className={`relative w-[120px] h-[90px] rounded-[8px] bg-white border border-[#dfe3e5] shadow-xs overflow-hidden cursor-crosshair select-none isolate ${className}`}
       style={{ width: `${mapW}px`, height: `${mapH}px` }}
       aria-label="Minimap toàn cảnh khán đài"
     >
-      {/* Scaled SVG background */}
-      <div className="absolute inset-0 pointer-events-none opacity-40">
+      {/* Scaled SVG background with internal safe margin */}
+      <div className="absolute inset-1 pointer-events-none opacity-40">
         <svg
           viewBox={viewBox}
           className="w-full h-full"
@@ -106,11 +106,6 @@ export const SeatMinimap = memo(function SeatMinimap({
         }}
         className="absolute border-[1.5px] border-primary bg-primary/10 rounded-[2px] pointer-events-none"
       />
-
-      {/* Label */}
-      <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded-[3px] bg-background/90 border border-border text-[8.5px] font-bold text-muted-foreground pointer-events-none leading-none">
-        Minimap
-      </div>
     </div>
   );
 });

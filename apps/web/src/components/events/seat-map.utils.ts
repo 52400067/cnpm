@@ -238,25 +238,32 @@ export function isZoneAvailable(
 }
 
 /**
- * Standard map legend items for SeatMap (UC04)
+ * Decision helper for displaying minimap (W03-FE2).
+ * Minimap is shown only for large venues (stadium scale) or when the user zooms in (zoom > 1.25).
  */
-export const ZONE_LEGEND_ITEMS = [
-  {
-    key: "available",
-    label: "Còn vé khả dụng",
-    borderColor: "#10b981",
-    bgColor: "#ecfdf5",
-  },
-  {
-    key: "selected",
-    label: "Đang chọn",
-    borderColor: "#064e3b",
-    bgColor: "#059669",
-  },
-  {
-    key: "soldout",
-    label: "Hết vé / Đã bán",
-    borderColor: "#cbd5e1",
-    bgColor: "#f1f5f9",
-  },
-] as const;
+export function shouldShowMinimap(
+  mapKey?: string | null,
+  zoom = 1,
+): boolean {
+  const isLargeVenue =
+    mapKey === "stadium-concert" || mapKey === "stadium-football";
+  return isLargeVenue || zoom > 1.25;
+}
+
+/**
+ * Calculates subtotal for ticket checkout order (W03-FE2)
+ */
+export function calculateOrderSubtotal(
+  unitPrice: number,
+  quantity: number,
+): number {
+  if (
+    !Number.isFinite(unitPrice) ||
+    !Number.isFinite(quantity) ||
+    unitPrice <= 0 ||
+    quantity <= 0
+  ) {
+    return 0;
+  }
+  return Math.round(unitPrice * quantity);
+}

@@ -5,7 +5,7 @@ import { Plus, Minus, Maximize2 } from "lucide-react";
 import { VENUE_SVG, type VenueMapKey } from "@/lib/venue-svg.generated";
 import { formatVnd } from "@/lib/events-catalog";
 import { SeatMinimap } from "@/components/events/seat-minimap";
-import { clampPanToMap, ZONE_LEGEND_ITEMS } from "@/components/events/seat-map.utils";
+import { clampPanToMap, shouldShowMinimap } from "@/components/events/seat-map.utils";
 
 export interface SeatMapProps {
   mapKey: VenueMapKey;
@@ -260,22 +260,22 @@ function SeatMapView({
               top: `${tooltip.y - 12}px`,
               pointerEvents: "none",
             }}
-            className="absolute z-30 transform -translate-x-1/2 -translate-y-full bg-foreground text-background text-[12px] px-3 py-1.5 rounded-sm shadow-lg whitespace-nowrap pointer-events-none select-none"
+            className="absolute z-30 transform -translate-x-1/2 -translate-y-full bg-[#141d23] text-white text-[12px] px-3 py-1.5 rounded-[6px] shadow-lg whitespace-nowrap pointer-events-none select-none"
           >
-            <div className="font-semibold text-background">{tooltip.name}</div>
+            <div className="font-semibold text-slate-200">{tooltip.name}</div>
             {tooltip.isSoldOut ? (
               <div className="font-bold text-rose-400 font-mono text-[11px] pt-0.5">
                 Hết vé khả dụng
               </div>
             ) : (
-              <div className="font-bold text-accent-foreground font-mono">
+              <div className="font-bold text-[#a7f3d0] font-mono">
                 Từ {formatVnd(tooltip.price)}
-                <span className="text-[11px] text-background/80 font-normal ml-1">
+                <span className="text-[11px] text-slate-300 font-normal ml-1">
                   ({tooltip.count} vé)
                 </span>
               </div>
             )}
-            <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-foreground" />
+            <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#141d23]" />
           </div>
         )}
 
@@ -297,52 +297,27 @@ function SeatMapView({
           />
         </div>
 
-        {/* Interactive Minimap in bottom-right corner */}
-        <div
-          className="absolute bottom-4 right-4 z-20 hidden sm:block"
-          onMouseDown={(e) => e.stopPropagation()}
-          onMouseMove={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <SeatMinimap
-            viewBox={mapData.viewBox}
-            markup={mapData.markup}
-            zoom={zoom}
-            pan={visiblePan}
-            containerWidth={viewportSize.canvasWidth}
-            containerHeight={viewportSize.canvasHeight}
-            svgWidth={viewportSize.svgWidth}
-            svgHeight={viewportSize.svgHeight}
-            onNavigate={(newPan) => setPan(newPan)}
-          />
-        </div>
-
-        {/* Floating Map Legend in bottom-left corner */}
-        <div
-          className="absolute bottom-4 left-4 z-20 bg-white/95 backdrop-blur-xs rounded-[10px] border border-[#dfe3e5] px-3.5 py-2.5 shadow-xs flex flex-col gap-1.5 text-[11px] font-medium text-[#141d23] pointer-events-auto"
-          onMouseDown={(e) => e.stopPropagation()}
-          onMouseMove={(e) => e.stopPropagation()}
-          onMouseUp={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="text-[9.5px] font-bold uppercase tracking-wider text-[#606970] mb-0.5">
-            Chú thích sơ đồ
+        {/* Interactive Minimap: shown only for large venues or when zoomed in */}
+        {shouldShowMinimap(mapKey, zoom) && (
+          <div
+            className="absolute bottom-4 right-4 z-20 hidden sm:block"
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseMove={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SeatMinimap
+              viewBox={mapData.viewBox}
+              markup={mapData.markup}
+              zoom={zoom}
+              pan={visiblePan}
+              containerWidth={viewportSize.canvasWidth}
+              containerHeight={viewportSize.canvasHeight}
+              svgWidth={viewportSize.svgWidth}
+              svgHeight={viewportSize.svgHeight}
+              onNavigate={(newPan) => setPan(newPan)}
+            />
           </div>
-          {ZONE_LEGEND_ITEMS.map((item) => (
-            <div key={item.key} className="flex items-center gap-2">
-              <span
-                style={{
-                  backgroundColor: item.bgColor,
-                  borderColor: item.borderColor,
-                }}
-                className="size-3 rounded-[3px] border-2 shrink-0"
-              />
-              <span className={item.key === "soldout" ? "text-[#868f97]" : ""}>
-                {item.label}
-              </span>
-            </div>
-          ))}
-        </div>
+        )}
 
         {/* Dynamic SVG Styles for Zone Highlights */}
         <style
