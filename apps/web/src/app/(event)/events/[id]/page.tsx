@@ -568,19 +568,19 @@ function EventSplitView({ event }: { event: EventItem }) {
 
           {/* Error Message Banner */}
           {holdErrorMessage && (
-            <div className="m-3 sm:m-4 p-3 rounded-[8px] bg-rose-50 border border-rose-200 text-rose-800 text-[12.5px] flex items-start justify-between gap-2.5 animate-in fade-in duration-150 shrink-0">
+            <div className="m-3 sm:m-4 p-3 rounded-[8px] bg-destructive/10 border border-destructive/30 text-destructive text-[12.5px] flex items-start justify-between gap-2.5 animate-in fade-in duration-150 shrink-0">
               <div className="flex items-start gap-2">
-                <AlertCircle className="size-4 text-rose-600 shrink-0 mt-0.5" />
+                <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold text-rose-900">Không thể giữ chỗ</div>
-                  <div className="text-[12px] text-rose-700 leading-snug">{holdErrorMessage}</div>
+                  <div className="font-bold text-destructive">Không thể giữ chỗ</div>
+                  <div className="text-[12px] text-destructive leading-snug">{holdErrorMessage}</div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setHoldErrorMessage(null)}
                 aria-label="Đóng thông báo lỗi"
-                className="text-rose-500 hover:text-rose-800 shrink-0 p-0.5"
+                className="text-destructive/70 hover:text-destructive shrink-0 p-0.5"
               >
                 <X className="size-4" />
               </button>
@@ -628,12 +628,12 @@ function EventSplitView({ event }: { event: EventItem }) {
                     }}
                     className={`p-3.5 sm:p-4 transition-colors flex gap-3.5 sm:gap-4 items-start ${
                       !isAvailable
-                        ? "bg-slate-50/70 opacity-60 cursor-not-allowed border-l-4 border-l-slate-300"
+                        ? "bg-muted opacity-60 cursor-not-allowed border-l-4 border-l-border"
                         : isSelected
                           ? "bg-emerald-50/70 border-l-4 border-l-primary cursor-pointer"
                           : isHovered
-                            ? "bg-[#f8fafc] cursor-pointer"
-                            : "hover:bg-[#f8fafc] cursor-pointer"
+                            ? "bg-muted cursor-pointer"
+                            : "hover:bg-muted cursor-pointer"
                     }`}
                   >
                     {/* Left: Clean Thumbnail Stage Photo */}
@@ -648,11 +648,11 @@ function EventSplitView({ event }: { event: EventItem }) {
                     {/* Middle: Clean details with small metadata icons */}
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
-                        <h2 className="text-[14px] sm:text-[15px] font-bold text-[#141d23] leading-snug">
+                        <h2 className="text-[14px] sm:text-[15px] font-bold text-foreground leading-snug">
                           {listing.section}
                         </h2>
                         {!isAvailable && (
-                          <span className="px-2 py-0.5 rounded-[4px] bg-rose-100 text-rose-700 text-[10.5px] font-bold">
+                          <span className="px-2 py-0.5 rounded-[4px] bg-destructive/10 text-destructive text-[10.5px] font-bold">
                             Chỉ còn {listing.availableTickets} vé
                           </span>
                         )}
@@ -699,12 +699,12 @@ function EventSplitView({ event }: { event: EventItem }) {
 
                     {/* Right: Price & Deal Score Badge & Temporary Subtotal */}
                     <div className="text-right shrink-0 flex flex-col items-end">
-                      <div className="text-[15px] sm:text-[16px] font-extrabold text-[#141d23] leading-tight">
+                      <div className="text-[15px] sm:text-[16px] font-extrabold text-foreground leading-tight">
                         {formatVnd(listing.price)}
-                        <span className="text-[11px] font-normal text-[#606970]">/vé</span>
+                        <span className="text-[11px] font-normal text-muted-foreground">/vé</span>
                       </div>
                       {!isAvailable && (
-                        <div className="text-[11px] text-rose-600 font-semibold pt-0.5">
+                        <div className="text-[11px] text-destructive font-semibold pt-0.5">
                           Không đủ {ticketQuantity} vé
                         </div>
                       )}
@@ -740,7 +740,7 @@ function EventSplitView({ event }: { event: EventItem }) {
           aria-modal="true"
           className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150"
         >
-          <div className="w-full max-w-[380px] bg-white rounded-[20px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 relative">
+          <div className="w-full max-w-[380px] bg-background rounded-[20px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 relative">
             {/* Close button */}
             <button
               type="button"
@@ -882,7 +882,7 @@ function EventSplitView({ event }: { event: EventItem }) {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#606970]">Đơn giá:</span>
-                <span className="font-semibold text-[#141d23]">
+                <span className="font-semibold text-foreground">
                   {formatVnd(selectedListing.price)}
                 </span>
               </div>
@@ -945,7 +945,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                 <button
                   type="button"
                   onClick={handleCancelHold}
-                  className="w-full h-9 rounded-[8px] border border-[#dfe3e5] bg-white hover:bg-[#f5f7f8] text-[12px] font-semibold text-[#606970] transition-colors cursor-pointer"
+                  className="w-full h-9 rounded-[8px] border border-border bg-background hover:bg-muted text-[12px] font-semibold text-muted-foreground transition-colors cursor-pointer"
                 >
                   Hủy giữ chỗ &amp; chọn khu vực khác
                 </button>
@@ -961,30 +961,30 @@ function EventSplitView({ event }: { event: EventItem }) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="subtotal-dialog-title"
-          className="fixed inset-0 z-50 bg-[#141d23]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-foreground/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setShowSubtotalModal(false)}
         >
           <div
-            className="w-full max-w-[460px] bg-white rounded-[16px] shadow-2xl border border-[#dfe3e5] p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200"
+            className="w-full max-w-[460px] bg-background rounded-[16px] shadow-2xl border border-border p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-[#dfe3e5] pb-3.5">
+            <div className="flex items-start justify-between border-b border-border pb-3.5">
               <div>
                 <h3
                   id="subtotal-dialog-title"
-                  className="text-[17px] sm:text-[18px] font-extrabold text-[#141d23]"
+                  className="text-[17px] sm:text-[18px] font-extrabold text-foreground"
                 >
                   Xác nhận tạm tính đơn hàng
                 </h3>
-                <p className="text-[12px] text-[#606970] mt-0.5">
+                <p className="text-[12px] text-muted-foreground mt-0.5">
                   Vui lòng kiểm tra lại thông tin vé trước khi chuyển sang cổng thanh toán
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowSubtotalModal(false)}
-                className="size-8 rounded-[8px] flex items-center justify-center text-[#606970] hover:text-[#141d23] hover:bg-[#f5f7f8] transition-colors cursor-pointer"
+                className="size-8 rounded-[8px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                 aria-label="Đóng hộp thoại"
               >
                 <X className="size-4.5" />
@@ -992,37 +992,37 @@ function EventSplitView({ event }: { event: EventItem }) {
             </div>
 
             {/* Event & Ticket Details */}
-            <div className="rounded-[10px] bg-[#f8fafc] border border-[#dfe3e5] p-3.5 space-y-2.5 text-[13px]">
-              <div className="font-bold text-[#141d23] text-[14px] line-clamp-1">
+            <div className="rounded-[10px] bg-muted border border-border p-3.5 space-y-2.5 text-[13px]">
+              <div className="font-bold text-foreground text-[14px] line-clamp-1">
                 {event.title}
               </div>
-              <div className="flex items-center justify-between text-[#606970] text-[12.5px]">
+              <div className="flex items-center justify-between text-muted-foreground text-[12.5px]">
                 <span>Khu vực khán đài:</span>
-                <span className="font-semibold text-[#141d23]">
+                <span className="font-semibold text-foreground">
                   {selectedListing.zoneName}
                   {selectedListing.row ? ` • ${selectedListing.row}` : ""}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[#606970] text-[12.5px]">
+              <div className="flex items-center justify-between text-muted-foreground text-[12.5px]">
                 <span>Số lượng đặt:</span>
-                <span className="font-semibold text-[#141d23]">
+                <span className="font-semibold text-foreground">
                   {ticketQuantity} vé
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[#606970] text-[12.5px]">
+              <div className="flex items-center justify-between text-muted-foreground text-[12.5px]">
                 <span>Đơn giá mỗi vé:</span>
-                <span className="font-semibold text-[#141d23]">
+                <span className="font-semibold text-foreground">
                   {formatVnd(selectedListing.price)}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[#606970] text-[12.5px]">
+              <div className="flex items-center justify-between text-muted-foreground text-[12.5px]">
                 <span>Phí dịch vụ &amp; nền tảng:</span>
                 <span className="font-semibold text-emerald-600">
                   Miễn phí (0đ)
                 </span>
               </div>
-              <div className="border-t border-[#dfe3e5] pt-2 flex items-center justify-between">
-                <span className="font-extrabold text-[#141d23] text-[14px]">
+              <div className="border-t border-border pt-2 flex items-center justify-between">
+                <span className="font-extrabold text-foreground text-[14px]">
                   Tạm tính tổng cộng:
                 </span>
                 <span className="text-[20px] font-black text-primary">
@@ -1032,7 +1032,7 @@ function EventSplitView({ event }: { event: EventItem }) {
             </div>
 
             {/* Trust badge */}
-            <div className="flex items-center gap-2 text-[12px] text-[#606970] bg-emerald-50/70 border border-emerald-100 rounded-[8px] p-2.5">
+            <div className="flex items-center gap-2 text-[12px] text-muted-foreground bg-emerald-50/70 border border-emerald-100 rounded-[8px] p-2.5">
               <ShieldCheck className="size-4 text-primary shrink-0" />
               <span>
                 Thanh toán VNPay sẽ được bổ sung ở giai đoạn sau (UC05).
@@ -1052,7 +1052,7 @@ function EventSplitView({ event }: { event: EventItem }) {
               <button
                 type="button"
                 onClick={() => setShowSubtotalModal(false)}
-                className="w-full h-9 rounded-[8px] border border-[#dfe3e5] bg-white hover:bg-[#f5f7f8] text-[12.5px] font-semibold text-[#606970] transition-colors cursor-pointer"
+                className="w-full h-9 rounded-[8px] border border-border bg-background hover:bg-muted text-[12.5px] font-semibold text-muted-foreground transition-colors cursor-pointer"
               >
                 Quay lại xem lại
               </button>

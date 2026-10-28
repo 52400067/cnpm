@@ -81,7 +81,7 @@ export const SeatMinimap = memo(function SeatMinimap({
       onMouseMove={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       title="Bản đồ thu nhỏ (Minimap) - Nhấp để định vị góc nhìn"
-      className={`relative w-[120px] h-[90px] rounded-[8px] bg-white border border-[#dfe3e5] shadow-xs overflow-hidden cursor-crosshair select-none isolate ${className}`}
+      className={`relative w-[120px] h-[90px] rounded-[8px] bg-background border border-border shadow-xs overflow-hidden cursor-crosshair select-none isolate ${className}`}
       style={{ width: `${mapW}px`, height: `${mapH}px` }}
       aria-label="Minimap toàn cảnh khán đài"
     >

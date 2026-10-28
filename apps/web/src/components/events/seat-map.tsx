@@ -326,22 +326,22 @@ function SeatMapView({
               top: `${tooltip.y - 12}px`,
               pointerEvents: "none",
             }}
-            className="absolute z-30 transform -translate-x-1/2 -translate-y-full bg-[#141d23] text-white text-[12px] px-3 py-1.5 rounded-[6px] shadow-lg whitespace-nowrap pointer-events-none select-none"
+            className="absolute z-30 transform -translate-x-1/2 -translate-y-full bg-foreground text-white text-[12px] px-3 py-1.5 rounded-[6px] shadow-lg whitespace-nowrap pointer-events-none select-none"
           >
-            <div className="font-semibold text-slate-200">{tooltip.name}</div>
+            <div className="font-semibold text-background/90">{tooltip.name}</div>
             {tooltip.isSoldOut ? (
-              <div className="font-bold text-rose-400 font-mono text-[11px] pt-0.5">
+              <div className="font-bold text-red-300 font-mono text-[11px] pt-0.5">
                 Hết vé khả dụng
               </div>
             ) : (
-              <div className="font-bold text-[#a7f3d0] font-mono">
+              <div className="font-bold text-emerald-200 font-mono">
                 Từ {formatVnd(tooltip.price)}
-                <span className="text-[11px] text-slate-300 font-normal ml-1">
+                <span className="text-[11px] text-background/70 font-normal ml-1">
                   ({tooltip.count} vé)
                 </span>
               </div>
             )}
-            <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#141d23]" />
+            <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-foreground" />
           </div>
         )}
 
