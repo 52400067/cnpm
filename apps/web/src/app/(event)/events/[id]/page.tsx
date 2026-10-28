@@ -17,6 +17,8 @@ import {
   Users,
   Search,
   Sparkles,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import {
   EVENTS,
@@ -77,7 +79,8 @@ function EventSplitView({ event }: { event: EventItem }) {
   );
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
-  // 5-minute Hold countdown
+  // 5-minute Hold countdown & server state (UC04)
+  const [holdOrderId, setHoldOrderId] = useState<string | null>(null);
   const [holdSecondsLeft, setHoldSecondsLeft] = useState<number | null>(null);
   const [holdOrderCode, setHoldOrderCode] = useState<string | null>(null);
   const [allocatedSeats, setAllocatedSeats] = useState<
@@ -88,6 +91,8 @@ function EventSplitView({ event }: { event: EventItem }) {
       seatNumber: string;
     }>
   >([]);
+  const [isHoldingTicket, setIsHoldingTicket] = useState<boolean>(false);
+  const [holdErrorMessage, setHoldErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (holdSecondsLeft === null || holdSecondsLeft <= 0) return;
@@ -97,20 +102,17 @@ function EventSplitView({ event }: { event: EventItem }) {
     return () => clearInterval(timer);
   }, [holdSecondsLeft]);
 
-  // Filter listings based on activeZoneId and ticketQuantity
+  // Filter listings based on activeZoneId
   const filteredListings = useMemo(() => {
     return allListings.filter((l) => {
       if (activeZoneId && l.zoneId !== activeZoneId) {
         return false;
       }
-      if (l.availableTickets < ticketQuantity) {
-        return false;
-      }
       return true;
     });
-  }, [allListings, activeZoneId, ticketQuantity]);
+  }, [allListings, activeZoneId]);
 
-  // Map of zone information for map tooltips
+  // Map of zone information for map tooltips (accumulates all tickets per zone)
   const zoneInfoMap = useMemo(() => {
     const map: Record<
       string,
@@ -133,11 +135,20 @@ function EventSplitView({ event }: { event: EventItem }) {
   }, [allListings]);
 
   const handleStartHold = async (listing: TicketListing) => {
-    setSelectedListing(listing);
-    setHoldSecondsLeft(300); // 5 minutes
-    const orderNum = (listing.price % 89999) + 10000;
-    setHoldOrderCode(`ORD-${orderNum}`);
-    setAllocatedSeats([]);
+    if (listing.availableTickets < ticketQuantity) {
+      setHoldErrorMessage(
+        `Hạng vé ${listing.section} chỉ còn ${listing.availableTickets} vé, không đủ cho yêu cầu ${ticketQuantity} vé của bạn. Vui lòng giảm số lượng vé hoặc chọn hạng vé khác.`,
+      );
+      return;
+    }
+
+    if (cannotBuyTickets) {
+      setSelectedListing(listing);
+      return;
+    }
+
+    setIsHoldingTicket(true);
+    setHoldErrorMessage(null);
 
     try {
       const token = getAccessToken();
@@ -157,26 +168,91 @@ function EventSplitView({ event }: { event: EventItem }) {
           ],
         }),
       });
-      if (response.ok) {
-        const json = await response.json();
-        if (json.data) {
-          if (json.data.orderCode) setHoldOrderCode(json.data.orderCode);
-          if (json.data.remainingSeconds)
-            setHoldSecondsLeft(json.data.remainingSeconds);
-          if (json.data.allocatedSeats)
-            setAllocatedSeats(json.data.allocatedSeats);
+
+      if (!response.ok) {
+        let errMessage =
+          "Không thể thực hiện giữ chỗ vé lúc này. Vui lòng thử lại sau.";
+        try {
+          const errData = await response.json();
+          if (errData?.error?.message) {
+            errMessage = errData.error.message;
+          } else if (response.status === 401) {
+            errMessage =
+              "Vui lòng đăng nhập tài khoản Người mua (Buyer) để thực hiện giữ chỗ và thanh toán vé.";
+          }
+        } catch {
+          if (response.status === 401) {
+            errMessage =
+              "Vui lòng đăng nhập tài khoản Người mua (Buyer) để thực hiện giữ chỗ và thanh toán vé.";
+          }
         }
+
+        // Gia Khang comment 4: Tuyệt đối không mở checkout drawer khi API thất bại
+        setHoldErrorMessage(errMessage);
+        setSelectedListing(null);
+        setHoldSecondsLeft(null);
+        setHoldOrderCode(null);
+        setHoldOrderId(null);
+        setAllocatedSeats([]);
+        return;
       }
-    } catch {
-      // Graceful fallback to client timer if offline or demo event
+
+      const json = await response.json();
+      if (json.success && json.data) {
+        setHoldOrderId(json.data.orderId || null);
+        setHoldOrderCode(json.data.orderCode || `ORD-${Date.now()}`);
+        setHoldSecondsLeft(json.data.remainingSeconds || 300);
+        setAllocatedSeats(json.data.allocatedSeats || []);
+        setSelectedListing(listing);
+        setHoldErrorMessage(null);
+      } else {
+        throw new Error(
+          json?.error?.message || "Không thể khởi tạo phiên giữ chỗ vé.",
+        );
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Đã xảy ra lỗi khi kết nối tới máy chủ giữ chỗ.";
+      setHoldErrorMessage(msg);
+      setSelectedListing(null);
+      setHoldSecondsLeft(null);
+      setHoldOrderCode(null);
+      setHoldOrderId(null);
+      setAllocatedSeats([]);
+    } finally {
+      setIsHoldingTicket(false);
     }
   };
 
-  const handleCancelHold = () => {
+  const handleCancelHold = async () => {
+    const currentOrderId = holdOrderId;
+
+    // Reset local state ngay lập tức để đóng checkout drawer
     setHoldSecondsLeft(null);
     setHoldOrderCode(null);
+    setHoldOrderId(null);
     setSelectedListing(null);
     setAllocatedSeats([]);
+    setHoldErrorMessage(null);
+
+    // Gọi API release hold trên máy chủ để giải phóng hàng ghế & Redis
+    if (currentOrderId) {
+      try {
+        const token = getAccessToken();
+        await fetch("/api/v1/booking/release", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ orderId: currentOrderId }),
+        });
+      } catch (err) {
+        console.error("Lỗi khi gửi yêu cầu hủy giữ chỗ lên máy chủ:", err);
+      }
+    }
   };
 
   const formatCountdown = (seconds: number) => {
@@ -414,6 +490,27 @@ function EventSplitView({ event }: { event: EventItem }) {
             </div>
           </div>
 
+          {/* Error Message Banner */}
+          {holdErrorMessage && (
+            <div className="m-3 sm:m-4 p-3 rounded-[8px] bg-rose-50 border border-rose-200 text-rose-800 text-[12.5px] flex items-start justify-between gap-2.5 animate-in fade-in duration-150 shrink-0">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="size-4 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-rose-900">Không thể giữ chỗ</div>
+                  <div className="text-[12px] text-rose-700 leading-snug">{holdErrorMessage}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHoldErrorMessage(null)}
+                aria-label="Đóng thông báo lỗi"
+                className="text-rose-500 hover:text-rose-800 shrink-0 p-0.5"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          )}
+
           {/* Scrollable Ticket Listings */}
           <div className="flex-1 overflow-y-auto divide-y divide-[#dfe3e5]">
             {filteredListings.length === 0 ? (
@@ -437,19 +534,31 @@ function EventSplitView({ event }: { event: EventItem }) {
               filteredListings.map((listing) => {
                 const isHovered = hoveredZoneId === listing.zoneId;
                 const isSelected = selectedListing?.id === listing.id;
+                const isAvailable = listing.availableTickets >= ticketQuantity;
+                const subtotal = listing.price * ticketQuantity;
 
                 return (
                   <div
                     key={listing.id}
                     onMouseEnter={() => setHoveredZoneId(listing.zoneId)}
                     onMouseLeave={() => setHoveredZoneId(null)}
-                    onClick={() => handleStartHold(listing)}
-                    className={`p-3.5 sm:p-4 transition-colors cursor-pointer flex gap-3.5 sm:gap-4 items-start ${
-                      isSelected
-                        ? "bg-emerald-50/70 border-l-4 border-l-primary"
-                        : isHovered
-                          ? "bg-[#f8fafc]"
-                          : "hover:bg-[#f8fafc]"
+                    onClick={() => {
+                      if (!isAvailable) {
+                        setHoldErrorMessage(
+                          `Hạng vé ${listing.section} chỉ còn ${listing.availableTickets} vé, không đủ cho yêu cầu ${ticketQuantity} vé của bạn. Vui lòng giảm số lượng vé hoặc chọn hạng vé khác.`
+                        );
+                        return;
+                      }
+                      handleStartHold(listing);
+                    }}
+                    className={`p-3.5 sm:p-4 transition-colors flex gap-3.5 sm:gap-4 items-start ${
+                      !isAvailable
+                        ? "bg-slate-50/70 opacity-60 cursor-not-allowed border-l-4 border-l-slate-300"
+                        : isSelected
+                          ? "bg-emerald-50/70 border-l-4 border-l-primary cursor-pointer"
+                          : isHovered
+                            ? "bg-[#f8fafc] cursor-pointer"
+                            : "hover:bg-[#f8fafc] cursor-pointer"
                     }`}
                   >
                     {/* Left: Clean Thumbnail Stage Photo */}
@@ -463,9 +572,16 @@ function EventSplitView({ event }: { event: EventItem }) {
 
                     {/* Middle: Clean details with small metadata icons */}
                     <div className="flex-1 min-w-0 space-y-1">
-                      <h2 className="text-[14px] sm:text-[15px] font-bold text-[#141d23] leading-snug">
-                        {listing.section}
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-[14px] sm:text-[15px] font-bold text-[#141d23] leading-snug">
+                          {listing.section}
+                        </h2>
+                        {!isAvailable && (
+                          <span className="px-2 py-0.5 rounded-[4px] bg-rose-100 text-rose-700 text-[10.5px] font-bold">
+                            Chỉ còn {listing.availableTickets} vé
+                          </span>
+                        )}
+                      </div>
 
                       {listing.row && (
                         <div className="text-[12px] text-[#606970]">
@@ -495,7 +611,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                           <span>Tầm nhìn trực diện</span>
                         </div>
 
-                        {listing.isLastTickets && (
+                        {listing.isLastTickets && isAvailable && (
                           <div className="pt-0.5">
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-[#fef2f2] text-[#dc2626] border border-[#fecaca] text-[10.5px] font-bold">
                               <Flame className="size-3 text-[#dc2626]" />
@@ -506,11 +622,21 @@ function EventSplitView({ event }: { event: EventItem }) {
                       </div>
                     </div>
 
-                    {/* Right: Price & Deal Score Badge */}
+                    {/* Right: Price & Deal Score Badge & Temporary Subtotal */}
                     <div className="text-right shrink-0 flex flex-col items-end">
-                      <div className="text-[16px] sm:text-[17px] font-extrabold text-[#141d23] leading-tight">
+                      <div className="text-[15px] sm:text-[16px] font-extrabold text-[#141d23] leading-tight">
                         {formatVnd(listing.price)}
+                        <span className="text-[11px] font-normal text-[#606970]">/vé</span>
                       </div>
+                      {isAvailable ? (
+                        <div className="text-[11.5px] font-bold text-primary pt-0.5">
+                          Tạm tính: {formatVnd(subtotal)}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-rose-600 font-semibold pt-0.5">
+                          Không đủ {ticketQuantity} vé
+                        </div>
+                      )}
                       {listing.originalPrice &&
                         listing.originalPrice > listing.price && (
                           <div className="text-[11px] text-[#606970] line-through">
@@ -518,7 +644,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                           </div>
                         )}
 
-                      {/* Clean Deal Score: solid green square + green text, unboxed */}
+                      {/* Clean Deal Score */}
                       <div className="mt-1.5 flex items-center gap-1.5">
                         <span className="size-5 rounded-[4px] bg-[#059669] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                           {listing.dealScore}
@@ -536,14 +662,14 @@ function EventSplitView({ event }: { event: EventItem }) {
         </div>
       </div>
 
-      {/* 4. "Bạn cần bao nhiêu vé?" Minimalist Popup Modal */}
+      {/* 4. "Bạn cần bao nhiêu vé?" Minimalist Popup Modal (Supports 1-6 tickets per UC04) */}
       {showQtyModal && (
         <div
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150"
         >
-          <div className="w-full max-w-[360px] bg-white rounded-[20px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 relative">
+          <div className="w-full max-w-[380px] bg-white rounded-[20px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 relative">
             {/* Close button */}
             <button
               type="button"
@@ -558,26 +684,26 @@ function EventSplitView({ event }: { event: EventItem }) {
                 Bạn cần bao nhiêu vé?
               </h2>
               <p className="text-[13px] text-[#606970]">
-                Các ghế ngồi sẽ được xếp cạnh nhau
+                Tối đa 6 vé/đơn. Các ghế ngồi sẽ được xếp cạnh nhau.
               </p>
             </div>
 
-            {/* 2x2 Ticket Quantity Grid: 1, 2, 3, 4 */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              {[1, 2, 3, 4].map((qty) => {
+            {/* 3x2 Ticket Quantity Grid: 1, 2, 3, 4, 5, 6 */}
+            <div className="grid grid-cols-3 gap-2.5 pt-1">
+              {[1, 2, 3, 4, 5, 6].map((qty) => {
                 const isSelected = ticketQuantity === qty;
                 return (
                   <button
                     key={qty}
                     type="button"
                     onClick={() => setTicketQuantity(qty)}
-                    className={`h-14 rounded-[12px] border text-[20px] font-extrabold transition-all flex items-center justify-center ${
+                    className={`h-12 rounded-[12px] border text-[17px] font-extrabold transition-all flex items-center justify-center ${
                       isSelected
                         ? "border-primary bg-primary text-white shadow-xs"
                         : "border-[#dfe3e5] bg-white text-[#141d23] hover:border-primary hover:bg-[#f8fafc]"
                     }`}
                   >
-                    {qty}
+                    {qty} vé
                   </button>
                 );
               })}
@@ -588,7 +714,7 @@ function EventSplitView({ event }: { event: EventItem }) {
               onClick={() => setShowQtyModal(false)}
               className="w-full h-11 rounded-[10px] bg-primary hover:bg-emerald-700 text-white font-bold text-[14px] transition-colors shadow-xs"
             >
-              Tiếp tục
+              Áp dụng
             </button>
           </div>
         </div>

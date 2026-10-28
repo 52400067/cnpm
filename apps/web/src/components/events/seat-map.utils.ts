@@ -218,3 +218,45 @@ export function parseViewBox(viewBox: string): {
     height: height > 0 ? height : 0,
   };
 }
+
+/**
+ * Validates ticket quantity according to UC04 specs (1 to 6 tickets per order)
+ */
+export function isValidTicketQuantity(qty: number): boolean {
+  return Number.isInteger(qty) && qty >= 1 && qty <= 6;
+}
+
+/**
+ * Evaluates whether a zone has enough tickets for the required quantity
+ */
+export function isZoneAvailable(
+  zoneInfo?: { count: number } | null,
+  requiredQty = 1,
+): boolean {
+  if (!zoneInfo) return false;
+  return zoneInfo.count >= requiredQty;
+}
+
+/**
+ * Standard map legend items for SeatMap (UC04)
+ */
+export const ZONE_LEGEND_ITEMS = [
+  {
+    key: "available",
+    label: "Còn vé khả dụng",
+    borderColor: "#10b981",
+    bgColor: "#ecfdf5",
+  },
+  {
+    key: "selected",
+    label: "Đang chọn",
+    borderColor: "#064e3b",
+    bgColor: "#059669",
+  },
+  {
+    key: "soldout",
+    label: "Hết vé / Đã bán",
+    borderColor: "#cbd5e1",
+    bgColor: "#f1f5f9",
+  },
+] as const;

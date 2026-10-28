@@ -5,7 +5,7 @@ import { Plus, Minus, Maximize2 } from "lucide-react";
 import { VENUE_SVG, type VenueMapKey } from "@/lib/venue-svg.generated";
 import { formatVnd } from "@/lib/events-catalog";
 import { SeatMinimap } from "@/components/events/seat-minimap";
-import { clampPanToMap } from "@/components/events/seat-map.utils";
+import { clampPanToMap, ZONE_LEGEND_ITEMS } from "@/components/events/seat-map.utils";
 
 export interface SeatMapProps {
   mapKey: VenueMapKey;
@@ -92,6 +92,7 @@ function SeatMapView({
     price: number;
     name: string;
     count: number;
+    isSoldOut: boolean;
     x: number;
     y: number;
   } | null>(null);
@@ -115,9 +116,9 @@ function SeatMapView({
   const handleZoomOut = () =>
     updateZoom(Math.max(0.75, Number((zoom - 0.25).toFixed(2))));
   const handleReset = () => {
+    // Reset zoom and pan only - do not wipe selected activeZoneId (Gia Khang review #12)
     setZoom(1);
     setPan({ x: 0, y: 0 });
-    onSelectZone(null);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -152,14 +153,17 @@ function SeatMapView({
       const target = (e.target as Element).closest("[data-zone]");
       if (target) {
         const zid = target.getAttribute("data-zone");
-        if (zid && zoneInfoMap[zid]) {
+        if (zid) {
+          const info = zoneInfoMap[zid];
+          const isSoldOut = !info || info.count <= 0;
           onHoverZone(zid);
           const rect = containerRef.current?.getBoundingClientRect();
           if (rect) {
             setTooltip({
-              price: zoneInfoMap[zid].minPrice,
-              name: zoneInfoMap[zid].name,
-              count: zoneInfoMap[zid].count,
+              price: info?.minPrice ?? 0,
+              name: info?.name ?? `Khu ${zid}`,
+              count: info?.count ?? 0,
+              isSoldOut,
               x: e.clientX - rect.left,
               y: e.clientY - rect.top,
             });
@@ -185,11 +189,17 @@ function SeatMapView({
     const target = (e.target as Element).closest("[data-zone]");
     if (target) {
       const zid = target.getAttribute("data-zone");
-      if (zid && zoneInfoMap[zid]) {
+      if (zid) {
+        const info = zoneInfoMap[zid];
+        // Do not allow selecting sold out / unavailable zones
+        if (!info || info.count <= 0) {
+          return;
+        }
         onSelectZone(activeZoneId === zid ? null : zid);
         return;
       }
     }
+    // Deselect if clicking outside
     onSelectZone(null);
   };
 
@@ -253,10 +263,18 @@ function SeatMapView({
             className="absolute z-30 transform -translate-x-1/2 -translate-y-full bg-foreground text-background text-[12px] px-3 py-1.5 rounded-sm shadow-lg whitespace-nowrap pointer-events-none select-none"
           >
             <div className="font-semibold text-background">{tooltip.name}</div>
-            <div className="font-bold text-accent-foreground font-mono">
-              Từ {formatVnd(tooltip.price)}
-            </div>
-            <div className="text-background/80">Còn {tooltip.count} vé</div>
+            {tooltip.isSoldOut ? (
+              <div className="font-bold text-rose-400 font-mono text-[11px] pt-0.5">
+                Hết vé khả dụng
+              </div>
+            ) : (
+              <div className="font-bold text-accent-foreground font-mono">
+                Từ {formatVnd(tooltip.price)}
+                <span className="text-[11px] text-background/80 font-normal ml-1">
+                  ({tooltip.count} vé)
+                </span>
+              </div>
+            )}
             <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-foreground" />
           </div>
         )}
@@ -299,6 +317,33 @@ function SeatMapView({
           />
         </div>
 
+        {/* Floating Map Legend in bottom-left corner */}
+        <div
+          className="absolute bottom-4 left-4 z-20 bg-white/95 backdrop-blur-xs rounded-[10px] border border-[#dfe3e5] px-3.5 py-2.5 shadow-xs flex flex-col gap-1.5 text-[11px] font-medium text-[#141d23] pointer-events-auto"
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseMove={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-[9.5px] font-bold uppercase tracking-wider text-[#606970] mb-0.5">
+            Chú thích sơ đồ
+          </div>
+          {ZONE_LEGEND_ITEMS.map((item) => (
+            <div key={item.key} className="flex items-center gap-2">
+              <span
+                style={{
+                  backgroundColor: item.bgColor,
+                  borderColor: item.borderColor,
+                }}
+                className="size-3 rounded-[3px] border-2 shrink-0"
+              />
+              <span className={item.key === "soldout" ? "text-[#868f97]" : ""}>
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
         {/* Dynamic SVG Styles for Zone Highlights */}
         <style
           dangerouslySetInnerHTML={{
@@ -319,6 +364,7 @@ function SeatMapView({
             fill: var(--secondary) !important;
             stroke: var(--border) !important;
             cursor: not-allowed !important;
+            opacity: 0.6 !important;
           }
           g[data-zone="11448"] text,
           g[data-zone="885"] text {
@@ -332,8 +378,9 @@ function SeatMapView({
             fill: var(--background);
             stroke: var(--border);
             stroke-width: 2px;
-            cursor: default;
+            cursor: not-allowed;
             transition: all 0.15s ease;
+            opacity: 0.65;
           }
           g[data-zone] text {
             fill: var(--muted-foreground);
@@ -343,23 +390,46 @@ function SeatMapView({
             user-select: none;
           }
           ${Object.keys(zoneInfoMap)
-            .map(
-              (zid) => `
+            .map((zid) => {
+              const info = zoneInfoMap[zid];
+              if (!info || info.count <= 0) {
+                return `
+          g[data-zone="${zid}"] {
+            cursor: not-allowed !important;
+          }
           g[data-zone="${zid}"] .sec {
-            fill: var(--accent);
-            stroke: var(--ring);
-            stroke-width: 3px;
-            cursor: pointer;
+            fill: var(--secondary) !important;
+            stroke: var(--border) !important;
+            stroke-width: 2px !important;
+            cursor: not-allowed !important;
+            opacity: 0.6 !important;
           }
           g[data-zone="${zid}"] text {
-            fill: var(--accent-foreground);
-            font-weight: 800;
+            fill: var(--muted-foreground) !important;
+            font-weight: 500 !important;
           }
-          `,
-            )
+                `;
+              }
+              return `
+          g[data-zone="${zid}"] {
+            cursor: pointer !important;
+          }
+          g[data-zone="${zid}"] .sec {
+            fill: var(--accent) !important;
+            stroke: var(--ring) !important;
+            stroke-width: 3px !important;
+            cursor: pointer !important;
+            opacity: 1 !important;
+          }
+          g[data-zone="${zid}"] text {
+            fill: var(--accent-foreground) !important;
+            font-weight: 800 !important;
+          }
+              `;
+            })
             .join("\n")}
           ${
-            hoveredZoneId
+            hoveredZoneId && zoneInfoMap[hoveredZoneId] && zoneInfoMap[hoveredZoneId].count > 0
               ? `
             g[data-zone="${hoveredZoneId}"] .sec {
               fill: var(--ring) !important;
@@ -383,6 +453,7 @@ function SeatMapView({
               fill: var(--primary) !important;
               stroke: var(--accent-foreground) !important;
               stroke-width: 7px !important;
+              opacity: 1 !important;
             }
             g[data-zone="${activeZoneId}"] text {
               fill: var(--primary-foreground) !important;

@@ -8,6 +8,9 @@ import {
   fitMapRect,
   minimapClickToPan,
   parseViewBox,
+  isValidTicketQuantity,
+  isZoneAvailable,
+  ZONE_LEGEND_ITEMS,
 } from "../src/components/events/seat-map.utils.ts";
 
 describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
@@ -199,5 +202,31 @@ describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
       width: 0,
       height: 0,
     });
+  });
+
+  test("isValidTicketQuantity kiem tra dung khoang 1 den 6 ve theo tieu chuan UC04", () => {
+    for (let qty = 1; qty <= 6; qty++) {
+      assert.ok(isValidTicketQuantity(qty), `So luong ${qty} ve phai hop le`);
+    }
+    assert.equal(isValidTicketQuantity(0), false, "0 ve khong hop le");
+    assert.equal(isValidTicketQuantity(7), false, "7 ve vuot qua gioi han 6 ve/don");
+    assert.equal(isValidTicketQuantity(-1), false, "So am khong hop le");
+    assert.equal(isValidTicketQuantity(2.5), false, "So thap phan khong hop le");
+  });
+
+  test("isZoneAvailable danh gia chinh xac trang thai con ve cua Zone", () => {
+    assert.equal(isZoneAvailable(null, 2), false, "Zone null khong kha dung");
+    assert.equal(isZoneAvailable({ count: 0 }, 1), false, "Zone 0 ve la het ve");
+    assert.equal(isZoneAvailable({ count: 3 }, 4), false, "Zone chi con 3 ve khong du cho yeu cau 4 ve");
+    assert.equal(isZoneAvailable({ count: 4 }, 4), true, "Zone du 4 ve cho yeu cau 4 ve");
+    assert.equal(isZoneAvailable({ count: 10 }, 6), true, "Zone du 10 ve cho yeu cau 6 ve");
+  });
+
+  test("ZONE_LEGEND_ITEMS dinh nghia day du 3 trang thai truc quan (available, selected, soldout)", () => {
+    assert.equal(ZONE_LEGEND_ITEMS.length, 3);
+    const keys = ZONE_LEGEND_ITEMS.map((item) => item.key);
+    assert.ok(keys.includes("available"), "Phai co chu thich Con ve kha dung");
+    assert.ok(keys.includes("selected"), "Phai co chu thich Dang chon");
+    assert.ok(keys.includes("soldout"), "Phai co chu thich Het ve / Da ban");
   });
 });
