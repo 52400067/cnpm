@@ -238,15 +238,39 @@ export function isZoneAvailable(
 }
 
 /**
+ * Suc chua uoc tinh (so cho) cua tung so do. Day la du lieu quyet dinh "map lon".
+ * Khong dung so luong khu de suy ra vi arena-basketball co 79 khu (gan bang san van dong)
+ * nhung la nha thi dau nho. Them map moi thi phai khai bao o day (co test kiem tra).
+ */
+export const VENUE_MAP_CAPACITY: Record<string, number> = {
+  "arena-t-stage": 12000,
+  "stadium-concert": 40000,
+  "stadium-football": 30000,
+  "arena-basketball": 6000,
+  theater: 2000,
+  "mega-festival": 80000,
+  "concert-open-air": 15000,
+  "theater-hoa-binh": 2500,
+  "football-hang-day": 22000,
+  "basketball-saigon-heat": 3500,
+  "opera-nha-hat-lon": 1200,
+};
+
+/** Tu muc suc chua nay tro len map duoc coi la lon va luon hien minimap. */
+export const LARGE_VENUE_CAPACITY = 20000;
+
+/**
  * Decision helper for displaying minimap (W03-FE2).
- * Minimap is shown only for large venues (stadium scale) or when the user zooms in (zoom > 1.25).
+ * Minimap is shown for large venues (capacity >= LARGE_VENUE_CAPACITY)
+ * or when the user zooms in (zoom > 1.25) and can no longer see the whole map.
  */
 export function shouldShowMinimap(
   mapKey?: string | null,
   zoom = 1,
 ): boolean {
+  const capacity = mapKey ? VENUE_MAP_CAPACITY[mapKey] : undefined;
   const isLargeVenue =
-    mapKey === "stadium-concert" || mapKey === "stadium-football";
+    capacity !== undefined && capacity >= LARGE_VENUE_CAPACITY;
   return isLargeVenue || zoom > 1.25;
 }
 

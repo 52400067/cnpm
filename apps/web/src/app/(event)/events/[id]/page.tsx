@@ -23,7 +23,6 @@ import {
   Search,
   Sparkles,
   AlertCircle,
-  Loader2,
 } from "lucide-react";
 import {
   EVENTS,
@@ -34,6 +33,7 @@ import {
   type EventItem,
   type TicketListing,
 } from "@/lib/events-catalog";
+import { NEW_VENUE_MAP_KEYS } from "@/lib/venue-zones";
 import { SeatMap } from "@/components/events/seat-map";
 import {
   computeRemainingSeconds,
@@ -850,7 +850,9 @@ function EventSplitView({ event }: { event: EventItem }) {
                 className="w-full h-full object-cover"
               />
               <span className="absolute bottom-2 left-2 px-2 py-1 rounded-[6px] bg-black/75 text-white text-[11px] font-semibold">
-                Góc nhìn thực tế sân khấu từ {selectedListing.section}
+                {(NEW_VENUE_MAP_KEYS as readonly string[]).includes(mapKey)
+                  ? `Ảnh minh họa góc nhìn từ ${selectedListing.section}`
+                  : `Góc nhìn thực tế sân khấu từ ${selectedListing.section}`}
               </span>
             </div>
 
