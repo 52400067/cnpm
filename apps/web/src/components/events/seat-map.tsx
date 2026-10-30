@@ -9,7 +9,10 @@ interface SeatMapProps {
   mapKey: VenueMapKey;
   activeZoneId?: string | null;
   hoveredZoneId?: string | null;
-  zoneInfoMap?: Record<string, { name: string; minPrice: number; count: number }>;
+  zoneInfoMap?: Record<
+    string,
+    { name: string; minPrice: number; count: number }
+  >;
   onSelectZone: (zoneId: string | null) => void;
   onHoverZone: (zoneId: string | null) => void;
 }
@@ -40,8 +43,10 @@ function SeatMapView({
     y: number;
   } | null>(null);
 
-  const handleZoomIn = () => setZoom((z) => Math.min(2.5, Number((z + 0.25).toFixed(2))));
-  const handleZoomOut = () => setZoom((z) => Math.max(0.75, Number((z - 0.25).toFixed(2))));
+  const handleZoomIn = () =>
+    setZoom((z) => Math.min(2.5, Number((z + 0.25).toFixed(2))));
+  const handleZoomOut = () =>
+    setZoom((z) => Math.max(0.75, Number((z - 0.25).toFixed(2))));
   const handleReset = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
@@ -87,7 +92,7 @@ function SeatMapView({
       onHoverZone(null);
       setTooltip(null);
     },
-    [isDragging, onHoverZone, zoneInfoMap]
+    [isDragging, onHoverZone, zoneInfoMap],
   );
 
   const handleMouseUp = () => setIsDragging(false);
@@ -174,7 +179,9 @@ function SeatMapView({
           }}
           className="absolute z-30 transform -translate-x-1/2 -translate-y-full bg-[#141d23] text-white text-[12px] px-2.5 py-1 rounded-[6px] shadow-lg whitespace-nowrap pointer-events-none select-none"
         >
-          <span className="font-bold text-[#a7f3d0]">{formatVnd(tooltip.price)}</span>
+          <span className="font-bold text-[#a7f3d0]">
+            {formatVnd(tooltip.price)}
+          </span>
           <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#141d23]" />
         </div>
       )}
@@ -260,7 +267,7 @@ function SeatMapView({
           fill: #064e3b;
           font-weight: 800;
         }
-        `
+        `,
           )
           .join("\n")}
 

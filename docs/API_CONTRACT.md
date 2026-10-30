@@ -400,13 +400,11 @@ Giữ chỗ vé trong thời hạn 5 phút với cơ chế tự động phân b�
 ```json
 {
   "eventId": "e1-uuid",
-  "items": [
-    { "ticketTypeId": "tt-vip-uuid", "quantity": 2 }
-  ]
+  "items": [{ "ticketTypeId": "tt-vip-uuid", "quantity": 2 }]
 }
 ```
 
-*Lưu ý: Hệ thống vẫn hỗ trợ tương thích trường hợp client chỉ định trực tiếp `seatId`:*
+_Lưu ý: Hệ thống vẫn hỗ trợ tương thích trường hợp client chỉ định trực tiếp `seatId`:_
 
 ```json
 {

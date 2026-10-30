@@ -73,6 +73,12 @@ jobs:
       - name: Check lint
         run: pnpm lint
 
+      - name: Check lint (web)
+        run: pnpm --filter @tickethub/web lint
+
+      - name: Check format
+        run: pnpm format:check
+
       - name: Run database migrations and seed
         run: |
           pnpm --filter @tickethub/api db:migrate
