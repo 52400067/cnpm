@@ -1,3 +1,4 @@
+import type { HttpErrorLike } from "./helpers/http-error";
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { inArray, eq } from "drizzle-orm";
@@ -382,7 +383,7 @@ describe("W03-BE2: Event Full-Text Search (UC02) Integration Test Suite", () => 
           minPrice: "500000",
           maxPrice: "200000",
         }),
-        (err: any) => {
+        (err: HttpErrorLike) => {
           assert.equal(err.status, 400);
           assert.equal(err.response.error.code, "VALIDATION_ERROR");
           return true;
@@ -396,7 +397,7 @@ describe("W03-BE2: Event Full-Text Search (UC02) Integration Test Suite", () => 
           fromDate: "2026-11-20T00:00:00.000Z",
           toDate: "2026-11-10T00:00:00.000Z",
         }),
-        (err: any) => {
+        (err: HttpErrorLike) => {
           assert.equal(err.status, 400);
           assert.equal(err.response.error.code, "VALIDATION_ERROR");
           return true;
