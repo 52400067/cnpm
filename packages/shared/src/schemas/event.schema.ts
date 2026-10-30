@@ -86,4 +86,3 @@ export const SearchQuerySchema = EventFilterQuerySchema.extend({
   }
 });
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
-
