@@ -79,9 +79,7 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      # Cảnh báo (không chặn) cho đến khi nâng cấp drizzle-orm, fastify, zod; sau đó bỏ continue-on-error
       - name: Audit production dependencies
-        continue-on-error: true
         run: pnpm audit --prod --audit-level=high
 
       - name: Check format
