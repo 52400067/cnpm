@@ -209,7 +209,10 @@ describe("W03-BE2: Event Read Cache (UC02) Integration Test Suite", () => {
       await redis.set(cacheKey, JSON.stringify(customPayload), "EX", 60);
 
       const res = await cacheService.getSeatMap(testEventId);
-      assert.equal((res as any).cachedMarker, "from-redis-test");
+      assert.equal(
+        (res as unknown as { cachedMarker?: string }).cachedMarker,
+        "from-redis-test",
+      );
     });
   });
 

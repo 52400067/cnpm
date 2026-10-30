@@ -1,3 +1,4 @@
+import type { HttpErrorLike } from "./helpers/http-error";
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import Redis from "ioredis";
@@ -355,7 +356,7 @@ describe("Auto Seat Allocation (UC04) Integration Tests", () => {
           ],
         });
       },
-      (err: any) => {
+      (err: HttpErrorLike) => {
         assert.equal(err.response?.error?.code, "INSUFFICIENT_TICKET_CAPACITY");
         return true;
       },
