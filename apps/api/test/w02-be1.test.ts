@@ -206,7 +206,6 @@ describe("W02-BE1: Auth (UC01) & Event Management (UC07) Verification", () => {
       assert.equal(res.expiresIn, 900);
       assert.equal(res.user.email, testUserEmail);
 
-      validAccessToken = res.accessToken;
       validRefreshToken = res.refreshToken;
     });
 
