@@ -94,11 +94,11 @@ export function validatePullRequest({ title = '', body = '', commits = [] }) {
       continue;
     }
 
-    if (EMOJI_REGEX.test(firstLine)) {
+    if (EMOJI_REGEX.test(message)) {
       errors.push(`Commit "${firstLine}" chua bieu tuong cam xuc (emoji). Vui long reword va go bo emoji.`);
       commitHasErrors = true;
     }
-    if (EM_DASH_REGEX.test(firstLine)) {
+    if (EM_DASH_REGEX.test(message)) {
       errors.push(`Commit "${firstLine}" chua ky tu gach ngang dai (em-dash). Vui long thay the bang dau gach noi hoac dau hai cham.`);
       commitHasErrors = true;
     }

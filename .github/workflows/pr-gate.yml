@@ -61,17 +61,19 @@ jobs:
             if (!result.valid) {
               console.log('PR Strict Gate failed. Errors:', result.errors);
 
-              // 1. Huy tien trinh ci.yml dang chay tren commit nay de tiet kiem tai nguyen
+              // 1. Huy tien trinh ci.yml dang chay hoac cho chay tren commit nay de tiet kiem tai nguyen
               try {
                 const runs = await github.rest.actions.listWorkflowRuns({
                   owner,
                   repo,
                   workflow_id: 'ci.yml',
-                  status: 'in_progress',
                 });
                 for (const run of runs.data.workflow_runs) {
-                  if (run.head_sha === pr.head.sha) {
-                    console.log(`Cancelling CI run ${run.id} for commit ${pr.head.sha}`);
+                  if (
+                    run.head_sha === pr.head.sha &&
+                    (run.status === 'in_progress' || run.status === 'queued')
+                  ) {
+                    console.log(`Cancelling CI run ${run.id} (${run.status}) for commit ${pr.head.sha}`);
                     await github.rest.actions.cancelWorkflowRun({
                       owner,
                       repo,

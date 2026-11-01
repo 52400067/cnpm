@@ -90,6 +90,20 @@ describe('validatePullRequest', () => {
     assert.ok(result.labelsToAdd.includes('invalid-commit'));
   });
 
+  it('fails when commit body contains emoji', () => {
+    const result = validatePullRequest({
+      title: 'feat(api): them tinh nang',
+      body: VALID_PR_BODY,
+      commits: [
+        { message: 'feat(api): them tinh nang\n\nNoi dung body chua emoji \u{1F680}' },
+      ],
+    });
+
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((err) => err.includes('emoji')));
+    assert.ok(result.labelsToAdd.includes('invalid-commit'));
+  });
+
   it('fails when commit message contains em-dash', () => {
     const result = validatePullRequest({
       title: 'feat(api): them tinh nang',
