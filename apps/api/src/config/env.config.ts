@@ -2,12 +2,7 @@ import { z } from "zod";
 import dotenv from "dotenv";
 import path from "path";
 
-const baseDir =
-  typeof import.meta !== "undefined" && import.meta.dirname
-    ? import.meta.dirname
-    : process.cwd();
-
-dotenv.config({ path: path.resolve(baseDir, "../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 dotenv.config();
 
 const DEV_JWT_SECRET =
