@@ -53,8 +53,9 @@ const REQUIRED_QUALITY_PATTERNS = [
 
 const PR_TYPE_PATTERN = /-\s*\[([xX])\]\s*`(feat|fix|docs|refactor|chore)`/;
 
-export function validatePullRequest({ title = '', body = '', commits = [] }) {
+export function validatePullRequest({ title = '', body = '', commits = [], docParity = null }) {
   const errors = [];
+  const warnings = [];
   const labelsToAdd = [];
   const labelsToRemove = [];
 
@@ -148,9 +149,27 @@ export function validatePullRequest({ title = '', body = '', commits = [] }) {
     labelsToRemove.push('invalid-commit');
   }
 
+  // 6. Kiem tra tinh dong bo tai lieu (Soft warning: khong tinh vao errors)
+  if (docParity && !docParity.valid) {
+    if (docParity.tableMismatches && docParity.tableMismatches.length > 0) {
+      for (const t of docParity.tableMismatches) {
+        warnings.push(`[ERD Drift] ${t.reason}`);
+      }
+    }
+    if (docParity.endpointMismatches && docParity.endpointMismatches.length > 0) {
+      for (const e of docParity.endpointMismatches) {
+        warnings.push(`[API Contract Drift] ${e.reason}`);
+      }
+    }
+    labelsToAdd.push('needs-doc-update');
+  } else if (docParity && docParity.valid) {
+    labelsToRemove.push('needs-doc-update');
+  }
+
   return {
     valid: errors.length === 0,
     errors,
+    warnings,
     labelsToAdd,
     labelsToRemove,
   };
