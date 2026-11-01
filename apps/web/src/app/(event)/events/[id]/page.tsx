@@ -246,7 +246,11 @@ function EventSplitView({ event }: { event: EventItem }) {
         } catch {
           // Body không phải JSON: dùng thông điệp theo mã HTTP
         }
-        const info = getHoldErrorInfo(response.status, serverCode, serverMessage);
+        const info = getHoldErrorInfo(
+          response.status,
+          serverCode,
+          serverMessage,
+        );
 
         // Tuyệt đối không mở checkout drawer khi API thất bại
         resetHoldState();
@@ -572,8 +576,12 @@ function EventSplitView({ event }: { event: EventItem }) {
               <div className="flex items-start gap-2">
                 <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold text-destructive">Không thể giữ chỗ</div>
-                  <div className="text-[12px] text-destructive leading-snug">{holdErrorMessage}</div>
+                  <div className="font-bold text-destructive">
+                    Không thể giữ chỗ
+                  </div>
+                  <div className="text-[12px] text-destructive leading-snug">
+                    {holdErrorMessage}
+                  </div>
                 </div>
               </div>
               <button
@@ -620,7 +628,7 @@ function EventSplitView({ event }: { event: EventItem }) {
                     onClick={() => {
                       if (!isAvailable) {
                         setHoldErrorMessage(
-                          `Hạng vé ${listing.section} chỉ còn ${listing.availableTickets} vé, không đủ cho yêu cầu ${ticketQuantity} vé của bạn. Vui lòng giảm số lượng vé hoặc chọn hạng vé khác.`
+                          `Hạng vé ${listing.section} chỉ còn ${listing.availableTickets} vé, không đủ cho yêu cầu ${ticketQuantity} vé của bạn. Vui lòng giảm số lượng vé hoặc chọn hạng vé khác.`,
                         );
                         return;
                       }
@@ -888,7 +896,9 @@ function EventSplitView({ event }: { event: EventItem }) {
               <div className="flex items-center justify-between border-t border-[#dfe3e5] pt-2">
                 <span className="font-bold text-[#141d23]">Tổng cộng:</span>
                 <span className="text-[18px] font-extrabold text-primary">
-                  {formatVnd(holdTotalAmount ?? selectedListing.price * ticketQuantity)}
+                  {formatVnd(
+                    holdTotalAmount ?? selectedListing.price * ticketQuantity,
+                  )}
                 </span>
               </div>
             </div>
@@ -977,7 +987,8 @@ function EventSplitView({ event }: { event: EventItem }) {
                   Xác nhận tạm tính đơn hàng
                 </h3>
                 <p className="text-[12px] text-muted-foreground mt-0.5">
-                  Vui lòng kiểm tra lại thông tin vé trước khi chuyển sang cổng thanh toán
+                  Vui lòng kiểm tra lại thông tin vé trước khi chuyển sang cổng
+                  thanh toán
                 </p>
               </div>
               <button
@@ -1025,7 +1036,9 @@ function EventSplitView({ event }: { event: EventItem }) {
                   Tạm tính tổng cộng:
                 </span>
                 <span className="text-[20px] font-black text-primary">
-                  {formatVnd(holdTotalAmount ?? selectedListing.price * ticketQuantity)}
+                  {formatVnd(
+                    holdTotalAmount ?? selectedListing.price * ticketQuantity,
+                  )}
                 </span>
               </div>
             </div>

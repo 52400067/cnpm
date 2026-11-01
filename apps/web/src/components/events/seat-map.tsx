@@ -327,7 +327,9 @@ function SeatMapView({
             }}
             className="absolute z-30 transform -translate-x-1/2 -translate-y-full bg-foreground text-white text-[12px] px-3 py-1.5 rounded-[6px] shadow-lg whitespace-nowrap pointer-events-none select-none"
           >
-            <div className="font-semibold text-background/90">{tooltip.name}</div>
+            <div className="font-semibold text-background/90">
+              {tooltip.name}
+            </div>
             {tooltip.isSoldOut ? (
               <div className="font-bold text-red-300 font-mono text-[11px] pt-0.5">
                 Hết vé khả dụng
@@ -447,7 +449,9 @@ function SeatMapView({
             })
             .join("\n")}
           ${
-            hoveredZoneId && zoneInfoMap[hoveredZoneId] && zoneInfoMap[hoveredZoneId].count > 0
+            hoveredZoneId &&
+            zoneInfoMap[hoveredZoneId] &&
+            zoneInfoMap[hoveredZoneId].count > 0
               ? `
             g[data-zone="${hoveredZoneId}"] .sec {
               fill: var(--ring) !important;

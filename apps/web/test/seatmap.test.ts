@@ -116,17 +116,41 @@ describe("SeatMap: UC04 Architectural Map & Navigation", () => {
       assert.ok(isValidTicketQuantity(qty), `So luong ${qty} ve phai hop le`);
     }
     assert.equal(isValidTicketQuantity(0), false, "0 ve khong hop le");
-    assert.equal(isValidTicketQuantity(7), false, "7 ve vuot qua gioi han 6 ve/don");
+    assert.equal(
+      isValidTicketQuantity(7),
+      false,
+      "7 ve vuot qua gioi han 6 ve/don",
+    );
     assert.equal(isValidTicketQuantity(-1), false, "So am khong hop le");
-    assert.equal(isValidTicketQuantity(2.5), false, "So thap phan khong hop le");
+    assert.equal(
+      isValidTicketQuantity(2.5),
+      false,
+      "So thap phan khong hop le",
+    );
   });
 
   test("isZoneAvailable danh gia chinh xac trang thai con ve cua Zone", () => {
     assert.equal(isZoneAvailable(null, 2), false, "Zone null khong kha dung");
-    assert.equal(isZoneAvailable({ count: 0 }, 1), false, "Zone 0 ve la het ve");
-    assert.equal(isZoneAvailable({ count: 3 }, 4), false, "Zone chi con 3 ve khong du cho yeu cau 4 ve");
-    assert.equal(isZoneAvailable({ count: 4 }, 4), true, "Zone du 4 ve cho yeu cau 4 ve");
-    assert.equal(isZoneAvailable({ count: 10 }, 6), true, "Zone du 10 ve cho yeu cau 6 ve");
+    assert.equal(
+      isZoneAvailable({ count: 0 }, 1),
+      false,
+      "Zone 0 ve la het ve",
+    );
+    assert.equal(
+      isZoneAvailable({ count: 3 }, 4),
+      false,
+      "Zone chi con 3 ve khong du cho yeu cau 4 ve",
+    );
+    assert.equal(
+      isZoneAvailable({ count: 4 }, 4),
+      true,
+      "Zone du 4 ve cho yeu cau 4 ve",
+    );
+    assert.equal(
+      isZoneAvailable({ count: 10 }, 6),
+      true,
+      "Zone du 10 ve cho yeu cau 6 ve",
+    );
   });
 
   test("calculateOrderSubtotal tinh chinh xac tong tien tam tinh don hang", () => {
@@ -157,7 +181,10 @@ describe("SeatMap: UC04 Architectural Map & Navigation", () => {
     );
     assert.equal(getHoldErrorInfo(403, "FORBIDDEN").action, "NONE");
     assert.equal(getHoldErrorInfo(409).action, "REFRESH");
-    assert.equal(getHoldErrorInfo(422, undefined, "Qua 6 ve").message, "Qua 6 ve");
+    assert.equal(
+      getHoldErrorInfo(422, undefined, "Qua 6 ve").message,
+      "Qua 6 ve",
+    );
     assert.equal(getHoldErrorInfo(429).action, "RETRY");
     assert.equal(getHoldErrorInfo(503).action, "RETRY");
     assert.ok(getHoldErrorInfo(500).message.length > 0);
