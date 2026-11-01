@@ -1,0 +1,164 @@
+name: PR Strict Gate
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+    branches:
+      - unstable
+      - stable
+
+permissions:
+  pull-requests: write
+  issues: write
+  actions: write
+  contents: read
+
+jobs:
+  gate-check:
+    name: Check PR Checklist and Commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Run PR Gate Validation
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { validatePullRequest } = await import('${{ github.workspace }}/scripts/pr-gate-check.mjs');
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Lay danh sach commits cua PR
+            const commitList = await github.paginate(github.rest.pulls.listCommits, {
+              owner,
+              repo,
+              pull_number: pr.number,
+            });
+
+            const commits = commitList.map((c) => ({
+              message: c.commit.message,
+              sha: c.sha,
+            }));
+
+            const result = validatePullRequest({
+              title: pr.title,
+              body: pr.body || '',
+              commits,
+            });
+
+            if (!result.valid) {
+              console.log('PR Strict Gate failed. Errors:', result.errors);
+
+              // 1. Huy tien trinh ci.yml dang chay tren commit nay de tiet kiem tai nguyen
+              try {
+                const runs = await github.rest.actions.listWorkflowRuns({
+                  owner,
+                  repo,
+                  workflow_id: 'ci.yml',
+                  status: 'in_progress',
+                });
+                for (const run of runs.data.workflow_runs) {
+                  if (run.head_sha === pr.head.sha) {
+                    console.log(`Cancelling CI run ${run.id} for commit ${pr.head.sha}`);
+                    await github.rest.actions.cancelWorkflowRun({
+                      owner,
+                      repo,
+                      run_id: run.id,
+                    });
+                  }
+                }
+              } catch (cancelError) {
+                console.log('Notice: Could not cancel CI run:', cancelError.message);
+              }
+
+              // 2. Gan label bao loi
+              if (result.labelsToAdd.length > 0) {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  labels: result.labelsToAdd,
+                });
+              }
+
+              // 3. Dang comment huong dan sua loi
+              const commentLines = [
+                '### Thong bao kiem soat Pull Request (PR Strict Gate)',
+                '',
+                'Pull Request nay chua vuot qua cong kiem soat so loai vi cac ly do sau:',
+                '',
+                ...result.errors.map((err) => `- ${err}`),
+                '',
+                '---',
+                '**Huong dan khac phuc:**',
+                '1. Chinh sua mo ta PR va tich du toan bo cac muc bat buoc trong checklist.',
+                '2. Neu commit sai quy chuan hoac chua emoji/em-dash, vui long reword va `git push --force`.',
+                '3. Khi da hoan tat, PR se tu dong duoc kiem tra lai va mo lai neu dat chuan.',
+                '',
+                '> Pull Request da duoc tam thoi dong tu dong de bao ve tai nguyen CI.',
+              ];
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: commentLines.join('\n'),
+              });
+
+              // 4. Dong PR
+              if (pr.state !== 'closed') {
+                await github.rest.pulls.update({
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                  state: 'closed',
+                });
+              }
+
+              core.setFailed('PR Gate Check khong dat yeu cau: ' + result.errors.join('; '));
+            } else {
+              console.log('PR Strict Gate passed successfully.');
+
+              // Go bo cac label vi pham cu neu co
+              for (const label of result.labelsToRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number: pr.number,
+                    name: label,
+                  });
+                } catch {
+                  // Bo qua neu label chua ton tai
+                }
+              }
+
+              // Neu PR dang bi dong truoc do va vua duoc sua hop le, tu dong mo lai
+              if (pr.state === 'closed') {
+                await github.rest.pulls.update({
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                  state: 'open',
+                });
+
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  body: '### Thong bao PR Strict Gate: Pull Request da duoc kiem tra lai va hop le. He thong da tu dong mo lai PR de tiep tuc quy trinh CI.',
+                });
+              }
+            }
