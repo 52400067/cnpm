@@ -29,6 +29,7 @@
 ### Task 1: Cập nhật Biểu mẫu PR Template và Kỹ năng AI PR Reviewer
 
 **Files:**
+
 - Modify: `.github/pull_request_template.md`
 - Modify: `.agents/skills/pr-reviewer/SKILL.md`
 
@@ -66,6 +67,7 @@
 ### Task 2: Nâng cấp Kịch bản Gate Check (`scripts/pr-gate-check.mjs`) theo TDD
 
 **Files:**
+
 - Modify: `tests/pr-gate-check.test.mjs`
 - Modify: `scripts/pr-gate-check.mjs`
 
@@ -81,9 +83,11 @@
   - Ca 9: PR bỏ quên checkbox cam kết hạ tầng -> Fail (`needs-checklist`).
 
 - [ ] **Step 2: Chạy kiểm thử để xác nhận các ca mới thất bại (RED)**
+
   ```bash
   node --test tests/pr-gate-check.test.mjs
   ```
+
   Expected: Các ca test mới thất bại do `scripts/pr-gate-check.mjs` chưa cài đặt logic.
 
 - [ ] **Step 3: Cài đặt logic kiểm duyệt trong `scripts/pr-gate-check.mjs` (GREEN)**
@@ -105,9 +109,11 @@
     - Thêm nhãn `security-violation` nếu can thiệp tệp hạ tầng.
 
 - [ ] **Step 4: Chạy lại toàn bộ unit tests để xác nhận vượt qua (GREEN)**
+
   ```bash
   node --test tests/pr-gate-check.test.mjs
   ```
+
   Expected: Toàn bộ tests PASS.
 
 - [ ] **Step 5: Commit các thay đổi**
@@ -121,6 +127,7 @@
 ### Task 3: Tích hợp Lấy danh sách Tệp thay đổi vào Workflow GitHub Actions
 
 **Files:**
+
 - Modify: `.github/workflows/pr-gate.yml`
 
 - [ ] **Step 1: Cập nhật `.github/workflows/pr-gate.yml`**
@@ -140,37 +147,48 @@
 ### Task 4: Kiểm thử Tích hợp Toàn diện Monorepo và Hoàn tất
 
 **Files:**
+
 - Execute: Monorepo test & verification commands
 
 - [ ] **Step 1: Chạy kiểm tra kiểu dữ liệu TypeScript**
+
   ```bash
   pnpm typecheck
   ```
+
   Expected: 0 lỗi.
 
 - [ ] **Step 2: Chạy kiểm tra linting**
+
   ```bash
   pnpm lint
   ```
+
   Expected: 0 lỗi vi phạm.
 
 - [ ] **Step 3: Chạy định dạng và kiểm tra Prettier**
+
   ```bash
   pnpm format
   pnpm format:check
   ```
+
   Expected: 100% chuẩn định dạng.
 
 - [ ] **Step 4: Chạy kiểm tra đối soát tài liệu kiến trúc**
+
   ```bash
   pnpm docs:check
   ```
+
   Expected: PASS với 0 mâu thuẫn.
 
 - [ ] **Step 5: Chạy toàn bộ bộ kiểm thử monorepo**
+
   ```bash
   pnpm test
   ```
+
   Expected: Toàn bộ các bài kiểm thử đều PASS.
 
 - [ ] **Step 6: Tạo PR mới, xác minh GitHub Actions và hợp nhất vào `unstable`**
