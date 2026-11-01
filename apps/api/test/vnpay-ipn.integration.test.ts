@@ -26,7 +26,6 @@ import {
   tickets,
   outbox,
   seats,
-  auditLog,
 } from "../src/database/schema";
 import { VnpayReconciliationService } from "../src/payments/vnpay-reconciliation.service";
 import { VnpayIpnService } from "../src/payments/vnpay-ipn.service";
