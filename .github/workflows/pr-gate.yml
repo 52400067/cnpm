@@ -53,6 +53,14 @@ jobs:
               sha: c.sha,
             }));
 
+            // Lay danh sach files thay doi cua PR
+            const changedFilesData = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: pr.number,
+            });
+            const changedFiles = changedFilesData.map((f) => f.filename);
+
             // Kiem tra doi soat tai lieu (Semantic Doc Parity)
             let docParity = null;
             try {
@@ -71,6 +79,7 @@ jobs:
               body: pr.body || '',
               commits,
               docParity,
+              changedFiles,
             });
 
             if (!result.valid) {
@@ -122,7 +131,9 @@ jobs:
                 '**Hướng dẫn khắc phục:**',
                 '1. Chỉnh sửa mô tả PR và tích đủ toàn bộ các mục bắt buộc trong checklist.',
                 '2. Nếu commit sai quy chuẩn hoặc chứa emoji/em-dash, vui lòng reword và `git push --force`.',
-                '3. Khi đã hoàn tất, PR sẽ tự động được kiểm tra lại và mở lại nếu đạt chuẩn.',
+                '3. Nếu có thay đổi giao diện tại apps/web, bắt buộc đính kèm hình ảnh hoặc video minh chứng tại Mục 6.',
+                '4. Không được phép chỉnh sửa hạ tầng kiểm duyệt gate hoặc workflow kiểm soát.',
+                '5. Khi đã hoàn tất, PR sẽ tự động được kiểm tra lại và mở lại nếu đạt chuẩn.',
                 '',
                 '> Pull Request đã được tạm thời đóng tự động để bảo vệ tài nguyên CI.',
               ];
