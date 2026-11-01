@@ -12,7 +12,9 @@
     "db:seed": "tsx src/database/seed.ts",
     "start:email-worker": "tsx src/jobs/email.worker.ts",
     "start:outbox-dispatcher": "tsx src/jobs/outbox.dispatcher.ts",
-    "start:outbox-recovery": "tsx src/jobs/outbox-recovery.ts"
+    "start:outbox-recovery": "tsx src/jobs/outbox-recovery.ts",
+    "start:refund-worker": "tsx src/jobs/refund.worker.ts",
+    "start:refund-dispatcher": "tsx src/jobs/refund-dispatcher.run.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",
