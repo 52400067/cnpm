@@ -140,4 +140,21 @@ describe('validatePullRequest', () => {
     assert.equal(result.valid, false);
     assert.ok(result.labelsToAdd.includes('needs-checklist'));
   });
+
+  it('adds soft warning and needs-doc-update label when doc parity fails without breaking valid status', () => {
+    const result = validatePullRequest({
+      title: 'feat(api): them tinh nang phan quyen',
+      body: VALID_PR_BODY_ACCENTED,
+      commits: [{ message: 'feat(api): them middleware phan quyen' }],
+      docParity: {
+        valid: false,
+        tableMismatches: [{ table: 'new_table', reason: 'Bảng thiếu trong doc' }],
+        endpointMismatches: [],
+      },
+    });
+
+    assert.equal(result.valid, true);
+    assert.ok(result.labelsToAdd.includes('needs-doc-update'));
+    assert.ok(result.warnings.some((w) => w.includes('ERD Drift')));
+  });
 });

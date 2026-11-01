@@ -36,6 +36,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { validatePullRequest } = await import('${{ github.workspace }}/scripts/pr-gate-check.mjs');
+            const { auditDocParity } = await import('${{ github.workspace }}/scripts/audit-doc-parity.mjs');
             const pr = context.payload.pull_request;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
@@ -52,10 +53,24 @@ jobs:
               sha: c.sha,
             }));
 
+            // Kiem tra doi soat tai lieu (Semantic Doc Parity)
+            let docParity = null;
+            try {
+              docParity = auditDocParity({
+                schemaDir: '${{ github.workspace }}/apps/api/src/database/schema',
+                controllersDir: '${{ github.workspace }}/apps/api/src',
+                erdPath: '${{ github.workspace }}/docs/ERD.md',
+                apiContractPath: '${{ github.workspace }}/docs/API_CONTRACT.md',
+              });
+            } catch (parityErr) {
+              console.log('Notice: Could not run doc parity check:', parityErr.message);
+            }
+
             const result = validatePullRequest({
               title: pr.title,
               body: pr.body || '',
               commits,
+              docParity,
             });
 
             if (!result.valid) {
@@ -145,6 +160,35 @@ jobs:
                 } catch {
                   // Bo qua neu label chua ton tai
                 }
+              }
+
+              // Canh bao mem ve tai lieu neu co
+              if (result.warnings && result.warnings.length > 0) {
+                if (result.labelsToAdd.includes('needs-doc-update')) {
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: pr.number,
+                    labels: ['needs-doc-update'],
+                  });
+                }
+
+                const warningComment = [
+                  '### Cảnh báo lệch hợp đồng tài liệu (Doc Parity Soft Warning)',
+                  '',
+                  'Hệ thống phát hiện một số thay đổi mã nguồn chưa được phản ánh trong tài liệu kiến trúc:',
+                  '',
+                  ...result.warnings.map((w) => `- ${w}`),
+                  '',
+                  '> Lưu ý: Đây là cảnh báo mềm để hỗ trợ tác giả và reviewer duy trì tài liệu đồng bộ.',
+                ];
+
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  body: warningComment.join('\n'),
+                });
               }
 
               // Neu PR dang bi dong truoc do va vua duoc sua hop le, tu dong mo lai
