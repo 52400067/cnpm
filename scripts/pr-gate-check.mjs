@@ -2,7 +2,8 @@
 
 /**
  * PR Gate Validation Engine
- * Kiểm tra tính hợp lệ của PR checklist, tiêu đề và commit message trên TicketHub repository.
+ * Kiểm tra tính hợp lệ của PR checklist, tiêu đề, commit message,
+ * bảo vệ hạ tầng kiểm soát và bắt buộc minh chứng trực quan khi sửa UI.
  */
 
 const EMOJI_REGEX = /\p{Extended_Pictographic}/u;
@@ -49,11 +50,69 @@ const REQUIRED_QUALITY_PATTERNS = [
     name: 'Không chứa ký tự gạch ngang dài (em-dash)',
     regex: /-\s*\[([ xX])\]\s*.*(?:gạch|gach)\s+(?:ngang|ngang)\s+(?:dài|dai)\s*\(em-dash\)/i,
   },
+  {
+    name: 'Không can thiệp trái phép vào hạ tầng kiểm soát',
+    regex: /-\s*\[([ xX])\]\s*.*(?:hạ|ha)\s+(?:tầng|tang)\s+(?:kiểm|kiem)\s+(?:soát|soat)/i,
+  },
 ];
 
 const PR_TYPE_PATTERN = /-\s*\[([xX])\]\s*`(feat|fix|docs|refactor|chore)`/;
 
-export function validatePullRequest({ title = '', body = '', commits = [], docParity = null }) {
+export const PROTECTED_INFRASTRUCTURE_PATTERNS = [
+  /^\.github\/workflows\//,
+  /^scripts\/pr-gate-/,
+  /^scripts\/audit-doc-/,
+  /^tests\/pr-gate-/,
+  /^tests\/audit-doc-/,
+];
+
+export function isProtectedInfrastructureFile(filePath) {
+  return PROTECTED_INFRASTRUCTURE_PATTERNS.some((pattern) => pattern.test(filePath));
+}
+
+export function isVisualUiFile(filePath) {
+  if (!filePath.startsWith('apps/web/src/')) {
+    return false;
+  }
+  // Loại trừ logic helper, proxy, api routes
+  if (
+    filePath.startsWith('apps/web/src/lib/') ||
+    filePath === 'apps/web/src/proxy.ts' ||
+    filePath === 'apps/web/src/proxy.js' ||
+    filePath.startsWith('apps/web/src/app/api/')
+  ) {
+    return false;
+  }
+  // Loại trừ unit test
+  if (/\.(test|spec)\.[a-zA-Z0-9]+$/.test(filePath)) {
+    return false;
+  }
+  // Khớp với các tệp giao diện hiển thị
+  return /\.(tsx|jsx|css|module\.css)$/.test(filePath);
+}
+
+const MARKDOWN_IMAGE_REGEX = /!\[.*?\]\(.+?\)/;
+const HTML_IMAGE_REGEX = /<img\s+[^>]*src=["'].+?["']/i;
+const MEDIA_URL_REGEX = /https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|mp4|webm|mov)(\?[^\s<>]*)?/i;
+const VIDEO_HOST_REGEX = /https?:\/\/(?:www\.)?(?:loom\.com\/share\/|youtube\.com\/|youtu\.be\/|drive\.google\.com\/)\S+/i;
+const FRAUDULENT_NA_REGEX = /\bN\/A\b|không có thay đổi giao diện|khong co thay doi giao dien/i;
+
+export function hasValidVisualEvidence(body = '') {
+  return (
+    MARKDOWN_IMAGE_REGEX.test(body) ||
+    HTML_IMAGE_REGEX.test(body) ||
+    MEDIA_URL_REGEX.test(body) ||
+    VIDEO_HOST_REGEX.test(body)
+  );
+}
+
+export function validatePullRequest({
+  title = '',
+  body = '',
+  commits = [],
+  docParity = null,
+  changedFiles = [],
+}) {
   const errors = [];
   const warnings = [];
   const labelsToAdd = [];
@@ -61,6 +120,8 @@ export function validatePullRequest({ title = '', body = '', commits = [], docPa
 
   let checklistHasErrors = false;
   let commitHasErrors = false;
+  let securityHasErrors = false;
+  let visualHasErrors = false;
 
   const normalizedBody = body || '';
 
@@ -136,6 +197,39 @@ export function validatePullRequest({ title = '', body = '', commits = [], docPa
     }
   }
 
+  // 6. Kiểm tra bảo vệ hạ tầng kiểm soát (Anti-Tampering Guard)
+  const fileList = Array.isArray(changedFiles) ? changedFiles : [];
+  const protectedFilesModified = fileList.filter((file) => isProtectedInfrastructureFile(file));
+  if (protectedFilesModified.length > 0) {
+    errors.push(
+      `Phát hiện can thiệp hạ tầng kiểm soát được bảo vệ: ${protectedFilesModified.join(', ')}. ` +
+      `Các tệp workflow và kịch bản PR Gate không được phép sửa đổi trong PR tính năng thông thường.`
+    );
+    securityHasErrors = true;
+  }
+
+  // 7. Kiểm tra minh chứng trực quan khi sửa UI (Visual Evidence Verification)
+  const uiFilesModified = fileList.filter((file) => isVisualUiFile(file));
+  const hasUiChanges = uiFilesModified.length > 0;
+
+  if (hasUiChanges) {
+    const hasMedia = hasValidVisualEvidence(normalizedBody);
+    const declaresNA = FRAUDULENT_NA_REGEX.test(normalizedBody);
+
+    if (declaresNA && !hasMedia) {
+      errors.push(
+        `PR có thay đổi tệp giao diện (${uiFilesModified.join(', ')}) nhưng khai báo N/A trong mục minh chứng trực quan. ` +
+        `Bắt buộc đính kèm ít nhất 1 ảnh chụp hoặc liên kết video minh chứng.`
+      );
+      visualHasErrors = true;
+    } else if (!hasMedia) {
+      errors.push(
+        `PR có thay đổi giao diện người dùng (${uiFilesModified.join(', ')}) nhưng thiếu hình ảnh hoặc video minh chứng tại Mục 6.`
+      );
+      visualHasErrors = true;
+    }
+  }
+
   // Xử lý nhãn (labels)
   if (checklistHasErrors) {
     labelsToAdd.push('needs-checklist');
@@ -149,7 +243,19 @@ export function validatePullRequest({ title = '', body = '', commits = [], docPa
     labelsToRemove.push('invalid-commit');
   }
 
-  // 6. Kiem tra tinh dong bo tai lieu (Soft warning: khong tinh vao errors)
+  if (securityHasErrors) {
+    labelsToAdd.push('security-violation');
+  } else {
+    labelsToRemove.push('security-violation');
+  }
+
+  if (visualHasErrors) {
+    labelsToAdd.push('needs-visual-proof');
+  } else {
+    labelsToRemove.push('needs-visual-proof');
+  }
+
+  // 8. Kiểm tra tính đồng bộ tài liệu (Soft warning: không tính vào errors)
   if (docParity && !docParity.valid) {
     if (docParity.tableMismatches && docParity.tableMismatches.length > 0) {
       for (const t of docParity.tableMismatches) {
@@ -180,6 +286,7 @@ if (process.argv[1] && process.argv[1].endsWith('pr-gate-check.mjs')) {
   const args = process.argv.slice(2);
   let title = '';
   let body = '';
+  let changedFiles = [];
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--title' && args[i + 1]) {
@@ -188,10 +295,13 @@ if (process.argv[1] && process.argv[1].endsWith('pr-gate-check.mjs')) {
     } else if (args[i] === '--body' && args[i + 1]) {
       body = args[i + 1];
       i++;
+    } else if (args[i] === '--changed-files' && args[i + 1]) {
+      changedFiles = args[i + 1].split(',').map((f) => f.trim()).filter(Boolean);
+      i++;
     }
   }
 
-  const result = validatePullRequest({ title, body, commits: [] });
+  const result = validatePullRequest({ title, body, commits: [], changedFiles });
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.valid ? 0 : 1);
 }
