@@ -26,7 +26,7 @@ Bắt buộc xác nhận toàn bộ các cam kết dưới đây:
 - [ ] Tuân thủ token màu tại `docs/DESIGN_TOKENS.md` (không dùng mã hex thô không khai báo)
 - [ ] Không chứa biểu tượng cảm xúc (emoji) trong commit message và nội dung trao đổi
 - [ ] Không chứa ký tự gạch ngang dài (em-dash) trong commit message và nội dung
-- [ ] Không can thiệp trái phép vào hạ tầng kiểm soát (không sửa đổi .github/workflows/, scripts/pr-gate-*, scripts/audit-doc-*, tests/pr-gate-*)
+- [ ] Không can thiệp trái phép vào hạ tầng kiểm soát (không sửa đổi .github/workflows/, scripts/pr-gate-_, scripts/audit-doc-_, tests/pr-gate-*)
 
 ## 4. Danh sách ca kiểm thử (Test Cases)
 
@@ -45,4 +45,3 @@ Bắt buộc đính kèm ít nhất 1 hình ảnh hoặc video minh chứng nế
 
 <!-- Dán ảnh chụp màn hình hoặc liên kết video (Loom, YouTube, Drive, MP4) tại đây -->
 <!-- Nếu PR chỉ sửa Backend hoặc Logic không có giao diện hiển thị, ghi rõ: N/A - Không có thay đổi giao diện -->
-

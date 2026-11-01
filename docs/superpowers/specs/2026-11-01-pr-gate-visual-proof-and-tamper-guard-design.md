@@ -9,11 +9,14 @@
 ## 1. Mục tiêu và Bối cảnh (Intent & Why)
 
 ### 1.1. Bối cảnh
+
 Quản lý dự án (PM) và các Reviewer phải xử lý số lượng lớn Pull Request (PR) từ các cộng tác viên. Hiện tại:
+
 - Khi một PR thay đổi giao diện (`apps/web`), reviewer phải mất nhiều thời gian kiểm tra hoặc khởi chạy môi trường cục bộ để xem giao diện có bị vỡ, lệch layout hay không.
 - Có nguy cơ cộng tác viên cố tình sửa đổi kịch bản kiểm tra gate (`scripts/pr-gate-check.mjs`), sửa đổi bộ unit test của gate (`tests/pr-gate-check.test.mjs`), hạ thấp ngưỡng kiểm tra trong GitHub workflow hoặc tự ý sửa đổi tài liệu kiến trúc cốt lõi (`docs/`) nhằm qua mặt quy trình kiểm duyệt chất lượng.
 
 ### 1.2. Mục tiêu cốt lõi
+
 1. **Giảm tải cho Quản lý dự án (Reduce PM Workload):** Tự động bắt buộc đính kèm minh chứng hình ảnh hoặc video khi PR có thay đổi giao diện người dùng hiển thị trực quan.
 2. **Bảo vệ hạ tầng kiểm soát (Anti-Tampering Protection):** Ngăn chặn 100% các PR từ người đóng góp thông thường tự ý sửa đổi kịch bản kiểm tra gate, workflow CI/CD và bộ unit test kiểm định của gate.
 3. **Bảo vệ tài liệu kiến trúc (Doc Guard):** Đảm bảo việc sửa đổi tài liệu kiến trúc phải được khai báo đúng loại PR và không làm sai lệch hợp đồng API / ERD.
@@ -37,10 +40,12 @@ Quản lý dự án (PM) và các Reviewer phải xử lý số lượng lớn P
 ## 3. Quy chuẩn kỹ thuật chi tiết (Detailed Specifications)
 
 ### 3.1. Cập nhật biểu mẫu Pull Request Template (`.github/pull_request_template.md`)
+
 Bổ sung thêm 2 mục bắt buộc:
+
 1. **Cam kết không can thiệp hạ tầng kiểm soát (Anti-Tampering Commitment):**
    ```markdown
-   - [ ] Không can thiệp trái phép vào hạ tầng kiểm soát (không sửa đổi .github/workflows/, scripts/pr-gate-*, scripts/audit-doc-*, tests/pr-gate-*)
+   - [ ] Không can thiệp trái phép vào hạ tầng kiểm soát (không sửa đổi .github/workflows/, scripts/pr-gate-_, scripts/audit-doc-_, tests/pr-gate-*)
    ```
 2. **Mục Minh chứng trực quan (Visual Evidence):**
    ```markdown
@@ -54,6 +59,7 @@ Bổ sung thêm 2 mục bắt buộc:
    ```
 
 ### 3.2. Cập nhật Kịch bản Kiểm tra Gate (`scripts/pr-gate-check.mjs`)
+
 Hàm `validatePullRequest` nhận thêm tham số `changedFiles: string[]`:
 
 1. **Quy tắc Anti-Tampering (Chống sửa lén kịch bản):**
@@ -86,6 +92,7 @@ Hàm `validatePullRequest` nhận thêm tham số `changedFiles: string[]`:
    - Kiểm tra ô checkbox cam kết không can thiệp hạ tầng kiểm soát phải được tích chọn `[x]`.
 
 ### 3.3. Tích hợp trong GitHub Actions (`.github/workflows/pr-gate.yml`)
+
 - Lấy danh sách `changedFiles` thông qua GitHub API (`github.rest.pulls.listFiles`).
 - Truyền danh sách tệp vào hàm `validatePullRequest({ title, body, commits, changedFiles, docParity })`.
 - Tự động quản lý nhãn `needs-visual-proof` và `security-violation` khi phát hiện vi phạm.
