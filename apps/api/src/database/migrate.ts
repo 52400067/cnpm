@@ -4,7 +4,10 @@ import { db, sqlClient } from "./db";
 
 async function runMigrations() {
   console.log("Running database migrations...");
-  const migrationsFolder = path.resolve(import.meta.dirname, "../../drizzle");
+  const migrationsFolder =
+    typeof import.meta !== "undefined" && import.meta.dirname
+      ? path.resolve(import.meta.dirname, "../../drizzle")
+      : path.resolve(process.cwd(), "drizzle");
   await migrate(db, { migrationsFolder });
   console.log("Database migrations completed successfully.");
   await sqlClient.end();
