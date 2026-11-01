@@ -66,8 +66,12 @@ export function parseControllerEndpoints(content) {
       const method = mMatch[1].toUpperCase();
       const subPath = (mMatch[2] || '').trim();
 
-      let fullPath = '/api/v1';
-      if (prefix) fullPath += `/${prefix}`;
+      let fullPath = '';
+      if (prefix.startsWith('/api/v1') || prefix.startsWith('api/v1')) {
+        fullPath = prefix.startsWith('/') ? prefix : `/${prefix}`;
+      } else {
+        fullPath = `/api/v1/${prefix}`;
+      }
       if (subPath) fullPath += `/${subPath}`;
 
       // Normalize path slashes: /api/v1/auth//me -> /api/v1/auth/me
@@ -94,18 +98,26 @@ export function parseErdDoc(content) {
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    const tableHeaderMatch = line.match(/^###.*?(?:Bảng|bang)\s+[`']?([a-zA-Z0-9_]+)[`']?(.*)/i);
+    // Khop `### users`, `### Bang users`, va `### gates va event_staff`
+    // Phai ket thuc boi het dong hoac mo ngoac vuong [PLANNED] hoac dau hai cham, de khong khop nham tieu de tieng Viet nhu `### Giu cho`
+    const tableHeaderMatch = line.match(/^###\s*(?:(?:Bảng|bang)\s+)?([a-zA-Z0-9_]+(?:\s+và\s+[a-zA-Z0-9_]+)?)\s*($|\[|:|\()/i);
     if (tableHeaderMatch) {
-      const tableName = tableHeaderMatch[1].toLowerCase();
+      const headerNames = tableHeaderMatch[1].toLowerCase().split(/\s+và\s+/);
       const restOfHeader = tableHeaderMatch[2];
       isPlanned = /\[PLANNED\]|\[Dự kiến\]|\[DỰ KIẾN\]/i.test(restOfHeader) || /\[PLANNED\]|\[Dự kiến\]|\[DỰ KIẾN\]/i.test(line);
 
-      currentTable = {
-        name: tableName,
-        isPlanned,
-        columns: [],
-      };
-      tables.set(tableName, currentTable);
+      for (const tName of headerNames) {
+        const cleanedName = tName.trim();
+        // Chi nhan ten bang la identifier hop le (chu thuong, so, gach duoi)
+        if (!/^[a-z0-9_]+$/.test(cleanedName)) continue;
+
+        currentTable = {
+          name: cleanedName,
+          isPlanned,
+          columns: [],
+        };
+        tables.set(cleanedName, currentTable);
+      }
       inColumnsTable = false;
       continue;
     }
