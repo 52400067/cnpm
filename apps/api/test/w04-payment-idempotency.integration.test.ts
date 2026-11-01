@@ -209,13 +209,16 @@ test("W04 - Payment Idempotency + QueryDR inspection", async () => {
     assert.equal(paidDecision, "ALREADY_PAID");
 
     // ===== Trường hợp D: đơn PENDING nhưng đã hết hạn =====
+
+    // ===== Truong hop D: thanh toan den muon, order EXPIRED =====
     await db
       .update(orders)
       .set({
-        status: OrderStatus.PENDING,
+        status: OrderStatus.EXPIRED,
         expiresAt: new Date(Date.now() - 60 * 1000),
       })
       .where(eq(orders.id, order.id));
+
     await db
       .update(transactions)
       .set({ status: TransactionStatus.PENDING })
@@ -225,7 +228,8 @@ test("W04 - Payment Idempotency + QueryDR inspection", async () => {
       transaction.transactionRef,
       validResponse,
     );
-    assert.equal(expiredDecision, "MANUAL_REVIEW");
+
+    assert.equal(expiredDecision, "PAYMENT_CONFIRMED_NEEDS_APPLY");
   } finally {
     createUrlMock.mock.restore();
 
