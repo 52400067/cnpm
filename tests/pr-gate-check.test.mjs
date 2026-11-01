@@ -32,6 +32,7 @@ describe('validatePullRequest', () => {
       commits: [
         { message: 'feat(api): them middleware phan quyen' },
         { message: 'test(api): bo sung unit test cho auth guard' },
+        { message: 'revert(web): khoi phuc trang my-tickets' },
       ],
     });
 

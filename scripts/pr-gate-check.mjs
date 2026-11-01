@@ -7,7 +7,7 @@
 
 const EMOJI_REGEX = /\p{Extended_Pictographic}/u;
 const EM_DASH_REGEX = /[\u2013\u2014]/;
-const CONVENTIONAL_COMMIT_REGEX = /^(feat|fix|docs|refactor|test|chore)(\([a-zA-Z0-9_.\-/]+\))?:\s.+/;
+const CONVENTIONAL_COMMIT_REGEX = /^(feat|fix|docs|refactor|test|chore|revert)(\([a-zA-Z0-9_.\-/]+\))?:\s.+/;
 
 const REQUIRED_PREFLIGHT_PATTERNS = [
   {
