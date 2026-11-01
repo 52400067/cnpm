@@ -97,19 +97,19 @@ jobs:
 
               // 3. Dang comment huong dan sua loi
               const commentLines = [
-                '### Thong bao kiem soat Pull Request (PR Strict Gate)',
+                '### Thông báo kiểm soát Pull Request (PR Strict Gate)',
                 '',
-                'Pull Request nay chua vuot qua cong kiem soat so loai vi cac ly do sau:',
+                'Pull Request này chưa vượt qua cổng kiểm soát sơ loại vì các lý do sau:',
                 '',
                 ...result.errors.map((err) => `- ${err}`),
                 '',
                 '---',
-                '**Huong dan khac phuc:**',
-                '1. Chinh sua mo ta PR va tich du toan bo cac muc bat buoc trong checklist.',
-                '2. Neu commit sai quy chuan hoac chua emoji/em-dash, vui long reword va `git push --force`.',
-                '3. Khi da hoan tat, PR se tu dong duoc kiem tra lai va mo lai neu dat chuan.',
+                '**Hướng dẫn khắc phục:**',
+                '1. Chỉnh sửa mô tả PR và tích đủ toàn bộ các mục bắt buộc trong checklist.',
+                '2. Nếu commit sai quy chuẩn hoặc chứa emoji/em-dash, vui lòng reword và `git push --force`.',
+                '3. Khi đã hoàn tất, PR sẽ tự động được kiểm tra lại và mở lại nếu đạt chuẩn.',
                 '',
-                '> Pull Request da duoc tam thoi dong tu dong de bao ve tai nguyen CI.',
+                '> Pull Request đã được tạm thời đóng tự động để bảo vệ tài nguyên CI.',
               ];
 
               await github.rest.issues.createComment({
@@ -129,7 +129,7 @@ jobs:
                 });
               }
 
-              core.setFailed('PR Gate Check khong dat yeu cau: ' + result.errors.join('; '));
+              core.setFailed('PR Gate Check không đạt yêu cầu: ' + result.errors.join('; '));
             } else {
               console.log('PR Strict Gate passed successfully.');
 
@@ -160,7 +160,7 @@ jobs:
                   owner,
                   repo,
                   issue_number: pr.number,
-                  body: '### Thong bao PR Strict Gate: Pull Request da duoc kiem tra lai va hop le. He thong da tu dong mo lai PR de tiep tuc quy trinh CI.',
+                  body: '### Thông báo PR Strict Gate: Pull Request đã được kiểm tra lại và hợp lệ. Hệ thống đã tự động mở lại PR để tiếp tục quy trình CI.',
                 });
               }
             }

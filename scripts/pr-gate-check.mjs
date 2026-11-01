@@ -2,7 +2,7 @@
 
 /**
  * PR Gate Validation Engine
- * Kiem tra tinh hop le cua PR checklist, tieu de va commit message tren TicketHub repository.
+ * Kiểm tra tính hợp lệ của PR checklist, tiêu đề và commit message trên TicketHub repository.
  */
 
 const EMOJI_REGEX = /\p{Extended_Pictographic}/u;
@@ -10,18 +10,45 @@ const EM_DASH_REGEX = /[\u2013\u2014]/;
 const CONVENTIONAL_COMMIT_REGEX = /^(feat|fix|docs|refactor|test|chore)(\([a-zA-Z0-9_.\-/]+\))?:\s.+/;
 
 const REQUIRED_PREFLIGHT_PATTERNS = [
-  { name: 'pnpm typecheck', regex: /-\s*\[([ xX])\]\s*Da chay `pnpm typecheck`/ },
-  { name: 'pnpm lint', regex: /-\s*\[([ xX])\]\s*Da chay `pnpm lint`/ },
-  { name: 'pnpm format:check', regex: /-\s*\[([ xX])\]\s*Da chay `pnpm format:check`/ },
-  { name: 'pnpm test', regex: /-\s*\[([ xX])\]\s*Da chay `pnpm test`/ },
+  {
+    name: 'pnpm typecheck',
+    regex: /-\s*\[([ xX])\]\s*.*`pnpm typecheck`/,
+  },
+  {
+    name: 'pnpm lint',
+    regex: /-\s*\[([ xX])\]\s*.*`pnpm lint`/,
+  },
+  {
+    name: 'pnpm format:check',
+    regex: /-\s*\[([ xX])\]\s*.*`pnpm format:check`/,
+  },
+  {
+    name: 'pnpm test',
+    regex: /-\s*\[([ xX])\]\s*.*`pnpm test`/,
+  },
 ];
 
 const REQUIRED_QUALITY_PATTERNS = [
-  { name: 'Khong chua ma gia lap o client', regex: /-\s*\[([ xX])\]\s*Khong chua ma gia lap o client/ },
-  { name: 'Khong su dung kieu any', regex: /-\s*\[([ xX])\]\s*Khong su dung kieu `?any`?/ },
-  { name: 'Tuan thu token mau tai docs/DESIGN_TOKENS.md', regex: /-\s*\[([ xX])\]\s*Tuan thu token mau/ },
-  { name: 'Khong chua bieu tuong cam xuc (emoji)', regex: /-\s*\[([ xX])\]\s*Khong chua bieu tuong cam xuc \(emoji\)/ },
-  { name: 'Khong chua ky tu gach ngang dai (em-dash)', regex: /-\s*\[([ xX])\]\s*Khong chua ky tu gach ngang dai \(em-dash\)/ },
+  {
+    name: 'Không chứa mã giả lập ở client',
+    regex: /-\s*\[([ xX])\]\s*.*(?:chứa|chua)\s+(?:mã|ma)\s+(?:giả|gia)\s+(?:lập|lap)\s+.*client/i,
+  },
+  {
+    name: 'Không sử dụng kiểu any',
+    regex: /-\s*\[([ xX])\]\s*.*(?:sử|su)\s+(?:dụng|dung)\s+(?:kiểu|kieu)\s+`?any`?/i,
+  },
+  {
+    name: 'Tuân thủ token màu tại docs/DESIGN_TOKENS.md',
+    regex: /-\s*\[([ xX])\]\s*.*token\s+(?:màu|mau)/i,
+  },
+  {
+    name: 'Không chứa biểu tượng cảm xúc (emoji)',
+    regex: /-\s*\[([ xX])\]\s*.*(?:biểu|bieu)\s+(?:tượng|tuong)\s+(?:cảm|cam)\s+(?:xúc|xuc)\s*\(emoji\)/i,
+  },
+  {
+    name: 'Không chứa ký tự gạch ngang dài (em-dash)',
+    regex: /-\s*\[([ xX])\]\s*.*(?:gạch|gach)\s+(?:ngang|ngang)\s+(?:dài|dai)\s*\(em-dash\)/i,
+  },
 ];
 
 const PR_TYPE_PATTERN = /-\s*\[([xX])\]\s*`(feat|fix|docs|refactor|chore)`/;
@@ -36,52 +63,52 @@ export function validatePullRequest({ title = '', body = '', commits = [] }) {
 
   const normalizedBody = body || '';
 
-  // 1. Kiem tra loai PR
+  // 1. Kiểm tra loại PR
   if (!PR_TYPE_PATTERN.test(normalizedBody)) {
-    errors.push('Loai thay doi (PR Type) chua duoc chon. Vui long tich it nhat mot loai (feat, fix, docs, refactor, chore).');
+    errors.push('Loại thay đổi (PR Type) chưa được chọn. Vui lòng tích ít nhất một loại (feat, fix, docs, refactor, chore).');
     checklistHasErrors = true;
   }
 
-  // 2. Kiem tra Pre-flight checks
+  // 2. Kiểm tra Pre-flight checks
   for (const item of REQUIRED_PREFLIGHT_PATTERNS) {
     const match = normalizedBody.match(item.regex);
     if (!match) {
-      errors.push(`Muc kiem tra bat buoc bi thieu: "${item.name}".`);
+      errors.push(`Mục kiểm tra bắt buộc bị thiếu: "${item.name}".`);
       checklistHasErrors = true;
     } else if (match[1].toLowerCase() !== 'x') {
-      errors.push(`Muc kiem tra bat buoc chua duoc tich: "${item.name}".`);
+      errors.push(`Mục kiểm tra bắt buộc chưa được tích: "${item.name}".`);
       checklistHasErrors = true;
     }
   }
 
-  // 3. Kiem tra Cam ket chat luong ma nguon
+  // 3. Kiểm tra Cam kết chất lượng mã nguồn
   for (const item of REQUIRED_QUALITY_PATTERNS) {
     const match = normalizedBody.match(item.regex);
     if (!match) {
-      errors.push(`Cam ket bat buoc bi thieu: "${item.name}".`);
+      errors.push(`Cam kết bắt buộc bị thiếu: "${item.name}".`);
       checklistHasErrors = true;
     } else if (match[1].toLowerCase() !== 'x') {
-      errors.push(`Cam ket bat buoc chua duoc xac nhan: "${item.name}".`);
+      errors.push(`Cam kết bắt buộc chưa được xác nhận: "${item.name}".`);
       checklistHasErrors = true;
     }
   }
 
-  // 4. Kiem tra Tieu de PR
+  // 4. Kiểm tra Tiêu đề PR
   const trimmedTitle = title.trim();
   if (EMOJI_REGEX.test(trimmedTitle)) {
-    errors.push('Tieu de PR chua bieu tuong cam xuc (emoji). Vui long go bo emoji theo CONTRIBUTING.md.');
+    errors.push('Tiêu đề PR chứa biểu tượng cảm xúc (emoji). Vui lòng gỡ bỏ emoji theo CONTRIBUTING.md.');
     commitHasErrors = true;
   }
   if (EM_DASH_REGEX.test(trimmedTitle)) {
-    errors.push('Tieu de PR chua ky tu gach ngang dai (em-dash). Vui long thay the bang dau hai cham, dau gach noi hoac dau ngoac don.');
+    errors.push('Tiêu đề PR chứa ký tự gạch ngang dài (em-dash). Vui lòng thay thế bằng dấu hai chấm, dấu gạch nối hoặc dấu ngoặc đơn.');
     commitHasErrors = true;
   }
   if (!CONVENTIONAL_COMMIT_REGEX.test(trimmedTitle)) {
-    errors.push('Tieu de PR khong dung quy chuan Conventional Commits. Cu phap hop le: <type>(<scope>): <mo ta ngan gon>');
+    errors.push('Tiêu đề PR không đúng quy chuẩn Conventional Commits. Cú pháp hợp lệ: <type>(<scope>): <mô tả ngắn gọn>');
     commitHasErrors = true;
   }
 
-  // 5. Kiem tra Commit messages
+  // 5. Kiểm tra Commit messages
   const commitList = Array.isArray(commits) ? commits : [];
   for (const commitItem of commitList) {
     const message = (typeof commitItem === 'string' ? commitItem : commitItem.message || '').trim();
@@ -89,26 +116,26 @@ export function validatePullRequest({ title = '', body = '', commits = [] }) {
 
     const firstLine = message.split('\n')[0].trim();
 
-    // Cho phep commit merge tieu chuan
+    // Cho phép commit merge tiêu chuẩn
     if (/^Merge (branch|remote-tracking branch|pull request)/.test(firstLine)) {
       continue;
     }
 
     if (EMOJI_REGEX.test(message)) {
-      errors.push(`Commit "${firstLine}" chua bieu tuong cam xuc (emoji). Vui long reword va go bo emoji.`);
+      errors.push(`Commit "${firstLine}" chứa biểu tượng cảm xúc (emoji). Vui lòng reword và gỡ bỏ emoji.`);
       commitHasErrors = true;
     }
     if (EM_DASH_REGEX.test(message)) {
-      errors.push(`Commit "${firstLine}" chua ky tu gach ngang dai (em-dash). Vui long thay the bang dau gach noi hoac dau hai cham.`);
+      errors.push(`Commit "${firstLine}" chứa ký tự gạch ngang dài (em-dash). Vui lòng thay thế bằng dấu gạch nối hoặc dấu hai chấm.`);
       commitHasErrors = true;
     }
     if (!CONVENTIONAL_COMMIT_REGEX.test(firstLine)) {
-      errors.push(`Commit "${firstLine}" khong tuan thu Conventional Commits. Cu phap hop le: <type>(<scope>): <mo ta>`);
+      errors.push(`Commit "${firstLine}" không tuân thủ Conventional Commits. Cú pháp hợp lệ: <type>(<scope>): <mô tả>`);
       commitHasErrors = true;
     }
   }
 
-  // Xu ly nhan (labels)
+  // Xử lý nhãn (labels)
   if (checklistHasErrors) {
     labelsToAdd.push('needs-checklist');
   } else {
@@ -129,7 +156,7 @@ export function validatePullRequest({ title = '', body = '', commits = [] }) {
   };
 }
 
-// Chay truc tiep qua CLI neu duoc goi tu dong lenh
+// Chạy trực tiếp qua CLI nếu được gọi từ dòng lệnh
 if (process.argv[1] && process.argv[1].endsWith('pr-gate-check.mjs')) {
   const args = process.argv.slice(2);
   let title = '';

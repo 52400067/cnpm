@@ -1,39 +1,39 @@
-## 1. Loai thay doi (PR Type)
+## 1. Loại thay đổi (PR Type)
 
-Danh dau vao loai thay doi tuong ung:
+Đánh dấu vào loại thay đổi tương ứng:
 
-- [ ] `feat`: Tinh nang moi
-- [ ] `fix`: Sua loi he thong
-- [ ] `docs`: Cap nhat tai lieu
-- [ ] `refactor`: Tai cau truc ma nguon (khong thay doi hanh vi)
-- [ ] `chore`: Cau hinh cong cu, nang cap thu vien, tac vu bao tri
+- [ ] `feat`: Tính năng mới
+- [ ] `fix`: Sửa lỗi hệ thống
+- [ ] `docs`: Cập nhật tài liệu
+- [ ] `refactor`: Tái cấu trúc mã nguồn (không thay đổi hành vi)
+- [ ] `chore`: Cấu hình công cụ, nâng cấp thư viện, tác vụ bảo trì
 
-## 2. Kiem tra ky thuat truoc khi gui (Pre-flight Checks)
+## 2. Kiểm tra kỹ thuật trước khi gửi (Pre-flight Checks)
 
-Bat buoc thuc thi va tich chon toan bo cac buoc sau tai moi truong cuc bo:
+Bắt buộc thực thi và tích chọn toàn bộ các bước sau tại môi trường cục bộ:
 
-- [ ] Da chay `pnpm typecheck` va khong co loi TypeScript
-- [ ] Da chay `pnpm lint` va khong co loi vi pham quy tac lint
-- [ ] Da chay `pnpm format:check` va ma nguon da duoc dinh dang nhat quan
-- [ ] Da chay `pnpm test` va tat ca cac bai kiem thu deu vuot qua (PASS)
+- [ ] Đã chạy `pnpm typecheck` và không có lỗi TypeScript
+- [ ] Đã chạy `pnpm lint` và không có lỗi vi phạm quy tắc lint
+- [ ] Đã chạy `pnpm format:check` và mã nguồn đã được định dạng nhất quán
+- [ ] Đã chạy `pnpm test` và tất cả các bài kiểm thử đều vượt qua (PASS)
 
-## 3. Cam ket chat luong ma nguon (Code Quality Guarantees)
+## 3. Cam kết chất lượng mã nguồn (Code Quality Guarantees)
 
-Bat buoc xac nhan toan bo cac cam ket duoi day:
+Bắt buộc xác nhận toàn bộ các cam kết dưới đây:
 
-- [ ] Khong chua ma gia lap o client (khong dung localStorage hoac mock de thay the API backend)
-- [ ] Khong su dung kieu `any` (dung schema Zod hoac kieu `unknown` co kiem tra kieu)
-- [ ] Tuan thu token mau tai `docs/DESIGN_TOKENS.md` (khong dung ma hex tho khong khai bao)
-- [ ] Khong chua bieu tuong cam xuc (emoji) trong commit message va noi dung trao doi
-- [ ] Khong chua ky tu gach ngang dai (em-dash) trong commit message va noi dung
+- [ ] Không chứa mã giả lập ở client (không dùng localStorage hoặc mock để thay thế API backend)
+- [ ] Không sử dụng kiểu `any` (dùng schema Zod hoặc kiểu `unknown` có kiểm tra kiểu)
+- [ ] Tuân thủ token màu tại `docs/DESIGN_TOKENS.md` (không dùng mã hex thô không khai báo)
+- [ ] Không chứa biểu tượng cảm xúc (emoji) trong commit message và nội dung trao đổi
+- [ ] Không chứa ký tự gạch ngang dài (em-dash) trong commit message và nội dung
 
-## 4. Danh sach ca kiem thu (Test Cases)
+## 4. Danh sách ca kiểm thử (Test Cases)
 
-Mieu ta cac ca kiem thu da thuc hien de chung minh tinh dung dan cua thay doi:
+Miêu tả các ca kiểm thử đã thực hiện để chứng minh tính đúng đắn của thay đổi:
 
-- Ca kiem thu 1: [Mo ta ca kiem thu va ket qua]
-- Ca kiem thu 2: [Mo ta ca kiem thu va ket qua]
+- Ca kiểm thử 1: [Mô tả ca kiểm thử và kết quả]
+- Ca kiểm thử 2: [Mô tả ca kiểm thử và kết quả]
 
-## 5. Ghi chu bo sung (Additional Notes)
+## 5. Ghi chú bổ sung (Additional Notes)
 
-[Neu co bat ky luu y kien truc nao, hay ghi tai day]
+[Nếu có bất kỳ lưu ý kiến trúc nào, hãy ghi tại đây]
