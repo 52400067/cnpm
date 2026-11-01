@@ -55,7 +55,11 @@ async function main() {
     .where(
       and(
         eq(outbox.status, OutboxStatus.PROCESSING),
-        inArray(outbox.eventType, ["USER_REGISTERED", "ORDER_PAID", ...REVIEW_EVENT_TYPES]),
+        inArray(outbox.eventType, [
+          "USER_REGISTERED",
+          "ORDER_PAID",
+          ...REVIEW_EVENT_TYPES,
+        ]),
         lte(outbox.updatedAt, cutoff),
         targetId ? eq(outbox.id, targetId) : undefined,
       ),

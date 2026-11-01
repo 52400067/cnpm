@@ -1,8 +1,8 @@
-export const MAX_REFUND_ATTEMPTS = 3; 
-export const MAX_RECONCILE_ATTEMPTS = 5; 
+export const MAX_REFUND_ATTEMPTS = 3;
+export const MAX_RECONCILE_ATTEMPTS = 5;
 
-const BASE_DELAY_MS = 5 * 60 * 1000; 
-const MAX_DELAY_MS = 60 * 60 * 1000; 
+const BASE_DELAY_MS = 5 * 60 * 1000;
+const MAX_DELAY_MS = 60 * 60 * 1000;
 
 export function computeRetryDelayMs(
   attemptsMade: number,
@@ -19,10 +19,7 @@ export function computeRetryDelayMs(
   return Math.round(exponential * jitter);
 }
 
-export type ProviderOutcome =
-  | "SUCCESS"
-  | "DEFINITIVE_FAILURE" 
-  | "UNKNOWN"; 
+export type ProviderOutcome = "SUCCESS" | "DEFINITIVE_FAILURE" | "UNKNOWN";
 
 export const DEFINITIVE_FAILURE_CODES = new Set<string>([]);
 
@@ -46,10 +43,7 @@ export function classifyRefundResponse(response: {
 }
 
 export type RefundNextStep =
-  | "FINALIZE"
-  | "SCHEDULE_RETRY"
-  | "MARK_FAILED"
-  | "RECONCILE";
+  "FINALIZE" | "SCHEDULE_RETRY" | "MARK_FAILED" | "RECONCILE";
 
 export function decideRefundNextStep(
   outcome: ProviderOutcome,
@@ -64,11 +58,7 @@ export function decideRefundNextStep(
 // Ket qua doi soat: truy van VNPay xem refund da xay ra chua.
 export type ReconcileQueryResult = "REFUNDED" | "NOT_REFUNDED" | "UNKNOWN";
 export type ReconcileAction =
-  | "FINALIZE" 
-  | "SCHEDULE_RETRY" 
-  | "MARK_FAILED" 
-  | "KEEP_WAITING" 
-  | "ESCALATE"; 
+  "FINALIZE" | "SCHEDULE_RETRY" | "MARK_FAILED" | "KEEP_WAITING" | "ESCALATE";
 
 export function decideReconcile(
   result: ReconcileQueryResult,

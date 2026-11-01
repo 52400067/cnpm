@@ -228,7 +228,8 @@ export class PaymentSettlementService {
         // EXPIRED đã được Booking Cleanup trả tồn kho. Không trừ heldCount
         // hay giải phóng ghế lần thứ hai khi QueryDR xác nhận thất bại.
         const releaseInventory =
-          (initial === "RECORD_FAILURE" && order.status === OrderStatus.PENDING) ||
+          (initial === "RECORD_FAILURE" &&
+            order.status === OrderStatus.PENDING) ||
           (lateRefund && order.status === OrderStatus.PENDING);
 
         if (sellInventory || releaseInventory) {
@@ -477,7 +478,8 @@ export class PaymentSettlementService {
       .sort();
 
     const expectedSeatTypeById = new Map(
-      items.filter((item) => item.seatId !== null)
+      items
+        .filter((item) => item.seatId !== null)
         .map((item) => [item.seatId!, item.ticketTypeId]),
     );
 

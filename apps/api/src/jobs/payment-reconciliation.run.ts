@@ -38,12 +38,14 @@ const args = new Set(process.argv.slice(2));
 const live = args.has("--live");
 const once = args.has("--once") || !args.has("--loop");
 const BATCH_SIZE = 20;
-const targetRefArg = process.argv.slice(2).find(x => x.startsWith("--ref="));
+const targetRefArg = process.argv.slice(2).find((x) => x.startsWith("--ref="));
 const targetRef = targetRefArg ? targetRefArg.slice("--ref=".length) : null;
 
 function guard() {
   if (targetRef !== null && !/^BE2[0-9A-F]{24}$/.test(targetRef)) {
-    throw new Error("--ref must be a real BE2 VNPay reference (not IPNTEST/EMAILTEST)");
+    throw new Error(
+      "--ref must be a real BE2 VNPay reference (not IPNTEST/EMAILTEST)",
+    );
   }
   const databaseUrl = new URL(env.DATABASE_URL);
   const redisUrl = new URL(env.REDIS_URL);

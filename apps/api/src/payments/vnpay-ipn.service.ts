@@ -22,8 +22,6 @@ export class VnpayIpnService {
     // 1. Xác minh chữ ký và merchant VNPay
     const verified = this.gateway.verifyCallback(params);
 
-    
-    
     if (!verified.verified || !verified.transactionRef) {
       return "INVALID_SIGNATURE";
     }
@@ -53,5 +51,4 @@ export class VnpayIpnService {
 
     return this.settlementService.settle(evidence);
   }
-  
 }
