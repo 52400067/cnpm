@@ -4,8 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Plus, Minus, Maximize2 } from "lucide-react";
 import { VENUE_SVG, type VenueMapKey } from "@/lib/venue-svg.generated";
 import { formatVnd } from "@/lib/events-catalog";
-import { SeatMinimap } from "@/components/events/seat-minimap";
-import { clampPanToMap, shouldShowMinimap } from "@/components/events/seat-map.utils";
+import { clampPanToMap } from "@/components/events/seat-map.utils";
 
 export interface SeatMapProps {
   mapKey: VenueMapKey;
@@ -362,30 +361,6 @@ function SeatMapView({
             dangerouslySetInnerHTML={{ __html: mapData.markup }}
           />
         </div>
-
-        {/* Interactive Minimap: shown only for large venues or when zoomed in */}
-        {shouldShowMinimap(mapKey, zoom) && (
-          <div
-            className="absolute bottom-4 right-4 z-20 hidden sm:block"
-            onMouseDown={(e) => e.stopPropagation()}
-            onMouseMove={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <SeatMinimap
-              viewBox={mapData.viewBox}
-              markup={mapData.markup}
-              zoom={zoom}
-              pan={visiblePan}
-              containerWidth={viewportSize.canvasWidth}
-              containerHeight={viewportSize.canvasHeight}
-              svgWidth={viewportSize.svgWidth}
-              svgHeight={viewportSize.svgHeight}
-              onNavigate={(newPan) => setPan(newPan)}
-            />
-          </div>
-        )}
 
         {/* Dynamic SVG Styles for Zone Highlights */}
         <style

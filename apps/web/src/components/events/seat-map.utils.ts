@@ -9,27 +9,6 @@ export interface MapRect {
   height: number;
 }
 
-export interface MinimapViewportParams {
-  zoom: number;
-  pan: { x: number; y: number };
-  minimapWidth: number;
-  minimapHeight: number;
-  containerWidth: number;
-  containerHeight: number;
-  svgWidth: number;
-  svgHeight: number;
-  viewBox: string;
-}
-
-export interface MinimapViewportResult {
-  scaleRatio: number;
-  rectWidth: number;
-  rectHeight: number;
-  rectX: number;
-  rectY: number;
-  mapBounds: MapRect;
-}
-
 export interface MapPanParams {
   pan: { x: number; y: number };
   zoom: number;
@@ -38,12 +17,6 @@ export interface MapPanParams {
   svgWidth: number;
   svgHeight: number;
   viewBox: string;
-}
-
-export interface MinimapClickParams extends Omit<MapPanParams, "pan"> {
-  clickX: number;
-  clickY: number;
-  mapBounds: MapRect;
 }
 
 /** Fit the SVG viewBox into a box using the browser's xMidYMid meet behavior. */
@@ -101,100 +74,6 @@ export function clampPanToMap({
   };
 }
 
-/** Calculate the visible canvas rectangle inside the minimap, including letterboxing. */
-export function calculateMinimapViewport({
-  zoom,
-  pan,
-  minimapWidth,
-  minimapHeight,
-  containerWidth,
-  containerHeight,
-  svgWidth,
-  svgHeight,
-  viewBox,
-}: MinimapViewportParams): MinimapViewportResult {
-  const safeZoom = Math.max(0.1, Number.isFinite(zoom) ? zoom : 1);
-  const mapBounds = fitMapRect(minimapWidth, minimapHeight, viewBox);
-  const canvasMap = fitMapRect(svgWidth, svgHeight, viewBox);
-  const visibleRatioX = canvasMap.width
-    ? Math.max(0, containerWidth / (canvasMap.width * safeZoom))
-    : 1;
-  const visibleRatioY = canvasMap.height
-    ? Math.max(0, containerHeight / (canvasMap.height * safeZoom))
-    : 1;
-  const rectWidth = Math.min(mapBounds.width, mapBounds.width * visibleRatioX);
-  const rectHeight = Math.min(
-    mapBounds.height,
-    mapBounds.height * visibleRatioY,
-  );
-  const panRatioX = canvasMap.width ? pan.x / (canvasMap.width * safeZoom) : 0;
-  const panRatioY = canvasMap.height
-    ? pan.y / (canvasMap.height * safeZoom)
-    : 0;
-
-  const rectX = Math.min(
-    mapBounds.x + mapBounds.width - rectWidth,
-    Math.max(
-      mapBounds.x,
-      mapBounds.x +
-        mapBounds.width / 2 -
-        rectWidth / 2 -
-        panRatioX * mapBounds.width,
-    ),
-  );
-  const rectY = Math.min(
-    mapBounds.y + mapBounds.height - rectHeight,
-    Math.max(
-      mapBounds.y,
-      mapBounds.y +
-        mapBounds.height / 2 -
-        rectHeight / 2 -
-        panRatioY * mapBounds.height,
-    ),
-  );
-
-  return {
-    scaleRatio: 1 / safeZoom,
-    rectWidth,
-    rectHeight,
-    rectX,
-    rectY,
-    mapBounds,
-  };
-}
-
-/** Translate a minimap click into a clamped canvas pan position. */
-export function minimapClickToPan({
-  clickX,
-  clickY,
-  mapBounds,
-  ...panParams
-}: MinimapClickParams): { x: number; y: number } {
-  if (!mapBounds.width || !mapBounds.height) return { x: 0, y: 0 };
-  const normalizedX = Math.min(
-    1,
-    Math.max(0, (clickX - mapBounds.x) / mapBounds.width),
-  );
-  const normalizedY = Math.min(
-    1,
-    Math.max(0, (clickY - mapBounds.y) / mapBounds.height),
-  );
-  const canvasMap = fitMapRect(
-    panParams.svgWidth,
-    panParams.svgHeight,
-    panParams.viewBox,
-  );
-  if (!canvasMap.width || !canvasMap.height) return { x: 0, y: 0 };
-
-  return clampPanToMap({
-    ...panParams,
-    pan: {
-      x: (0.5 - normalizedX) * canvasMap.width * panParams.zoom,
-      y: (0.5 - normalizedY) * canvasMap.height * panParams.zoom,
-    },
-  });
-}
-
 /** Parses SVG viewBox string "minX minY width height" into numeric components. */
 export function parseViewBox(viewBox: string): {
   minX: number;
@@ -235,19 +114,6 @@ export function isZoneAvailable(
 ): boolean {
   if (!zoneInfo) return false;
   return zoneInfo.count >= requiredQty;
-}
-
-/**
- * Decision helper for displaying minimap (W03-FE2).
- * Minimap is shown only for large venues (stadium scale) or when the user zooms in (zoom > 1.25).
- */
-export function shouldShowMinimap(
-  mapKey?: string | null,
-  zoom = 1,
-): boolean {
-  const isLargeVenue =
-    mapKey === "stadium-concert" || mapKey === "stadium-football";
-  return isLargeVenue || zoom > 1.25;
 }
 
 /**

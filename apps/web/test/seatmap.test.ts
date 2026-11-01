@@ -4,19 +4,16 @@ import { SeatStatus } from "@tickethub/shared";
 import { VENUE_SVG } from "../src/lib/venue-svg.generated.ts";
 import {
   clampPanToMap,
-  calculateMinimapViewport,
   fitMapRect,
-  minimapClickToPan,
   parseViewBox,
   isValidTicketQuantity,
   isZoneAvailable,
-  shouldShowMinimap,
   calculateOrderSubtotal,
   computeRemainingSeconds,
   getHoldErrorInfo,
 } from "../src/components/events/seat-map.utils.ts";
 
-describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
+describe("SeatMap: UC04 Architectural Map & Navigation", () => {
   test("SeatStatus enum tu shared package dung quy chuan", () => {
     assert.equal(SeatStatus.AVAILABLE, "AVAILABLE");
     assert.equal(SeatStatus.HELD, "HELD");
@@ -69,99 +66,6 @@ describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
       width: 120,
       height: 60,
     });
-  });
-
-  test("calculateMinimapViewport tinh viewport theo ti le SVG va pan", () => {
-    const common = {
-      minimapWidth: 120,
-      minimapHeight: 90,
-      containerWidth: 800,
-      containerHeight: 600,
-      svgWidth: 800,
-      svgHeight: 600,
-    };
-
-    const fullView = calculateMinimapViewport({
-      ...common,
-      viewBox: "0 0 4 3",
-      zoom: 1,
-      pan: { x: 0, y: 0 },
-    });
-    assert.equal(fullView.rectWidth, 120);
-    assert.equal(fullView.rectHeight, 90);
-    assert.equal(fullView.rectX, 0);
-    assert.equal(fullView.rectY, 0);
-
-    const zoomed = calculateMinimapViewport({
-      ...common,
-      viewBox: "0 0 4 3",
-      zoom: 2,
-      pan: { x: 0, y: 0 },
-    });
-    assert.equal(zoomed.scaleRatio, 0.5);
-    assert.equal(zoomed.rectWidth, 60);
-    assert.equal(zoomed.rectHeight, 45);
-    assert.equal(zoomed.rectX, 30);
-    assert.equal(zoomed.rectY, 22.5);
-
-    const portrait = calculateMinimapViewport({
-      ...common,
-      viewBox: "0 0 2 4",
-      zoom: 2,
-      pan: { x: 0, y: 0 },
-      svgWidth: 500,
-      svgHeight: 500,
-      containerWidth: 500,
-      containerHeight: 500,
-    });
-    assert.deepEqual(portrait.mapBounds, {
-      x: 37.5,
-      y: 0,
-      width: 45,
-      height: 90,
-    });
-    assert.equal(portrait.rectWidth, 45);
-    assert.equal(portrait.rectHeight, 45);
-    assert.equal(portrait.rectX, 37.5);
-    assert.equal(portrait.rectY, 22.5);
-  });
-
-  test("minimapClickToPan gioi han pan va quy doi theo vung SVG thuc", () => {
-    const params = {
-      mapBounds: { x: 0, y: 0, width: 120, height: 90 },
-      containerWidth: 400,
-      containerHeight: 300,
-      svgWidth: 800,
-      svgHeight: 600,
-      viewBox: "0 0 4 3",
-      zoom: 2,
-    };
-
-    const centerPan = minimapClickToPan({ clickX: 60, clickY: 45, ...params });
-    assert.deepEqual(centerPan, { x: 0, y: 0 });
-
-    const topLeftPan = minimapClickToPan({ clickX: 0, clickY: 0, ...params });
-    assert.deepEqual(topLeftPan, { x: 600, y: 450 });
-
-    const bottomRightPan = minimapClickToPan({
-      clickX: 120,
-      clickY: 90,
-      ...params,
-    });
-    assert.deepEqual(bottomRightPan, { x: -600, y: -450 });
-
-    const portraitMapClick = minimapClickToPan({
-      ...params,
-      clickX: 0,
-      clickY: 0,
-      mapBounds: { x: 37.5, y: 0, width: 45, height: 90 },
-      containerWidth: 500,
-      containerHeight: 500,
-      svgWidth: 500,
-      svgHeight: 500,
-      viewBox: "0 0 2 4",
-    });
-    assert.deepEqual(portraitMapClick, { x: 0, y: 250 });
   });
 
   test("clampPanToMap khong de lo khoang trong va khong pan khi xem toan canh", () => {
@@ -223,22 +127,6 @@ describe("SeatMap & Minimap: UC04 Architectural Map & Navigation", () => {
     assert.equal(isZoneAvailable({ count: 3 }, 4), false, "Zone chi con 3 ve khong du cho yeu cau 4 ve");
     assert.equal(isZoneAvailable({ count: 4 }, 4), true, "Zone du 4 ve cho yeu cau 4 ve");
     assert.equal(isZoneAvailable({ count: 10 }, 6), true, "Zone du 10 ve cho yeu cau 6 ve");
-  });
-
-  test("shouldShowMinimap chi hien thi voi san van dong quy mo lon hoac khi phong to (zoom > 1.25)", () => {
-    // Sân vận động lớn: luôn hiển thị minimap
-    assert.equal(shouldShowMinimap("stadium-concert", 1), true);
-    assert.equal(shouldShowMinimap("stadium-football", 1), true);
-
-    // Khán phòng/Nhà hát vừa & nhỏ: không hiển thị minimap ở tỉ lệ mặc định
-    assert.equal(shouldShowMinimap("theater-classic", 1), false);
-    assert.equal(shouldShowMinimap("arena-t-stage", 1), false);
-    assert.equal(shouldShowMinimap(null, 1), false);
-
-    // Khán phòng/Nhà hát vừa & nhỏ: tự động hiển thị minimap khi người dùng zoom sâu (> 1.25)
-    assert.equal(shouldShowMinimap("theater-classic", 1.2), false);
-    assert.equal(shouldShowMinimap("theater-classic", 1.3), true);
-    assert.equal(shouldShowMinimap("arena-t-stage", 2), true);
   });
 
   test("calculateOrderSubtotal tinh chinh xac tong tien tam tinh don hang", () => {
